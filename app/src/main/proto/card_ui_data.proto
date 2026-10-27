@@ -1,0 +1,2 @@
+syntax = "proto3"; package jarvis.card; option java_package = "com.jarvis.breeno.assistant.card"; option java_multiple_files = true;
+message CardUiData { string title = 1; string body = 2; repeated CardAction actions = 3; }

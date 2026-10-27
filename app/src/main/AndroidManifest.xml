@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.BIND_VOICE_INTERACTION"/>
+ <application android:name=".JarvisApp" android:label="Джарвис" android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+  <activity android:name=".ui.MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+  <activity android:name=".ui.setup.SetupAssistantActivity" android:exported="false"/>
+  <service android:name=".service.JarvisVoiceInteractionService" android:permission="android.permission.BIND_VOICE_INTERACTION" android:exported="true"><meta-data android:name="android.voice_interaction" android:resource="@xml/voice_interaction_service"/><intent-filter><action android:name="android.service.voice.VoiceInteractionService"/></intent-filter></service>
+  <service android:name=".service.JarvisAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config"/></service>
+  <service android:name=".service.JarvisRemoteService" android:exported="false"/><service android:name=".service.JarvisSessionService" android:exported="false"/>
+  <receiver android:name=".updater.RomUpdateReceiver" android:exported="false"/><receiver android:name=".service.BreenoIpcHookReceiver" android:exported="false"/>
+  <receiver android:name=".ui.widget.JarvisShelfWidgetProvider" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info"/></receiver>
+ </application>
+</manifest>

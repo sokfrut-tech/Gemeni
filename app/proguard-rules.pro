@@ -1,0 +1,2 @@
+-keep class com.jarvis.breeno.assistant.** { *; }
+-keep class com.microsoft.onnxruntime.** { *; }
