@@ -1,0 +1,26 @@
+{
+  "package_name": "com.heytap.speechassist",
+  "version_code": 130302,
+  "source": "Zafiro public compatibility configuration; reference only, not an Xposed implementation",
+  "capture_input": {
+    "owner_class": "com.heytap.speechassist.aichat.AIChatDataCenter",
+    "method": "s",
+    "parameter": "com.heytap.speechassist.aichat.bean.AIChatViewBean"
+  },
+  "conversation_reset": {
+    "owner_class": "com.heytap.speechassist.aichat.AIChatRoomIdManager",
+    "method": "p",
+    "parameters": ["java.lang.String", "java.lang.String"]
+  },
+  "render_card": {
+    "view_bean_class": "com.heytap.speechassist.aichat.bean.AIChatViewBean",
+    "insert_method": "s",
+    "update_method": "f1",
+    "set_content": "setContent",
+    "set_reasoning_content": "setReasoningContent",
+    "set_reasoning_state": "setReasoningState",
+    "set_final": "setFinal",
+    "set_first_slice": "setFirstSlice",
+    "add_client_local_data": "addClientLocalData"
+  }
+}
