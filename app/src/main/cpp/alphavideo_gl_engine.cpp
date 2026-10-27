@@ -1,6 +1,5 @@
 #include <jni.h>
 #include <GLES2/gl2.h>
-#include <cmath>
 
 static GLuint gProgram = 0;
 static GLint gTime = -1;
@@ -8,21 +7,21 @@ static GLint gResolution = -1;
 static GLint gListening = -1;
 static float gT = 0.0f;
 
-static GLuint compile(GLenum type, const char* src) {
-    GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, nullptr);
-    glCompileShader(s);
-    return s;
+static GLuint compileShader(GLenum type, const char* source) {
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
+    return shader;
 }
 
 static void ensureProgram() {
-    if (gProgram) return;
-    const char* vs = R"GLSL(
+    if (gProgram != 0) return;
+    const char* vertex = R"GLSL(
         attribute vec2 aPos;
         varying vec2 vUv;
         void main(){ vUv=aPos*0.5+0.5; gl_Position=vec4(aPos,0.0,1.0); }
     )GLSL";
-    const char* fs = R"GLSL(
+    const char* fragment = R"GLSL(
         precision mediump float;
         varying vec2 vUv;
         uniform float uTime;
@@ -44,9 +43,12 @@ static void ensureProgram() {
             gl_FragColor=vec4(col*edge, edge*(0.78+0.22*core));
         }
     )GLSL";
-    GLuint v=compile(GL_VERTEX_SHADER,vs), f=compile(GL_FRAGMENT_SHADER,fs);
-    gProgram=glCreateProgram(); glAttachShader(gProgram,v); glAttachShader(gProgram,f);
-    glBindAttribLocation(gProgram,0,"aPos"); glLinkProgram(gProgram);
+    GLuint v=compileShader(GL_VERTEX_SHADER,vertex);
+    GLuint f=compileShader(GL_FRAGMENT_SHADER,fragment);
+    gProgram=glCreateProgram();
+    glAttachShader(gProgram,v); glAttachShader(gProgram,f);
+    glBindAttribLocation(gProgram,0,"aPos");
+    glLinkProgram(gProgram);
     glDeleteShader(v); glDeleteShader(f);
     gTime=glGetUniformLocation(gProgram,"uTime");
     gResolution=glGetUniformLocation(gProgram,"uResolution");
@@ -60,19 +62,22 @@ Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeCreate(JN
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeDraw(JNIEnv*, jobject, jint texture, jint matrix) {
-    (void)texture; (void)matrix;
+Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeDraw(JNIEnv*, jobject, jint listening, jint matrix) {
+    (void)matrix;
     ensureProgram();
     static const GLfloat quad[] = {-1.f,-1.f, 1.f,-1.f, -1.f,1.f, 1.f,1.f};
     glClearColor(0.f,0.f,0.f,0.f);
     glClear(GL_COLOR_BUFFER_BIT);
-    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(gProgram);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,quad);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,quad);
     gT += 0.016f;
-    GLint vp[4]; glGetIntegerv(GL_VIEWPORT,vp);
-    glUniform1f(gTime,gT); glUniform2f(gResolution,(float)vp[2],(float)vp[3]);
-    glUniform1f(gListening,0.0f);
+    GLint viewport[4]; glGetIntegerv(GL_VIEWPORT,viewport);
+    glUniform1f(gTime,gT);
+    glUniform2f(gResolution,(float)viewport[2],(float)viewport[3]);
+    glUniform1f(gListening,listening ? 1.0f : 0.0f);
     glDrawArrays(GL_TRIANGLE_STRIP,0,4);
     glDisableVertexAttribArray(0);
 }
