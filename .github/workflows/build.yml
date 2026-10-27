@@ -1,8 +1,10 @@
 name: Build Jarvis
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -19,6 +21,8 @@ jobs:
         run: |
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;26.3.11579264"
+      - name: Install pinned Sherpa-ONNX Android runtime
+        run: bash scripts/setup_sherpa_onnx.sh
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -29,8 +33,9 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
           ! unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E '(^|/)(.env|.*secret.*|.*keystore.*)$' || (echo 'secret-like file inside APK' && exit 1)
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'libsherpa-onnx-jni.so'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'libonnxruntime.so'
       - uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: jarvis-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-# Force CI validation from the current main revision.
