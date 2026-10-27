@@ -5,7 +5,7 @@ import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 
-/** Streaming speech gate. It does not perform recognition; it only segments speech. */
+/** Streaming speech segmenter backed by Sherpa-ONNX Silero VAD. */
 class SileroVadEngine {
     companion object { const val SAMPLE_RATE = 16_000 }
 
@@ -38,6 +38,16 @@ class SileroVadEngine {
         if (samples.isEmpty()) return false
         engine.acceptWaveform(FloatArray(samples.size) { samples[it] / 32768.0f })
         return engine.isSpeechDetected()
+    }
+
+    /** Returns the next completed speech segment, or null while speech is ongoing. */
+    @Synchronized
+    fun pollSegment(): FloatArray? {
+        val engine = vad ?: return null
+        if (engine.empty()) return null
+        val segment = engine.front()
+        engine.pop()
+        return segment.samples
     }
 
     @Synchronized
