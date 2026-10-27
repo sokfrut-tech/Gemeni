@@ -18,7 +18,7 @@ cp "$WORK/src"/sherpa-onnx/kotlin-api/*.kt "$API_DST/"
 
 curl -fL --retry 4 --retry-delay 2 \
   -o "$WORK/android.tar.bz2" \
-  "https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION#v}-android.tar.bz2"
+  "https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION}-android.tar.bz2"
 
 tar -xjf "$WORK/android.tar.bz2" -C "$WORK"
 
