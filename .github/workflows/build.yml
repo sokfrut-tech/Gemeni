@@ -28,13 +28,17 @@ jobs:
           gradle-version: '8.10.2'
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Security checks
+      - name: Security and native compatibility checks
         run: |
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
-          ! unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E '(^|/)(.env|.*secret.*|.*keystore.*)$' || (echo 'secret-like file inside APK' && exit 1)
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'libsherpa-onnx-jni.so'
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'libonnxruntime.so'
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          ! unzip -l "$APK" | grep -E '(^|/)(\.env|.*secret.*|.*keystore.*)$' || { echo 'secret-like file inside APK'; exit 1; }
+          unzip -l "$APK" | grep -q 'libsherpa-onnx-jni.so'
+          unzip -l "$APK" | grep -q 'libonnxruntime.so'
+          # zipalign -P 16 validates APK alignment suitable for 16 KiB-page devices.
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$APK"
       - name: Inspect APK manifest, services and native ABIs
         run: bash scripts/inspect_apk.sh app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
