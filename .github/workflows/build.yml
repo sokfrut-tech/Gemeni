@@ -33,3 +33,4 @@ jobs:
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+# Force CI validation from the current main revision.
