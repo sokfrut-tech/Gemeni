@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Джарвис</string>
+    <string name="accessibility_description">Доступ к экранному контексту Джарвиса</string>
+</resources>
