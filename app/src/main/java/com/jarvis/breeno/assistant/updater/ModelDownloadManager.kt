@@ -16,7 +16,7 @@ class ModelDownloadManager(private val context: Context) {
 
         private val FILES = listOf(
             ModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d"),
-            ModelFile("decoder.onnx", "89b3088a0f9e20e1ef7f85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
+            ModelFile("decoder.onnx", "89b3088a20e1ef7f85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
             ModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5"),
             ModelFile("tokens.txt", null),
         )
@@ -37,9 +37,7 @@ class ModelDownloadManager(private val context: Context) {
             val target = dir.resolve(item.name)
             if (!target.isFile || target.length() == 0L || (item.sha256 != null && sha256(target) != item.sha256)) {
                 download(URL(BASE + item.name), target)
-                item.sha256?.let { expected ->
-                    check(sha256(target) == expected) { "SHA-256 mismatch for ${item.name}" }
-                }
+                item.sha256?.let { expected -> check(sha256(target) == expected) { "SHA-256 mismatch for ${item.name}" } }
             }
             onProgress(((index + 1) * 100) / FILES.size)
         }
@@ -56,11 +54,9 @@ class ModelDownloadManager(private val context: Context) {
         }
         try {
             check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
-            connection.inputStream.use { input ->
-                tmp.outputStream().use { output -> input.copyTo(output, 64 * 1024) }
-            }
+            connection.inputStream.use { input -> tmp.outputStream().use { output -> input.copyTo(output, 64 * 1024) } }
             check(tmp.length() > 0) { "Empty model file: ${destination.name}" }
-            if (!tmp.renameTo(destination)) error("Cannot commit ${destination.name}")
+            check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
         } finally {
             connection.disconnect()
             tmp.delete()
