@@ -6,6 +6,8 @@ static GLint gTime = -1;
 static GLint gResolution = -1;
 static GLint gListening = -1;
 static float gT = 0.0f;
+static float gWidth = 1.0f;
+static float gHeight = 1.0f;
 
 static GLuint compileShader(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
@@ -56,13 +58,20 @@ static void ensureProgram() {
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeCreate(JNIEnv*, jobject) {
+Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_00024JarvisSphereRenderer_nativeCreate(JNIEnv*, jobject) {
     ensureProgram();
     return 1;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeDraw(JNIEnv*, jobject, jint listening, jint matrix) {
+Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_00024JarvisSphereRenderer_nativeResize(JNIEnv*, jobject, jint width, jint height) {
+    gWidth = width > 0 ? static_cast<float>(width) : 1.0f;
+    gHeight = height > 0 ? static_cast<float>(height) : 1.0f;
+    glViewport(0, 0, width, height);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_00024JarvisSphereRenderer_nativeDraw(JNIEnv*, jobject, jint listening, jint matrix) {
     (void)matrix;
     ensureProgram();
     static const GLfloat quad[] = {-1.f,-1.f, 1.f,-1.f, -1.f,1.f, 1.f,1.f};
@@ -74,9 +83,8 @@ Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_nativeDraw(JNIE
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,quad);
     gT += 0.016f;
-    GLint viewport[4]; glGetIntegerv(GL_VIEWPORT,viewport);
     glUniform1f(gTime,gT);
-    glUniform2f(gResolution,(float)viewport[2],(float)viewport[3]);
+    glUniform2f(gResolution,gWidth,gHeight);
     glUniform1f(gListening,listening ? 1.0f : 0.0f);
     glDrawArrays(GL_TRIANGLE_STRIP,0,4);
     glDisableVertexAttribArray(0);
