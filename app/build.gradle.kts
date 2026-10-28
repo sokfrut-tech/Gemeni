@@ -13,9 +13,10 @@ android {
         applicationId = "com.jarvis.breeno.assistant"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        versionCode = 53
+        versionName = "0.53-runtime-diagnostics"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; aidl = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -43,9 +44,12 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
-    // Sherpa-ONNX v2.0.1 supplies the matching native ONNX Runtime 1.28.2.
-    // Do not add a second onnxruntime-android Maven dependency: mixing ORT builds
-    // can cause duplicate native libraries and ABI/runtime mismatches.
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
     implementation("com.google.code.gson:gson:2.12.1")
+
+    // Runtime UI smoke tests. UI Automator is intentionally kept in androidTest only.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
