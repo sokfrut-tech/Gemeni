@@ -30,20 +30,24 @@ jobs:
           path: build/agent-review
 
   llm-review:
-    if: ${{ secrets.JARVIS_LLM_BASE_URL != '' && secrets.JARVIS_LLM_API_KEY != '' }}
     runs-on: ubuntu-24.04
+    env:
+      JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
+      JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
+      JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen3.5' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check LLM configuration
+        if: ${{ env.JARVIS_LLM_BASE_URL == '' || env.JARVIS_LLM_API_KEY == '' }}
+        run: echo "LLM reviewer secrets are not configured; model-backed review will be skipped."
       - name: Run model-backed independent reviewers
-        env:
-          JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
-          JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
-          JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen3.5' }}
+        if: ${{ env.JARVIS_LLM_BASE_URL != '' && env.JARVIS_LLM_API_KEY != '' }}
         run: python3 tools/agent_swarm/run_swarm.py --repo . --out build/agent-review-llm --llm
       - name: Upload model reviews
+        if: ${{ env.JARVIS_LLM_BASE_URL != '' && env.JARVIS_LLM_API_KEY != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-agent-review-llm
