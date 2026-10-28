@@ -88,6 +88,7 @@ jobs:
           DEEPSEEK_URL: ${{ secrets.JARVIS_DEEPSEEK_BASE_URL }}
           GENERIC_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
         run: |
+          mkdir -p build/factory
           if [ -n "$QWEN_URL$DEEPSEEK_URL$GENERIC_URL" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
