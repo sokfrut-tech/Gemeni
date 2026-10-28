@@ -1,0 +1,13 @@
+Gemeni
+Copyright 2026 sokfrut-tech
+
+Original Gemeni source code is licensed under the Apache License, Version 2.0.
+
+Third-party components, models, source code, documentation, and assets retain
+ their original licenses and copyright notices. They are not relicensed by
+this repository's Apache-2.0 license. Before bundling any external component,
+the build/release process must record its source, version/commit, license,
+required notices, and redistribution conditions in the third-party inventory.
+
+OPPO, ColorOS, Breeno and other third-party trademarks and proprietary
+materials are not claimed by this project.
