@@ -1,0 +1,11 @@
+{
+  "name": "jarvis-hive",
+  "version": 1,
+  "workers": [
+    {"name":"qwen","base_url_env":"JARVIS_QWEN_BASE_URL","model_env":"JARVIS_QWEN_MODEL","token_env":"JARVIS_QWEN_API_KEY"},
+    {"name":"deepseek","base_url_env":"JARVIS_DEEPSEEK_BASE_URL","model_env":"JARVIS_DEEPSEEK_MODEL","token_env":"JARVIS_DEEPSEEK_API_KEY"},
+    {"name":"generic","base_url_env":"JARVIS_LLM_BASE_URL","model_env":"JARVIS_LLM_MODEL","token_env":"JARVIS_LLM_API_KEY"}
+  ],
+  "capabilities": ["reasoning","code_review","research","android","ndk","speech","qa","security"],
+  "policy": {"require_health":true,"require_explicit_configuration":true,"no_credential_harvesting":true,"no_provider_bypass":true,"no_self_approval":true}
+}
