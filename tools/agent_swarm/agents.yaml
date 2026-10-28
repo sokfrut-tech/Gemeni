@@ -1,0 +1,29 @@
+agents:
+  - id: android_coloros
+    role: Senior Android System/ColorOS engineer
+    focus: VoiceInteractionService, VoiceInteractionSession, exported services, permissions, lifecycle, Chinese ColorOS behavior
+    hard_fail: true
+  - id: ui_ux
+    role: Senior Android Compose product designer and QA engineer
+    focus: real rendered UI, visual states, animations, accessibility semantics, clickable actions, no placeholder-only screens
+    hard_fail: true
+  - id: ndk_gles
+    role: Senior Android NDK/OpenGL ES engineer
+    focus: JNI signatures, EGL/GLES2 lifecycle, SurfaceView/GLSurfaceView, native crashes, ABI and frame rendering
+    hard_fail: true
+  - id: speech
+    role: Senior speech/edge-AI engineer
+    focus: AudioRecord, Silero VAD, hotword KWS, Sherpa-ONNX Russian ASR, Piper/VITS TTS, model download/cache/offline behavior
+    hard_fail: true
+  - id: functional
+    role: Senior Android automation engineer
+    focus: AIDL, intents, navigation/search/phone tools, real side effects, state machine, error handling
+    hard_fail: true
+  - id: security
+    role: Android application security engineer
+    focus: exported components, permissions, Web/API keys, model integrity, downloads, native loading, debug leakage
+    hard_fail: true
+  - id: qa
+    role: Independent release QA lead
+    focus: emulator e2e tests, OPPO device test plan, evidence quality, release gates and regression detection
+    hard_fail: true
