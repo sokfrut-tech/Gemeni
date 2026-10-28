@@ -32,9 +32,9 @@ jobs:
   llm-review:
     runs-on: ubuntu-24.04
     env:
-      JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
-      JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
-      JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen3.5' }}
+      JARVIS_LLM_BASE_URL: ${{ secrets.Qwen_URL }}
+      JARVIS_LLM_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen/qwen3.5-35b-a3b:free' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
