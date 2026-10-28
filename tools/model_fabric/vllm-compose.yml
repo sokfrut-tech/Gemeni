@@ -1,0 +1,28 @@
+services:
+  qwen-worker:
+    image: vllm/vllm-openai:latest
+    ipc: host
+    environment:
+      VLLM_API_KEY: ${QWEN_WORKER_TOKEN}
+    command: >-
+      --model ${QWEN_MODEL}
+      --host 0.0.0.0
+      --port 8000
+      --api-key ${QWEN_WORKER_TOKEN}
+      --generation-config vllm
+    ports: ["8001:8000"]
+    gpus: all
+
+  deepseek-worker:
+    image: vllm/vllm-openai:latest
+    ipc: host
+    environment:
+      VLLM_API_KEY: ${DEEPSEEK_WORKER_TOKEN}
+    command: >-
+      --model ${DEEPSEEK_MODEL}
+      --host 0.0.0.0
+      --port 8000
+      --api-key ${DEEPSEEK_WORKER_TOKEN}
+      --generation-config vllm
+    ports: ["8002:8000"]
+    gpus: all
