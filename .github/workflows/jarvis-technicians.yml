@@ -1,0 +1,72 @@
+name: Jarvis Factory — Repair Crew
+
+on:
+  workflow_run:
+    workflows: ["Jarvis Factory — Director"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: jarvis-repair-crew
+  cancel-in-progress: false
+
+jobs:
+  dispatcher:
+    name: Foreman / dispatch repair tickets
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: ${{ github.event_name == 'workflow_run' }}
+        continue-on-error: true
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: factory-*
+          path: build/factory
+          merge-multiple: true
+      - name: Dispatch technicians
+        run: python3 tools/technician/technician_dispatch.py .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: technician-dispatch
+          path: build/factory/technician-dispatch.json
+
+  technician:
+    name: Technician — ${{ matrix.role }}
+    needs: dispatcher
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [infra, android, speech, native, ui, functional, security, qa]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect current repository for assigned fault class
+        env:
+          ROLE: ${{ matrix.role }}
+        run: |
+          mkdir -p build/technicians/$ROLE
+          python3 tools/technician/technician_dispatch.py . > build/technicians/$ROLE/dispatch.txt
+          printf 'role=%s\ncommit=%s\npolicy=repair-with-evidence; never-disable-tests\n' "$ROLE" "$GITHUB_SHA" > build/technicians/$ROLE/handoff.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: technician-${{ matrix.role }}
+          path: build/technicians/${{ matrix.role }}
+
+  gate:
+    name: Foreman / repair gate
+    needs: technician
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all repair lanes to complete
+        run: test "${{ needs.technician.result }}" = success
+      - name: Explain next action
+        run: |
+          echo 'Repair crew completed diagnosis.'
+          echo 'A technician may not silently disable tests or claim a fix without evidence.'
+          echo 'The next Director run is the acceptance loop.'
