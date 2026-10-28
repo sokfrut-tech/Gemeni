@@ -31,6 +31,13 @@
         </service>
 
         <service
+            android:name=".service.JarvisSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:process=":session"
+            android:exported="true"
+            android:label="Джарвис — голосовая сессия" />
+
+        <service
             android:name=".service.JarvisAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true"
@@ -44,8 +51,6 @@
         </service>
 
         <service android:name=".service.JarvisRemoteService" android:exported="false" />
-        <service android:name=".service.JarvisSessionService" android:exported="false" />
-
         <receiver android:name=".updater.RomUpdateReceiver" android:exported="false" />
         <receiver android:name=".service.BreenoIpcHookReceiver" android:exported="false" />
 
