@@ -27,18 +27,8 @@ jobs:
         with:
           gradle-version: '8.10.2'
       - name: Build debug APK
+        id: build-apk
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Runtime smoke tests on Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: Pixel_2
-          target: default
-          force-avd-creation: true
-          disable-animations: true
-          emulator-options: -no-window -no-boot-anim
-          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Security and native compatibility checks
         run: |
           set -euo pipefail
@@ -54,6 +44,17 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$APK"
       - name: Inspect APK manifest, services and native ABIs
         run: bash scripts/inspect_apk.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Runtime smoke tests on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: Pixel 2
+          target: default
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -no-boot-anim
+          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,6 +65,7 @@ jobs:
             app/build/outputs/connected_android_test_additional_output/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
+        if: always() && steps.build-apk.outcome == 'success'
         with:
           name: jarvis-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
