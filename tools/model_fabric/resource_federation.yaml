@@ -1,0 +1,38 @@
+version: 1
+name: jarvis-hive-resource-federation
+purpose: "Discover and use lawfully configured GPU/model workers. Never harvest credentials or bypass provider access controls."
+providers:
+  github_actions_gpu:
+    enabled: true
+    labels: [self-hosted, gpu]
+    purpose: build-and-test
+  huggingface_zero_gpu:
+    enabled: true
+    purpose: burst-inference
+    notes: "Requires an owned Space and available quota/credits."
+  huggingface_gpu_space:
+    enabled: true
+    purpose: persistent-inference
+    notes: "Requires an owned Space and configured hardware."
+  kaggle_gpu:
+    enabled: true
+    purpose: ephemeral-batch-research
+    notes: "Requires an owned/authorized Kaggle account and session."
+  cloud_gpu:
+    enabled: true
+    purpose: persistent-inference
+    endpoint_env: JARVIS_REMOTE_GPU_ENDPOINT
+    token_env: JARVIS_REMOTE_GPU_TOKEN
+allocation:
+  strategy: capability_first
+  fallback: local_cpu
+  healthcheck_seconds: 30
+  max_parallel_workers: 8
+  require_attestation: true
+security:
+  no_stolen_credentials: true
+  no_credential_exfiltration: true
+  no_provider_bypass: true
+  secrets_only_from_environment: true
+  model_artifacts_must_be_verified: true
+  workers_must_be_revocable: true
