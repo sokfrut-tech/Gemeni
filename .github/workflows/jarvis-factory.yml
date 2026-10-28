@@ -72,17 +72,46 @@ jobs:
           name: factory-${{ matrix.role }}
           path: build/factory/${{ matrix.role }}
 
+  model-workers:
+    name: Model workers / Qwen + DeepSeek
+    needs: director
+    if: ${{ secrets.JARVIS_QWEN_BASE_URL != '' || secrets.JARVIS_DEEPSEEK_BASE_URL != '' || secrets.JARVIS_LLM_BASE_URL != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Live multi-model review
+        env:
+          JARVIS_QWEN_BASE_URL: ${{ secrets.JARVIS_QWEN_BASE_URL }}
+          JARVIS_QWEN_API_KEY: ${{ secrets.JARVIS_QWEN_API_KEY }}
+          JARVIS_QWEN_MODEL: ${{ vars.JARVIS_QWEN_MODEL }}
+          JARVIS_DEEPSEEK_BASE_URL: ${{ secrets.JARVIS_DEEPSEEK_BASE_URL }}
+          JARVIS_DEEPSEEK_API_KEY: ${{ secrets.JARVIS_DEEPSEEK_API_KEY }}
+          JARVIS_DEEPSEEK_MODEL: ${{ vars.JARVIS_DEEPSEEK_MODEL }}
+          JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
+          JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
+          JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL }}
+        run: python3 tools/agent_swarm/multi_model_review.py .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-live-model-review
+          path: build/multi-model-review.json
+
   release-gate:
     name: Director / release gate
-    needs: specialist
+    needs: [specialist, model-workers]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Verify all specialist lanes completed
+      - name: Verify specialist lanes
+        run: test "${{ needs.specialist.result }}" = success
+      - name: Require live model evidence when configured
         run: |
-          echo "Director gate: specialist matrix completed with result=${{ needs.specialist.result }}"
-          test "${{ needs.specialist.result }}" = success
+          echo "model-workers=${{ needs.model-workers.result }}"
+          if [ "${{ needs.model-workers.result }}" = "failure" ]; then exit 1; fi
       - name: Check for placeholder implementation markers
         run: |
           if grep -RInE 'TODO|NotImplemented|return null|return Unit|placeholder|stub|fake|dummy' app/src/main --include='*.kt' --include='*.cpp' --include='*.java' | grep -vE 'build|generated'; then
@@ -96,6 +125,7 @@ jobs:
           # Jarvis Factory handoff
           - commit: ${GITHUB_SHA}
           - specialist_result: ${{ needs.specialist.result }}
+          - model_workers: ${{ needs.model-workers.result }}
           - rule: build success alone never means release
           - next: Android runtime/e2e/device evidence before APK release
           EOF
