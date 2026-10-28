@@ -32,7 +32,7 @@ jobs:
   llm-review:
     runs-on: ubuntu-24.04
     env:
-      JARVIS_LLM_BASE_URL: ${{ secrets.Qwen_URL }}
+      JARVIS_LLM_BASE_URL: https://openrouter.ai/api/v1
       JARVIS_LLM_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen/qwen3.5-35b-a3b:free' }}
     steps:
@@ -42,15 +42,14 @@ jobs:
           python-version: '3.12'
       - name: Check LLM configuration
         env:
-          HAS_BASE_URL: ${{ secrets.Qwen_URL != '' }}
           HAS_API_KEY: ${{ secrets.OPENROUTER_API_KEY != '' }}
         run: |
-          if [ "$HAS_BASE_URL" != "true" ] || [ "$HAS_API_KEY" != "true" ]; then
-            echo "::error::Missing GitHub Actions repository secrets. Configure Qwen_URL and OPENROUTER_API_KEY in Settings > Secrets and variables > Actions > Repository secrets."
+          if [ "$HAS_API_KEY" != "true" ]; then
+            echo "::error::Missing OPENROUTER_API_KEY. Add it under Settings > Secrets and variables > Actions > Repository secrets."
             echo "Secret values are never printed."
             exit 1
           fi
-          echo "LLM endpoint and API key are configured."
+          echo "OpenRouter endpoint is configured; API key secret is present."
       - name: Run model-backed independent reviewers
         run: python3 tools/agent_swarm/run_swarm.py --repo . --out build/agent-review-llm --llm
       - name: Upload model reviews
