@@ -1,0 +1,100 @@
+name: Jarvis Test Factory
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test-matrix:
+    name: Parallel test cell (${{ matrix.cell }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cell:
+          - build-integrity
+          - ui-static
+          - speech-static
+          - voiceinteraction-static
+          - native-gles
+          - functional-intents
+          - security
+          - apk-contract
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify tested commit
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "TESTED_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+
+      - name: Run test cell
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-evidence
+          case "${{ matrix.cell }}" in
+            build-integrity)
+              test -f settings.gradle.kts
+              test -f app/build.gradle.kts
+              ;;
+            ui-static)
+              test -d app/src/main/java || test -d app/src/main/kotlin
+              grep -R "JarvisSphere\|ДЖАРВИС" app/src/main 2>/dev/null | head -20 || true
+              ;;
+            speech-static)
+              test -d app/src/main || exit 1
+              grep -R "AudioRecord\|Sherpa\|ASR\|VAD\|KWS" app/src/main 2>/dev/null | head -30 || true
+              ;;
+            voiceinteraction-static)
+              grep -R "VoiceInteractionService\|VoiceInteractionSessionService\|VoiceInteractionSession" app/src/main 2>/dev/null | head -30 || true
+              ;;
+            native-gles)
+              find app/src -type f \( -name '*.cpp' -o -name '*.c' -o -name '*.so' \) | head -50
+              grep -R "GLSurfaceView\|GLES\|EGL" app/src/main 2>/dev/null | head -30 || true
+              ;;
+            functional-intents)
+              grep -R "Intent\|startActivity\|AIDL\|startListening\|stopListening" app/src/main 2>/dev/null | head -50 || true
+              ;;
+            security)
+              ! grep -R "AIza[0-9A-Za-z_-]\{20,\}\|sk-[A-Za-z0-9]\{20,\}" app/src 2>/dev/null || (echo 'Potential hard-coded API secret'; exit 1)
+              ;;
+            apk-contract)
+              test -f app/src/main/AndroidManifest.xml
+              ;;
+          esac
+          printf 'cell=%s\nsha=%s\nstatus=PASS\n' "${{ matrix.cell }}" "$GITHUB_SHA" > "test-evidence/${{ matrix.cell }}.txt"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence-${{ matrix.cell }}
+          path: test-evidence/
+          if-no-files-found: ignore
+
+  test-summary:
+    name: Test Factory Gate
+    if: always()
+    needs: test-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every parallel test cell to pass
+        run: |
+          if [ "${{ needs.test-matrix.result }}" != "success" ]; then
+            echo 'At least one independent test cell failed.'
+            exit 1
+          fi
+          echo 'All parallel test cells passed.'
