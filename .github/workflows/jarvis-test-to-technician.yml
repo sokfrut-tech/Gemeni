@@ -1,0 +1,81 @@
+name: Jarvis Test-to-Technician Loop
+
+on:
+  workflow_run:
+    workflows: ["Jarvis Test Factory"]
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  route-defects:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Classify failed test lanes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p routing
+          python3 - <<'PY'
+          import json, os, urllib.request
+          run_id=os.environ['RUN_ID']; repo=os.environ['REPO']; token=os.environ['GH_TOKEN']
+          req=urllib.request.Request(f'https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs',headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json'})
+          data=json.load(urllib.request.urlopen(req))
+          routes={
+            'build-integrity':'Infra Technician',
+            'ui':'UI Technician',
+            'speech':'Speech Technician',
+            'voiceinteraction':'Android/ColorOS Technician',
+            'native':'Native/GLES Technician',
+            'functional':'Functional Technician',
+            'security':'Security Technician',
+            'apk':'Infra Technician'
+          }
+          defects=[]
+          for job in data.get('jobs',[]):
+            if job.get('conclusion') != 'failure': continue
+            name=job.get('name','').lower()
+            technician='General Foreman'
+            for key,value in routes.items():
+              if key in name:
+                technician=value; break
+            defects.append({'job':job.get('name'),'job_id':job.get('id'),'technician':technician})
+          with open('routing/defects.json','w') as f: json.dump({'run_id':run_id,'defects':defects},f,indent=2)
+          print(json.dumps(defects,indent=2))
+          PY
+
+      - name: Open repair tickets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          repo=os.environ['REPO']; token=os.environ['GH_TOKEN']
+          defects=json.load(open('routing/defects.json'))['defects']
+          for d in defects:
+            title=f"[AUTO-FIX] {d['technician']}: {d['job']} failed"
+            body=(f"Automated defect from Jarvis Test Factory run {os.environ['RUN_ID']}.\n\n"
+                  f"Assigned repair lane: **{d['technician']}**\n"
+                  f"Failed job: `{d['job']}`\n"
+                  f"Job ID: `{d['job_id']}`\n\n"
+                  "Technician must reproduce, diagnose root cause, make the smallest safe fix, and attach evidence. "
+                  "Do not disable or weaken the failing test to obtain a pass.")
+            req=urllib.request.Request(f'https://api.github.com/repos/{repo}/issues',data=json.dumps({'title':title,'body':body,'labels':['automated-defect']}).encode(),method='POST',headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','Content-Type':'application/json'})
+            try: urllib.request.urlopen(req).read()
+            except Exception as e: print(f'issue creation failed: {e}')
+          PY
+
+      - name: Upload defect routing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: technician-routing-${{ github.event.workflow_run.id }}
+          path: routing/defects.json
