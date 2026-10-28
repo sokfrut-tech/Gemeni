@@ -100,13 +100,13 @@ jobs:
         env:
           JARVIS_QWEN_BASE_URL: ${{ secrets.JARVIS_QWEN_BASE_URL }}
           JARVIS_QWEN_API_KEY: ${{ secrets.JARVIS_QWEN_API_KEY }}
-          JARVIS_QWEN_MODEL: ${{ vars.JARVIS_QWEN_MODEL }}
+          JARVIS_QWEN_MODEL: ${{ vars.JARVIS_QWEN_MODEL || 'qwen-plus' }}
           JARVIS_DEEPSEEK_BASE_URL: ${{ secrets.JARVIS_DEEPSEEK_BASE_URL }}
           JARVIS_DEEPSEEK_API_KEY: ${{ secrets.JARVIS_DEEPSEEK_API_KEY }}
-          JARVIS_DEEPSEEK_MODEL: ${{ vars.JARVIS_DEEPSEEK_MODEL }}
+          JARVIS_DEEPSEEK_MODEL: ${{ vars.JARVIS_DEEPSEEK_MODEL || 'deepseek-chat' }}
           JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
           JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
-          JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL }}
+          JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen-plus' }}
         run: python3 tools/agent_swarm/multi_model_review.py .
       - name: Record model-worker state
         run: |
