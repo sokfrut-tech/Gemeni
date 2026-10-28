@@ -1,6 +1,8 @@
 package com.jarvis.breeno.assistant.ui
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
@@ -9,7 +11,7 @@ import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
-/** Real runtime bridge: microphone -> local Russian ASR -> intent -> spoken response. */
+/** Real runtime bridge: microphone -> local Russian ASR -> intent -> device action -> speech. */
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
     private val models = ModelDownloadManager(appContext)
@@ -42,15 +44,33 @@ class JarvisRuntimeController(context: Context) {
             onProgress("Речь не распознана")
             return ""
         }
+
         val command = intents.dispatch(text)
         val response = when {
-            command.startsWith("SEARCH:") -> "Ищу: ${text.replaceFirst(Regex("^(найди|поиск)\\s*"), "")}" 
-            command.startsWith("OPEN:") -> "Команда на открытие: $text"
+            command.startsWith("SEARCH:") -> {
+                val query = text.replaceFirst(Regex("^(найди|поиск)\\s*"), "").trim()
+                launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}")))
+                "Открываю поиск: $query"
+            }
+            command.startsWith("OPEN:") && text.contains("навига", true) -> {
+                launch(Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map")))
+                "Открываю Яндекс Навигатор"
+            }
+            command.startsWith("OPEN:") -> "Пытаюсь открыть: $text"
+            text.contains("позвони", true) || text.contains("телефон", true) -> {
+                launch(Intent(Intent.ACTION_DIAL))
+                "Открываю телефон"
+            }
             else -> "Вы сказали: $text"
         }
         speaker.speak(response)
         onProgress(response)
         return text
+    }
+
+    private fun launch(intent: Intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { appContext.startActivity(intent) }
     }
 
     fun close() { asr.close() }
