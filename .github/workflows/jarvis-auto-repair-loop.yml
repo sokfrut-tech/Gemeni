@@ -1,0 +1,72 @@
+name: Jarvis Auto Repair Loop
+
+on:
+  workflow_run:
+    workflows: ["Jarvis Test Factory"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: jarvis-auto-repair
+  cancel-in-progress: false
+
+jobs:
+  dispatch-repairs:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Collect failure context
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p repair-evidence
+          gh run view "${RUN_ID:-0}" --repo "$REPO" --log-failed > repair-evidence/failed.log 2>&1 || true
+          printf '%s\n' "tested_sha=${{ github.event.workflow_run.head_sha || github.sha }}" > repair-evidence/context.txt
+          printf '%s\n' "source_run=${RUN_ID:-manual}" >> repair-evidence/context.txt
+
+      - name: Classify failures
+        run: |
+          python tools/technician/test_loop_dispatcher.py \
+            --input repair-evidence/failed.log \
+            --output repair-evidence/repair-queue.json || true
+          test -f repair-evidence/repair-queue.json || printf '%s\n' '{"items":[]}' > repair-evidence/repair-queue.json
+
+      - name: Create repair issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          p='repair-evidence/repair-queue.json'
+          data=json.load(open(p, encoding='utf-8'))
+          for item in data.get('items', []):
+              title='[AUTO-REPAIR] '+item.get('area','unknown')+': '+item.get('summary','test failure')
+              body='''Automated repair request.\n\nArea: {area}\nTechnician: {tech}\nTested SHA: {sha}\n\nEvidence:\n```\n{evidence}\n```\n\nRules: fix the root cause; do not disable, weaken, skip, or delete the failing test. Re-run the affected test before requesting merge.'''.format(
+                  area=item.get('area','unknown'), tech=item.get('technician','foreman'), sha=os.environ.get('GITHUB_SHA'), evidence=item.get('evidence',''))
+              subprocess.run(['gh','issue','create','--repo',os.environ['GITHUB_REPOSITORY'],'--title',title,'--body',body], check=False)
+
+      - name: Persist repair evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-repair-evidence-${{ github.run_id }}
+          path: repair-evidence/
+
+      - name: Commit dispatcher evidence only
+        run: |
+          git config user.name "jarvis-technician"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add repair-evidence || true
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(factory): record automated repair queue"
+          git push origin HEAD:${GITHUB_REF_NAME}
