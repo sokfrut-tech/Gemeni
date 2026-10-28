@@ -1,0 +1,50 @@
+name: Jarvis Agent Review
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'tools/agent_swarm/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run deterministic agent swarm
+        run: python3 tools/agent_swarm/run_swarm.py --repo . --out build/agent-review
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-agent-review
+          path: build/agent-review
+
+  llm-review:
+    if: ${{ secrets.JARVIS_LLM_BASE_URL != '' && secrets.JARVIS_LLM_API_KEY != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run model-backed independent reviewers
+        env:
+          JARVIS_LLM_BASE_URL: ${{ secrets.JARVIS_LLM_BASE_URL }}
+          JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
+          JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen3.5' }}
+        run: python3 tools/agent_swarm/run_swarm.py --repo . --out build/agent-review-llm --llm
+      - name: Upload model reviews
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-agent-review-llm
+          path: build/agent-review-llm
