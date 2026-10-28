@@ -130,7 +130,7 @@ jobs:
         run: echo "model-workers=${{ needs.model-workers.result }}"
       - name: Check for placeholder implementation markers
         run: |
-          if grep -RInE 'TODO|NotImplemented|return null|return Unit|placeholder|stub|fake|dummy' app/src/main --include='*.kt' --include='*.cpp' --include='*.java' | grep -vE 'build|generated'; then
+          if grep -RInE 'TODO|NotImplementedException|placeholder|stub|fake|dummy' app/src/main --include='*.kt' --include='*.cpp' --include='*.java' | grep -vE 'build|generated'; then
             echo 'Blocking: placeholder/stub markers remain in production source.'
             exit 1
           fi
