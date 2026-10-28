@@ -27,23 +27,18 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
         var listening = false
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             nativeCreate()
-            GLES2Bridge.init()
         }
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-            GLES2Bridge.resize(width, height)
+            nativeResize(width, height)
         }
         override fun onDrawFrame(gl: GL10?) {
             nativeDraw(if (listening) 1 else 0, 0)
         }
-    }
 
-    private object GLES2Bridge {
-        fun init() = Unit
-        fun resize(width: Int, height: Int) = Unit
+        private external fun nativeCreate(): Long
+        private external fun nativeResize(width: Int, height: Int)
+        private external fun nativeDraw(texture: Int, matrix: Int)
     }
-
-    private external fun nativeCreate(): Long
-    private external fun nativeDraw(texture: Int, matrix: Int)
 
     companion object {
         init { System.loadLibrary("jarvis_native") }
