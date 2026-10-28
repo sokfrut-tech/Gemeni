@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.jarvis.breeno.assistant.BuildConfig
 import com.jarvis.breeno.assistant.R
 import com.jarvis.breeno.assistant.ui.render.AlphaVideoSurfaceView
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
@@ -67,42 +68,35 @@ private fun JarvisHome() {
                     .align(Alignment.TopCenter)
                     .padding(top = 112.dp),
                 factory = { context ->
-                    AlphaVideoSurfaceView(context).also { sphere = it }
+                    AlphaVideoSurfaceView(context).also {
+                        it.contentDescription = "JarvisSphere"
+                        sphere = it
+                    }
                 },
-                update = { it.setListening(listening) }
+                update = {
+                    it.contentDescription = "JarvisSphere"
+                    it.setListening(listening)
+                }
             )
-            DisposableEffect(Unit) {
-                onDispose { sphere = null }
-            }
+            DisposableEffect(Unit) { onDispose { sphere = null } }
 
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("ДЖАРВИС", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
                         Text("Русский ассистент • ColorOS", color = Color(0xFF9CA8B8), style = MaterialTheme.typography.bodySmall)
+                        if (BuildConfig.DEBUG) Text("BUILD ${BuildConfig.VERSION_CODE}", color = Color(0xFF566274), style = MaterialTheme.typography.labelSmall)
                     }
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Color(0xFFB8C5D6))
-                    }
+                    IconButton(onClick = {}) { Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Color(0xFFB8C5D6)) }
                 }
 
                 Spacer(modifier = Modifier.height(330.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(R.drawable.assistant_mascot),
-                        contentDescription = "Джарвис",
-                        modifier = Modifier.size(92.dp),
-                        contentScale = ContentScale.Fit
-                    )
+                    Image(painter = painterResource(R.drawable.assistant_mascot), contentDescription = "Джарвис", modifier = Modifier.size(92.dp), contentScale = ContentScale.Fit)
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(if (listening) "Слушаю…" else "Я рядом", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -112,11 +106,7 @@ private fun JarvisHome() {
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xCC111824))
-                ) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xCC111824))) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Быстрые команды", color = Color(0xFFB8C5D6), style = MaterialTheme.typography.labelLarge)
                         Spacer(modifier = Modifier.height(8.dp))
