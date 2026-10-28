@@ -37,7 +37,7 @@ jobs:
           target: default
           force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim
+          emulator-options: -no-window -no-boot-anim
           script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Security and native compatibility checks
         run: |
