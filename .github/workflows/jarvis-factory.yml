@@ -1,0 +1,105 @@
+name: Jarvis Factory — Director
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'tools/**'
+      - 'docs/**'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-factory
+  cancel-in-progress: false
+
+jobs:
+  director:
+    name: Director / intake
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.state.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: state
+        name: Record production state
+        run: |
+          mkdir -p build/factory
+          SHA=$(git rev-parse HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "JARVIS FACTORY" "commit=$SHA" "time=$(date -u +%FT%TZ)" > build/factory/intake.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-intake
+          path: build/factory
+
+  specialist:
+    name: Specialist — ${{ matrix.role }}
+    needs: director
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        role:
+          - android_coloros
+          - speech
+          - functional
+          - ui_ux
+          - ndk_gles
+          - security
+          - qa
+          - research
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run deterministic evidence collector
+        env:
+          ROLE: ${{ matrix.role }}
+        run: |
+          mkdir -p "build/factory/${ROLE}"
+          python3 tools/agent_swarm/run_swarm.py --repo . --out "build/factory/${ROLE}"
+          printf '%s\n' "role=${ROLE}" "commit=${GITHUB_SHA}" "time=$(date -u +%FT%TZ)" > "build/factory/${ROLE}/handoff.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-${{ matrix.role }}
+          path: build/factory/${{ matrix.role }}
+
+  release-gate:
+    name: Director / release gate
+    needs: specialist
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all specialist lanes completed
+        run: |
+          echo "Director gate: specialist matrix completed with result=${{ needs.specialist.result }}"
+          test "${{ needs.specialist.result }}" = success
+      - name: Check for placeholder implementation markers
+        run: |
+          if grep -RInE 'TODO|NotImplemented|return null|return Unit|placeholder|stub|fake|dummy' app/src/main --include='*.kt' --include='*.cpp' --include='*.java' | grep -vE 'build|generated'; then
+            echo 'Blocking: placeholder/stub markers remain in production source.'
+            exit 1
+          fi
+      - name: Write director handoff
+        run: |
+          mkdir -p build/factory
+          cat > build/factory/DIRECTOR_HANDOFF.md <<EOF
+          # Jarvis Factory handoff
+          - commit: ${GITHUB_SHA}
+          - specialist_result: ${{ needs.specialist.result }}
+          - rule: build success alone never means release
+          - next: Android runtime/e2e/device evidence before APK release
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factory-director-handoff
+          path: build/factory/DIRECTOR_HANDOFF.md
