@@ -7,9 +7,9 @@ import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.takeWhile
 
-/** Real runtime bridge used by the UI. It owns microphone -> local ASR -> intent -> speech. */
+/** Real runtime bridge: microphone -> local Russian ASR -> intent -> spoken response. */
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
     private val models = ModelDownloadManager(appContext)
@@ -29,12 +29,10 @@ class JarvisRuntimeController(context: Context) {
         val samples = ArrayList<ShortArray>()
         val started = System.nanoTime()
         onProgress("Микрофон активен — говорите")
-        withTimeout(7_000) {
-            audio.frames().collect { frame ->
-                samples += frame
-                if ((System.nanoTime() - started) / 1_000_000 >= 4_500) throw StopCapture()
-            }
-        }
+        audio.frames()
+            .takeWhile { (System.nanoTime() - started) / 1_000_000 < 4_500 }
+            .collect { samples += it }
+
         val pcm = ShortArray(samples.sumOf { it.size })
         var offset = 0
         samples.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
@@ -46,7 +44,7 @@ class JarvisRuntimeController(context: Context) {
         }
         val command = intents.dispatch(text)
         val response = when {
-            command.startsWith("SEARCH:") -> "Ищу: ${text.removePrefix("найди").removePrefix("поиск").trim()}"
+            command.startsWith("SEARCH:") -> "Ищу: ${text.replaceFirst(Regex("^(найди|поиск)\\s*"), "")}" 
             command.startsWith("OPEN:") -> "Команда на открытие: $text"
             else -> "Вы сказали: $text"
         }
@@ -55,9 +53,5 @@ class JarvisRuntimeController(context: Context) {
         return text
     }
 
-    fun close() {
-        asr.close()
-    }
-
-    private class StopCapture : RuntimeException(null, null, false, false)
+    fun close() { asr.close() }
 }
