@@ -83,7 +83,7 @@ fun JarvisOrb(state: OrbState, onClick: () -> Unit, modifier: Modifier = Modifie
             // Свечение вокруг шара
             drawCircle(
                 brush = Brush.radialGradient(
-                    colorStops = arrayOf(0f to glow, 1f to Color.Transparent),
+                    0f to glow, 1f to Color.Transparent,
                     center = center,
                     radius = 121f * k
                 ),
@@ -95,7 +95,7 @@ fun JarvisOrb(state: OrbState, onClick: () -> Unit, modifier: Modifier = Modifie
             val coreRadius = 75f * k
             drawCircle(
                 brush = Brush.radialGradient(
-                    colorStops = arrayOf(0f to core, 0.75f to Background),
+                    0f to core, 0.75f to Background,
                     center = Offset(center.x - coreRadius + coreRadius * 0.8f, center.y - coreRadius + coreRadius * 0.7f),
                     radius = coreRadius * 1.6f
                 ),
