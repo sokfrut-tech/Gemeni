@@ -1,0 +1,953 @@
+build	Runtime smoke tests on Android emulator	﻿2026-10-29T03:24:36.7376317Z ##[group]Run reactivecircus/android-emulator-runner@v2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7376729Z with:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7376966Z   api-level: 35
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7377215Z   arch: x86_64
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7377461Z   target: default
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7377719Z   force-avd-creation: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7378007Z   disable-animations: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7378323Z   emulator-options: -no-window -no-boot-anim
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7378803Z   script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7379226Z   cores: 2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7379456Z   avd-name: test
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7379713Z   emulator-boot-timeout: 600
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7380007Z   emulator-port: 5554
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7380297Z   disable-spellchecker: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7380615Z   disable-linux-hw-accel: auto
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7380918Z   enable-hw-keyboard: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7381198Z   channel: stable
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7381838Z env:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7382196Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7382798Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7383238Z   MAVEN_ARGS: -ntp
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7383517Z   ANDROID_HOME: /usr/local/lib/android/sdk
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7383872Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7384251Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7384779Z   GRADLE_USER_HOME: /home/runner/.gradle
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7385119Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7385466Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7385962Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7386495Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7386892Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7387219Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7985714Z ##[group]Configure emulator
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7989729Z You're running a Linux VM where hardware acceleration is not available. Please consider using a macOS VM instead to take advantage of native hardware acceleration support provided by HAXM.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7991492Z API level: 35
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7992057Z System image API level: 35
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7992589Z target: default
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7993099Z CPU architecture: x86_64
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7995444Z Hardware profile: 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7996020Z Cores: 2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7996300Z RAM size: 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7996544Z Heap size: 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7996829Z SD card path or size: 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7997182Z Disk size: 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7997441Z AVD name: test
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7997747Z force avd creation: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7998199Z Emulator boot timeout: 600
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7998746Z emulator port: 5554
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7999141Z emulator options: -no-window -no-boot-anim
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7999590Z disable animations: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.7999943Z disable spellchecker: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8000382Z disable Linux hardware acceleration: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8000790Z enable hardware keyboard: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8001618Z Channel: 0 (stable)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8003327Z Script:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8004008Z gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8004591Z Pre emulator launch script:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8005265Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8006357Z ##[group]Install Android SDK
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:36.8049530Z [command]/usr/bin/sh -c \yes | sdkmanager --licenses > /dev/null
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:39.7754782Z Warning: This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:41.2956021Z Installing latest build tools, platform tools, and platform.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:41.2971922Z [command]/usr/bin/sh -c \sdkmanager --install 'build-tools;37.0.0' platform-tools 'platforms;android-35'> /dev/null
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:41.9649372Z Warning: This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:43.0698078Z Installing latest emulator.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:43.0712170Z [command]/usr/bin/sh -c \sdkmanager --install emulator --channel=0 > /dev/null
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:43.7310480Z Warning: This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:50.9332867Z Installing system images.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:50.9350775Z [command]/usr/bin/sh -c \sdkmanager --install 'system-images;android-35;default;x86_64' --channel=0 > /dev/null
+build	Runtime smoke tests on Android emulator	2026-10-29T03:24:51.5990016Z Warning: This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:04.9938080Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:04.9939789Z ##[group]Create AVD
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:04.9940510Z Creating AVD.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:04.9962296Z [command]/usr/bin/sh -c \echo no | avdmanager create avd --force -n test --package 'system-images;android-35;default;x86_64'
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.6882999Z Loading local repository...                                                     
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.6922389Z Warning: This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.8232925Z [=========                              ] 25% Loading local repository...       
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.8262545Z [=========                              ] 25% Fetch remote repository...        
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.8263652Z [=======================================] 100% Fetch remote repository...       
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.8952970Z Auto-selecting single ABI x86_64
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9658648Z Do you wish to create a custom hardware profile? [no] [command]/usr/bin/sh -c \printf 'hw.cpu.ncore=2\n' >> /home/runner/.android/avd/test.avd/config.ini
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9683524Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9685660Z ##[group]Launch Emulator
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9686317Z Disabling Linux hardware acceleration.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9686922Z Starting emulator.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9700090Z [command]/usr/bin/sh -c \/usr/local/lib/android/sdk/emulator/emulator -port 5554 -avd test -no-window -no-boot-anim -accel off &
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9819253Z INFO         | Android emulator version 37.2.12.0 (build_id 16428233) (CL:N/A)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9820204Z INFO         | Graphics backend: gfxstream
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:05.9821589Z INFO         | Found systemPath /usr/local/lib/android/sdk/system-images/android-35/default/x86_64/
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0279400Z INFO         | Saving last run QEMU version for the AVD to 2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0280351Z INFO         | Increasing RAM size to 2560MB
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0281200Z INFO         | Guest GLES Driver: Auto (ext controls)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0282532Z WARNING      | Your GPU drivers may have a bug. Switching to software rendering.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0283857Z INFO         | emuglConfig_init: vulkan_mode_selected:lavapipe gles_mode_selected:swangle
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0284948Z INFO         | Checking system compatibility:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0285785Z INFO         |   Checking: hasSufficientDiskSpace
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0286754Z INFO         |      Ok: Disk space requirements to run avd: `test` are met
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0287658Z INFO         |   Checking: hasSufficientHwGpu
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0288606Z INFO         |      Ok: Hardware GPU compatibility checks are not required
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0289511Z INFO         |   Checking: hasSufficientSystem
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0290705Z INFO         |      Ok: System requirements to run avd: `test` are met
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.0292984Z WARNING      | Feature QuickbootFileBacked is disabled due to stability issues, if you really want that, the environment variable ANDROID_EMU_FORCE_QUICKBOOT_FILE_BACKED need to set to 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2604824Z ProbeKVM: This user doesn't have permissions to use KVM (/dev/kvm).
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2607000Z The KVM line in /etc/group is: [kvm:x:993:]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2607445Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2607800Z If the current user has KVM permissions,
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2608736Z the KVM line in /etc/group should end with ":" followed by your username.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2609297Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2609921Z If we see LINE_NOT_FOUND, the kvm group may need to be created along with permissions:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2610843Z     sudo groupadd -r kvm
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2612012Z     # Then ensure /lib/udev/rules.d/50-udev-default.rules contains something like:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2612938Z     # KERNEL=="kvm", GROUP="kvm", MODE="0660"
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2613329Z     # and then run:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2613644Z     sudo gpasswd -a $USER kvm
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2613841Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2614243Z If we see kvm:... but no username at the end, running the following command may allow KVM access:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2614807Z     sudo gpasswd -a $USER kvm
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2615005Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2615797Z You may need to log out and back in for changes to take effect.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2616110Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.2616436Z WARNING      | x86_64 emulation may not work without hardware acceleration!
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6037764Z ERROR        | Unable to connect to adb daemon on port: 5037
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6040255Z INFO         | Storing crashdata in: /tmp/android-runner/emu-crash-37.2.12.db, detection is enabled for process: 3702
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6041629Z INFO         | Initializing gfxstream backend
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6053240Z INFO         | startOpenglesRendererImpl: gpu info
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6053981Z INFO         | 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6055813Z INFO         | initIcdPaths: ICD set to 'lavapipe', using Lavapipe ICD
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6057156Z INFO         | Setting ICD filenames for the loader = /usr/local/lib/android/sdk/emulator/lib64/vulkan/lvp_icd.json
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6058611Z INFO         | SharedLibrary::open for [/usr/local/lib/android/sdk/emulator/qemu/linux-x86_64/lib64/vulkan/libvulkan.so]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6060212Z INFO         | SharedLibrary::open for [/usr/local/lib/android/sdk/emulator/qemu/linux-x86_64/lib64/vulkan/libvulkan.so.1]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6062062Z INFO         | SharedLibrary::open for [/usr/local/lib/android/sdk/emulator/lib64/vulkan/libvulkan.so]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6063511Z INFO         | Added library: /usr/local/lib/android/sdk/emulator/lib64/vulkan/libvulkan.so
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6252943Z INFO         | Selecting Vulkan device: llvmpipe (LLVM 21.0.0, 256 bits), Version: 1.4.318
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6253661Z INFO         | Using Vulkan externalMemoryMode: OpaqueFd for VkEmulation
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6578443Z INFO         | Format VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16 does not support YCbCr sampler conversion
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6609758Z INFO         | SharedLibrary::open for [libX11]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6611891Z WARNING      | Could not open libX11.so, try libX11.so.6
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6612779Z INFO         | SharedLibrary::open for [libX11.so.6]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6613610Z INFO         | SharedLibrary::open for [libX11-xcb]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6614499Z WARNING      | Could not open libX11-xcb.so, try libX11-xcb.so.1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6615400Z INFO         | SharedLibrary::open for [libX11-xcb.so.1]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6742173Z INFO         | Initializing VkEmulation features:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6743261Z INFO         |     glInteropSupported: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6744191Z INFO         |     useDeferredCommands: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6745186Z INFO         |     createResourceWithRequirements: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6746562Z INFO         |     useVulkanComposition: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6747515Z INFO         |     useVulkanNativeSwapchain: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6748456Z INFO         |     enable guestRenderDoc: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6749315Z INFO         |     ASTC LDR emulation mode: Gpu
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6750014Z INFO         |     enable ETC2 emulation: true
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6750619Z INFO         |     enable Ycbcr emulation: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6751205Z INFO         |     guestVulkanOnly: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6752217Z INFO         |     useDedicatedAllocations: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6752855Z INFO         |     guestVulkanMaxApiVersion: 1.3.0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6753552Z INFO         |     enableProtectedMemoryEmulation: false
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6754262Z INFO         | Graphics Adapter Vendor Google (Google Inc.)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6755100Z INFO         | Graphics Adapter Android Emulator OpenGL ES Translator (Google SwiftShader)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6755880Z INFO         | Graphics API Version OpenGL ES 3.0 (OpenGL ES 3.0 SwiftShader 4.0.0.1)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6758727Z INFO         | Graphics API Extensions GL_OES_EGL_sync GL_OES_EGL_image GL_OES_EGL_image_external GL_OES_depth24 GL_OES_depth32 GL_OES_element_index_uint GL_OES_texture_float GL_OES_texture_float_linear GL_OES_compressed_paletted_texture GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth_texture GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_packed_depth_stencil GL_OES_vertex_half_float GL_OES_standard_derivatives GL_OES_texture_npot GL_OES_rgb8_rgba8 GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_texture_format_BGRA8888 GL_APPLE_texture_format_BGRA8888 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6763259Z INFO         | Graphics Device Extensions N/A
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6764070Z INFO         | Disabling sparse binding feature support
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6819267Z ERROR        | Setting read-only feature 'GLAsyncSwap' to '0'
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6832507Z INFO         | Feature 'GLAsyncSwap' (50) is overridden to 'disabled'
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6846412Z INFO         | Sending adb public key [QAAAAAUUgk4zZ2iUVtPw0xWQ7YvqzBXQSjn2pj8WPq1Q6N7v3Srvt+rJGKfikDMowm6gSBvJ/Tc1Q/uB2jkV1QyH03ZQJZYCn+ZN7zYeNZ2UGjcz6pX/ZM9eIvQW9cbXavJWLTptdVaXBFWozaKh7t+hhrDwneCiH8EtolNm8AdPltATO4qkU9Gemk17+g7PqIJ65M4OV1NdVWzAxFjLAgyvbSIng3Jayn3FDOBDVqthx0l8uvAZQjyrGAAm2pCfmtEoQAUqYIMS1jLBYztzxOO0Jw7NT3DhqLRHr9w3tMF3aeC7oz7xuG9of6lNugfqplffMtCZWmv7vNLyOoC9qo1jIkTxFfOlso+nb0nrLcF09QAMIoLFNWbHHU6QlASmCfW3Szlc8HoemxTyxvWpcrt8WQfmj8M8ta6JzC3K86Q7JG/1fTnFBg5DYLbnhhFktRVNEM2uIfsKItwxLzhXClnP66vw4ds5TkfP2SzwsqEzMOKhgIBZ8dzDhkx1FFG+ihSbA1DXjOrK/MiBpX1wIAfQrNku/uy5W6OqNjNeIrYzi7uqcMxE2IQ11SFqWOAD8BmnAI8D2FG1HAmdl0zzL2rns0JPhocC4Eflwzq+f+Rd1qPEAEV7jQxKIODJjGm3sbHxJ0cMrsvXoWiu7v04n/W551/5HDgL0ZvqOqG6c4mwavrwgMjoIAEAAQA= runner@unknown]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6850473Z INFO         | Userspace boot properties:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6851716Z INFO         |   androidboot.boot_devices=pci0000:00/0000:00:03.0 pci0000:00/0000:00:06.0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6853050Z INFO         |   androidboot.dalvik.vm.heapsize=576m
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6853900Z INFO         |   androidboot.debug.hwui.renderer=skiagl
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6854527Z INFO         |   androidboot.debug.sf.nobootanimation=1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6864218Z INFO         |   androidboot.hardware=ranchu
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6864877Z INFO         |   androidboot.hardware.gltransport=pipe
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6865721Z INFO         |   androidboot.hardware.vulkan=ranchu
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6866551Z INFO         |   androidboot.logcat=*:V
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6867412Z INFO         |   androidboot.opengles.version=196608
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6868188Z INFO         |   androidboot.qemu=1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6877668Z INFO         |   androidboot.qemu.adb.pubkey=QAAAAAUUgk4zZ2iUVtPw0xWQ7YvqzBXQSjn2pj8WPq1Q6N7v3Srvt+rJGKfikDMowm6gSBvJ/Tc1Q/uB2jkV1QyH03ZQJZYCn+ZN7zYeNZ2UGjcz6pX/ZM9eIvQW9cbXavJWLTptdVaXBFWozaKh7t+hhrDwneCiH8EtolNm8AdPltATO4qkU9Gemk17+g7PqIJ65M4OV1NdVWzAxFjLAgyvbSIng3Jayn3FDOBDVqthx0l8uvAZQjyrGAAm2pCfmtEoQAUqYIMS1jLBYztzxOO0Jw7NT3DhqLRHr9w3tMF3aeC7oz7xuG9of6lNugfqplffMtCZWmv7vNLyOoC9qo1jIkTxFfOlso+nb0nrLcF09QAMIoLFNWbHHU6QlASmCfW3Szlc8HoemxTyxvWpcrt8WQfmj8M8ta6JzC3K86Q7JG/1fTnFBg5DYLbnhhFktRVNEM2uIfsKItwxLzhXClnP66vw4ds5TkfP2SzwsqEzMOKhgIBZ8dzDhkx1FFG+ihSbA1DXjOrK/MiBpX1wIAfQrNku/uy5W6OqNjNeIrYzi7uqcMxE2IQ11SFqWOAD8BmnAI8D2FG1HAmdl0zzL2rns0JPhocC4Eflwzq+f+Rd1qPEAEV7jQxKIODJjGm3sbHxJ0cMrsvXoWiu7v04n/W551/5HDgL0ZvqOqG6c4mwavrwgMjoIAEAAQA= runner@unknown
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6886386Z INFO         |   androidboot.qemu.avd_name=test
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6887322Z INFO         |   androidboot.qemu.camera_hq_edge_processing=0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6888272Z INFO         |   androidboot.qemu.camera_protocol_ver=1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6889230Z INFO         |   androidboot.qemu.cpuvulkan.version=4206592
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6890295Z INFO         |   androidboot.qemu.gltransport.drawFlushInterval=800
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6891630Z INFO         |   androidboot.qemu.gltransport.name=pipe
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6892540Z INFO         |   androidboot.qemu.hwcodec.avcdec=2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6893405Z INFO         |   androidboot.qemu.hwcodec.hevcdec=2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6894252Z INFO         |   androidboot.qemu.hwcodec.vpxdec=2
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6895332Z INFO         |   androidboot.qemu.settings.system.screen_off_timeout=2147483647
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6896316Z INFO         |   androidboot.qemu.skin=320x640
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6897096Z INFO         |   androidboot.qemu.virtiowifi=1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6898596Z INFO         |   androidboot.qemu.vsync=60
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6899575Z INFO         |   androidboot.serialno=EMULATOR37X2X12X0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6900988Z INFO         |   androidboot.vbmeta.digest=602b0c809848f3be570a96601071931225108ec3b3739d99a1dc41db38efe83c
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6902496Z INFO         |   androidboot.vbmeta.hash_alg=sha256
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6903322Z INFO         |   androidboot.vbmeta.size=6720
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.6904090Z INFO         |   androidboot.veritymode=enforcing
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7005170Z TCG doesn't support requested feature: CPUID.01H:ECX.avx [bit 28]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7005842Z TCG doesn't support requested feature: CPUID.01H:ECX.f16c [bit 29]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7029783Z TCG doesn't support requested feature: CPUID.01H:ECX.avx [bit 28]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7030863Z TCG doesn't support requested feature: CPUID.01H:ECX.f16c [bit 29]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7032423Z WARNING: cannnot unmap ptr 0x7effa6401000 as it is in the protected range from 0x7eff06400000 to 0x7effa6600000
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7166057Z pulseaudio: Failed to initialize PA contextCould not init `pa' audio driver
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:06.7205914Z INFO         | Monitoring duration of emulator setup.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7319250Z INFO         | Activated packet streamer for bluetooth emulation
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7320171Z INFO         | Successfully initialized netsim WiFi
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7341977Z INFO         | Setting display: 0 configuration to: 320x640, dpi: 160x160 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7342946Z INFO         | setDisplayActiveConfig: id:0, 320x640
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7344175Z INFO         | emulatorSetupEnvironment: Environment scene is not required
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7474924Z INFO         | Loading snapshot 'default_boot'...
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7476525Z WARNING      | Failed to process .ini file /home/runner/.android/emu-update-last-check.ini for reading.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7640141Z WARNING      | Device 'cache' does not have the requested snapshot 'default_boot'
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7640820Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7641245Z WARNING      | Failed to load snapshot 'default_boot'
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.7643081Z USER_INFO    | The emulator is performing a cold boot without a saved state because there's no snapshot and you have configured it not to save on exit.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:07.8428609Z WARNING      | Failed to process .ini file /home/runner/.android/emu-update-last-check.ini for reading.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:15.9752091Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:15.9787380Z * daemon not running; starting now at tcp:5037
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:16.1771012Z * daemon started successfully
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:16.1776105Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:16.1780238Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:18.1808332Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:18.1840973Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:18.1847971Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:20.1893270Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:20.1932179Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:20.1939540Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:22.1975726Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:22.2009900Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:22.2017066Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:24.2067872Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:24.2104733Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:24.2110666Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:26.2138992Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:26.2176138Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:26.2181832Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:28.2216659Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:28.2255038Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:28.2260688Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:30.2301394Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:30.2342950Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:30.2352500Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:32.2385445Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:32.2423797Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:32.2430112Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:34.2452887Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:34.2490680Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:34.2496437Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:36.2543237Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:36.2602866Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:36.2603862Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:38.2624523Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:38.2660752Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:38.2666286Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:40.2704776Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:40.2740665Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:40.2746147Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:42.2778596Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:42.2814460Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:42.2820593Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:44.2864136Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:44.2900836Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:44.2906046Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:46.2952752Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:46.2992384Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:46.2997916Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:48.3034159Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:48.3072714Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:48.3076930Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:50.3118935Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:50.3155246Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:50.3162179Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:52.3209398Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:52.3245614Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:52.3250852Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:54.3292772Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:54.3329100Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:54.3334879Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:56.3377728Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:56.3414651Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:56.3419779Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:58.3442475Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:58.3479939Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:25:58.3485860Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:00.3527401Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:00.3566542Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:00.3575550Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:02.3612215Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:02.3646851Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:02.3652270Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:04.3684686Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:04.3725399Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:04.3752474Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:06.3762828Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:06.3796565Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:06.3802054Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:08.3833479Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:08.3868220Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:08.3874400Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:10.3916051Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:10.3950394Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:10.3955282Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:12.4000360Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:12.4039010Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:12.4044737Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:14.4078401Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:14.4115784Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:14.4121136Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:16.4142934Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:16.4179762Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:16.4185585Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:18.4225362Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:18.4264579Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:18.4271002Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:20.4311183Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:20.4351683Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:20.4356334Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:22.4378073Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:22.4416668Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:22.4422723Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:24.4463575Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:24.4500848Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:24.4506365Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:26.4529204Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:26.4566957Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:26.4572675Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:28.4626263Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:28.4662066Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:28.4667948Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:30.4689925Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:30.4725806Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:30.4731982Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:32.4771580Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:32.4810671Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:32.4816192Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:34.4856643Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:34.4894326Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:34.4899678Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:36.4930195Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:36.4966588Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:36.4972044Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:38.4993237Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:38.5033242Z adb: device offline
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:38.5038494Z The process '/usr/local/lib/android/sdk/platform-tools/adb' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:40.5078831Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:43.4717538Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:45.5522658Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:50.5757701Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:52.6206298Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:54.5248918Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:56.5300518Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:26:58.7037515Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:00.7282766Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:02.8439725Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:04.8509603Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:06.9105153Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:08.9236296Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:09.9526906Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:11.9556143Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:12.9194663Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:15.0206461Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:16.2972036Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:18.3114090Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:19.4444581Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:21.5001519Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:22.1445975Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:24.1492068Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:24.8110131Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:26.8181072Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:27.4484376Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:29.4668230Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:30.8242786Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:32.8283623Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:33.9254423Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:35.9320700Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:36.7472657Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:38.7514461Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:39.5997921Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:41.6048288Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:42.3965616Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:44.4016182Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:45.1383803Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:47.1492269Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:47.9010538Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:49.9069273Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:50.6070034Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:52.6119858Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:53.5847170Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:55.6042789Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:56.5789284Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:58.5841122Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:27:59.3874720Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:01.4025617Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:02.1014829Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:04.1093821Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:04.8689286Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:06.8736189Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:07.6053301Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:09.6100543Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:10.2863092Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:12.2915475Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:12.9511702Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:14.9595134Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:16.1750135Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:18.1798712Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:19.8955311Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:21.9000746Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:22.9531600Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:24.9582411Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:25.9296363Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:27.9342007Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:29.4761735Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:31.4905489Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:33.1589359Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:35.1742795Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:36.7862592Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:38.7915882Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:41.0389954Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:43.0435370Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:44.9354298Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:46.9406237Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:49.9124091Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:51.9163212Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:55.6197503Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:57.6234441Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:28:59.8869513Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:01.9352999Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:04.4320924Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:06.4379348Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:09.8361668Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:11.8587391Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:14.7325172Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:16.7378654Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:19.8702658Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:21.9052064Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:24.9182077Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:26.9228432Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:29.5974821Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:31.6066337Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:34.0706497Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:36.0826157Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:38.7826668Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:40.7875791Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:43.0562742Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:45.0605365Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:46.7270328Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:48.7317064Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:51.0633202Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:53.0760680Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:55.5196450Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:29:57.5247647Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:00.4597815Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:02.4682814Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:05.5359174Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:07.5460694Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:10.1393643Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:12.1612246Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:14.3617569Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:16.3696852Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:19.2563132Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:21.3009687Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:24.2831569Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:26.2977319Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:29.3539942Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:31.3584252Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:33.6802372Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:35.6847742Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:38.7448320Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:40.7762612Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:42.8510143Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:44.8732312Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:46.9898130Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:49.0058940Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:50.3023641Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:52.3075752Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:53.6474324Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:55.6587034Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:57.0654082Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:30:59.0719224Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:00.5942048Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:02.6116624Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:04.0741528Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:06.0770070Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:06.8574775Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:08.8615746Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:09.9828902Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:11.9876076Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:13.2897910Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:15.3129724Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:16.0553638Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:18.0600302Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:18.9102281Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:20.9376122Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:21.6663696Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:23.6710837Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:24.4154917Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:26.4372115Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:27.4890018Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:29.4976750Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:30.8341511Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:32.8398080Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:33.9662567Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:35.9702189Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:36.7497353Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:38.7536142Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:39.4962149Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:41.5078130Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:42.4396328Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:44.4515241Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:45.2516434Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:47.2555665Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:48.2627547Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:50.2851031Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:51.6283786Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:53.6330893Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:54.5547864Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:56.5610567Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:57.4737304Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:31:59.4786361Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:00.4373363Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:02.4466116Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:03.3481019Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:05.3528044Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:06.0333452Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:08.0375229Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:08.7806858Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:10.7852738Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:11.5978820Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:13.6079409Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:14.3220525Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:16.3319457Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:17.9263104Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:19.9294984Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:20.9403456Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:22.9815394Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:23.9422455Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:25.9472863Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:27.1568036Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:29.1613285Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:30.4176029Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:32.4230557Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:33.6623807Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:35.6646671Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:37.3608509Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:39.3716299Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:39.9943519Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:42.0026872Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:42.9390002Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:44.9435168Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:45.5997647Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:47.6074679Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:48.9656958Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:50.9685786Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:52.6395206Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:54.7268664Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:55.8088892Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:57.8132627Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:32:58.7616452Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:00.7884057Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:01.6186938Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:03.6232421Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:04.4001896Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:06.4066019Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:07.1169818Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:09.1435249Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:09.8801834Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:11.8884394Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:12.6454302Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:14.6502379Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:15.3748782Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:17.3794171Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:18.1016249Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:20.1058138Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:20.7771097Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:22.7897890Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:23.6083398Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:25.6160965Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:26.3250588Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:28.3327055Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:29.1087479Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:31.1131901Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:31.7802786Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:33.8067959Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:34.8523842Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:36.8560949Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:37.5730469Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:39.6233164Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:40.5639506Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:42.5681795Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:43.4997650Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:45.5040937Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:46.4540246Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:48.4819811Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:49.2833274Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:51.2907554Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:52.0817013Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:54.0999570Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:55.0918180Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:57.0982862Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:57.8272983Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:33:59.8312903Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:00.6181196Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:02.6230425Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:03.2842793Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:05.2878422Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:05.9990626Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:08.0198311Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:08.7591001Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:10.7631932Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:11.5206988Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:13.5343274Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:14.2290867Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:16.2332379Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:17.3847571Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:19.3956538Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:20.0998063Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:22.1044080Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:22.8505747Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:24.8597343Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:25.9603062Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:27.9635245Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:29.3967192Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:31.4091289Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:32.3083133Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:34.3225800Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:35.3167607Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:37.3195161Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:38.0462231Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:40.0537014Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:40.8654089Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:42.8701184Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:43.6324725Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:45.6352746Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:46.3939259Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:48.3978020Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:49.0825085Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:51.0864134Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:51.8751153Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:53.8898696Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:54.7103519Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:56.7149250Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:57.9276244Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:34:59.9315259Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:01.0783586Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:03.1120328Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:04.3044743Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:06.3126062Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:08.3603402Z 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:08.3615016Z Emulator booted.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:08.3632917Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell input keyevent 82
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:09.9216765Z INFO         | Boot completed in 603912 ms
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:09.9218230Z INFO         | Increasing screen off timeout, logcat buffer size to 2M.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:13.3283049Z Disabling animations.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:13.3300654Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell settings put global window_animation_scale 0.0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:16.6182520Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell settings put global transition_animation_scale 0.0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:20.8268986Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 shell settings put global animator_duration_scale 0.0
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:24.2875153Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:24.2899985Z [command]/usr/bin/sh -c gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:25.1009660Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:26.5023326Z Daemon will be stopped at the end of the build 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:37.7103828Z > Task :app:preBuild UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:37.7122160Z > Task :app:preDebugBuild UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4003263Z > Task :app:compileDebugAidl UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4047754Z > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4112766Z > Task :app:generateDebugBuildConfig UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4137014Z > Task :app:extractDebugProto UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4192945Z > Task :app:extractIncludeDebugProto UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.4242196Z > Task :app:extractProto UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.5031729Z > Task :app:generateDebugProto UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.6008558Z > Task :app:checkDebugAarMetadata UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.6050685Z > Task :app:generateDebugResValues UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.6082190Z > Task :app:mapDebugSourceSetPaths UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.6112250Z > Task :app:generateDebugResources UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.7014002Z > Task :app:mergeDebugResources UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.7046989Z > Task :app:packageDebugResources UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.7063564Z > Task :app:parseDebugLocalResources UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.7064673Z > Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.7118519Z > Task :app:extractDeepLinksDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.8028974Z > Task :app:processDebugMainManifest UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.8052343Z > Task :app:processDebugManifest UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:38.8082419Z > Task :app:processDebugManifestForPackage UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.0005538Z > Task :app:processDebugResources UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.2003046Z > Task :app:compileDebugKotlin UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.2012420Z > Task :app:javaPreCompileDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.2013616Z > Task :app:compileDebugJavaWithJavac UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.3019900Z > Task :app:preDebugAndroidTestBuild SKIPPED
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.3055599Z > Task :app:compileDebugAndroidTestAidl NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.4014335Z > Task :app:bundleDebugClassesToCompileJar
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.6042757Z > Task :app:processDebugAndroidTestManifest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.6072205Z > Task :app:generateDebugAndroidTestBuildConfig
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.6073049Z > Task :app:extractAndroidTestDebugProto
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:39.6132509Z > Task :app:extractAndroidTestProto
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.0042782Z > Task :app:extractIncludeDebugAndroidTestProto
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.0064409Z > Task :app:generateDebugAndroidTestProto NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.1010315Z > Task :app:generateDebugAndroidTestResValues
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.1014309Z > Task :app:checkDebugAndroidTestAarMetadata
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.1015531Z > Task :app:mapDebugAndroidTestSourceSetPaths
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.1016521Z > Task :app:generateDebugAndroidTestResources
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.3994738Z > Task :app:mergeDebugShaders UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.3995950Z > Task :app:javaPreCompileDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.3997036Z > Task :app:compileDebugShaders NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.4009439Z > Task :app:generateDebugAssets UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.4017181Z > Task :app:mergeDebugAndroidTestResources
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.4048094Z > Task :app:mergeDebugAssets UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.5023595Z > Task :app:compressDebugAssets UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.5048997Z > Task :app:desugarDebugFileDependencies UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.5083271Z > Task :app:dexBuilderDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.7014233Z > Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.7042176Z > Task :app:processDebugJavaRes UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.7064133Z > Task :app:mergeDebugJavaResource UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.8002621Z > Task :app:checkDebugDuplicateClasses UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.9064417Z > Task :app:mergeExtDexDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.9112261Z > Task :app:mergeLibDexDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:40.9126922Z > Task :app:mergeProjectDexDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:41.0011777Z > Task :app:processDebugAndroidTestResources
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:41.4002694Z > Task :app:configureCMakeDebug[arm64-v8a]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:41.9034580Z > Task :app:buildCMakeDebug[arm64-v8a]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:41.9079196Z > Task :app:configureCMakeDebug[armeabi-v7a]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.0003827Z > Task :app:buildCMakeDebug[armeabi-v7a]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.0023850Z > Task :app:configureCMakeDebug[x86]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.0079192Z > Task :app:buildCMakeDebug[x86]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.0997919Z > Task :app:configureCMakeDebug[x86_64]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1019044Z > Task :app:buildCMakeDebug[x86_64]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1062181Z > Task :app:mergeDebugJniLibFolders UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1076918Z > Task :app:mergeDebugNativeLibs UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1087229Z > Task :app:stripDebugDebugSymbols UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1112419Z > Task :app:validateSigningDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1142068Z > Task :app:writeDebugAppMetadata UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.1167297Z > Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2047831Z > Task :app:packageDebug UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2052554Z > Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2103780Z > Task :app:mergeDebugAndroidTestShaders
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2112308Z > Task :app:compileDebugAndroidTestShaders NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2113629Z > Task :app:generateDebugAndroidTestAssets UP-TO-DATE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.2114607Z > Task :app:mergeDebugAndroidTestAssets
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.3032536Z > Task :app:compressDebugAndroidTestAssets
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.3069097Z > Task :app:desugarDebugAndroidTestFileDependencies
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.3127337Z > Task :app:checkDebugAndroidTestDuplicateClasses
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.3152362Z > Task :app:mergeDebugAndroidTestJniLibFolders
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.4007568Z > Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.4008713Z > Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.5087534Z > Task :app:mergeLibDexDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.6032772Z > Task :app:validateSigningDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:42.6047362Z > Task :app:writeDebugAndroidTestSigningConfigVersions
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:44.9002849Z > Task :app:mergeExtDexDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:49.1995784Z > Task :app:compileDebugAndroidTestKotlin
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:51.2022755Z > Task :app:compileDebugAndroidTestJavaWithJavac
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:51.7996801Z > Task :app:dexBuilderDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:51.8019183Z > Task :app:mergeDebugAndroidTestGlobalSynthetics
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:51.8995169Z > Task :app:processDebugAndroidTestJavaRes
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:52.0007323Z > Task :app:mergeProjectDexDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:52.2002969Z > Task :app:mergeDebugAndroidTestJavaResource
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:52.5010451Z > Task :app:packageDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:52.5042496Z > Task :app:createDebugAndroidTestApkListingFileRedirect
+build	Runtime smoke tests on Android emulator	2026-10-29T03:35:57.9995154Z [EmulatorConsole]: Failed to start Emulator console for 5554
+build	Runtime smoke tests on Android emulator	2026-10-29T03:36:22.4995989Z > Task :app:connectedDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:38:55.2703761Z ERROR        | Failed to find ColorBuffer: 66
+build	Runtime smoke tests on Android emulator	2026-10-29T03:38:55.2704446Z ERROR        | Failed to bind to texture: invalid color buffer.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:29.2000151Z Starting 0 tests on emulator-5554 - 15
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:39.1993126Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:39.1995004Z emulator-5554 - 15 Tests 0/0 completed. (0 skipped) (0 failed)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:47.9994764Z Finished 0 tests on emulator-5554 - 15
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.3994110Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.3994991Z > Task :app:connectedDebugAndroidTest
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.3995857Z Test run failed to complete. Instrumentation run failed due to Process crashed.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9015707Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9016792Z > Task :app:connectedDebugAndroidTest FAILED
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9043008Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__reactivecircus_android-emulator-runner-1793244928861.json
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9071643Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9095506Z FAILURE: Build failed with an exception.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9172159Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9190376Z * What went wrong:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9202386Z Execution failed for task ':app:connectedDebugAndroidTest'.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9232918Z > There were failing tests. See the report at: file:///home/runner/work/Gemeni/Gemeni/app/build/reports/androidTests/connected/debug/index.html
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9251753Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9281924Z * Try:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9290687Z > Run with --info or --debug option to get more log output.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9323031Z > Run with --scan to get full insights.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9332282Z > Get more help at https://help.gradle.org.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9357849Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9358290Z * Exception is:
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9359785Z org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:connectedDebugAndroidTest'.
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9362397Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:130)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9378305Z 	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:293)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9380227Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:128)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9383124Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9398185Z 	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9400602Z 	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9403228Z 	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9405353Z 	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9407713Z 	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9409903Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9412119Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9421070Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9423667Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9430236Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9432989Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9435067Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9437141Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9439125Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9441097Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9443238Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9450008Z 	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9452691Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9455084Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9457707Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9459951Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9462690Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9465327Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9467551Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9469387Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9471474Z 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9473467Z 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9475967Z Caused by: org.gradle.api.GradleException: There were failing tests. See the report at: file:///home/runner/work/Gemeni/Gemeni/app/build/reports/androidTests/connected/debug/index.html
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9478659Z 	at com.android.build.gradle.internal.tasks.DeviceProviderInstrumentTestTask.run(DeviceProviderInstrumentTestTask.java:445)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9481127Z 	at com.android.build.gradle.internal.tasks.DeviceProviderInstrumentTestTask.doTaskAction(DeviceProviderInstrumentTestTask.java:305)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9483749Z 	at com.android.build.gradle.internal.tasks.NonIncrementalTask$taskAction$$inlined$recordTaskAction$1.invoke(BaseTask.kt:79)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9485578Z 	at com.android.build.gradle.internal.tasks.Blocks.recordSpan(Blocks.java:51)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9487258Z 	at com.android.build.gradle.internal.tasks.NonIncrementalTask.taskAction(NonIncrementalTask.kt:78)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9489058Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9490808Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9493352Z 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9495019Z 	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9496584Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9498543Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9532555Z 	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9576352Z 	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:244)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9592680Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:29)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9615914Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9628202Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9657552Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9689378Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9722712Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9762804Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9775770Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9785871Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9788002Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9789944Z 	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9791848Z 	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9793518Z 	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9795056Z 	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9796507Z 	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9798821Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9801558Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9803846Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9805867Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9807861Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9809816Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9812062Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9813727Z 	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9815227Z 	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9816969Z 	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9819019Z 	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9820643Z 	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9822892Z 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9824999Z 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:28)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9827087Z 	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:67)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9829265Z 	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:37)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9831721Z 	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:61)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9833967Z 	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:26)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9836349Z 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9838650Z 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9840789Z 	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:40)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9843277Z 	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:29)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9845232Z 	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9847025Z 	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:75)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9848655Z 	at org.gradle.internal.Either$Right.fold(Either.java:175)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9849992Z 	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9851794Z 	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:73)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9853431Z 	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:48)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9855235Z 	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:46)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9857173Z 	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:35)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9859006Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9860791Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9862749Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9864429Z 	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9866526Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9869025Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9871786Z 	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:49)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9877905Z 	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:27)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9880396Z 	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:71)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9883015Z 	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:39)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9889846Z 	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:65)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9903142Z 	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:36)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9905097Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:107)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9906973Z 	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:56)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9909323Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9912534Z 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9929552Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9932973Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9945989Z 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9948457Z 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9950738Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9953983Z 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9956009Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:75)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9957888Z 	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:41)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9959937Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9962318Z 	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:289)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9964447Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9966549Z 	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9968472Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9970221Z 	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9972648Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9975261Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9977721Z 	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9979927Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9982263Z 	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9983996Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:48)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9985649Z 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:35)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9987474Z 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:61)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9989757Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:127)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9992322Z 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9995097Z 	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:48.9999328Z 	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0002021Z 	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0004253Z 	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0006418Z 	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0008493Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0010497Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0012784Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0015023Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0017526Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0020015Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0022202Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0024200Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0026160Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0028227Z 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0030163Z 	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0032116Z 	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0034224Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0036623Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0039112Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0041804Z 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0044153Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0046768Z 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0048983Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0050853Z 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0053120Z 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0055001Z 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0056000Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0056166Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0056584Z BUILD FAILED in 5m 24s
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.0057441Z 83 actionable tasks: 41 executed, 42 up-to-date
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4097399Z ##[error]The process '/usr/bin/sh' failed with exit code 1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4109361Z ##[group]Terminate Emulator
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4110762Z [command]/usr/local/lib/android/sdk/platform-tools/adb -s emulator-5554 emu kill
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4139235Z OK: killing emulator, bye bye
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4139846Z OK
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4141788Z INFO         | Wait for emulator (pid 3702) 20 seconds to shutdown gracefully before kill;you can set environment variable ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL(in seconds) to change the default value (20 seconds)
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4143621Z 
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:49.4154317Z ##[endgroup]
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.4403433Z INFO         | Saving with gfxstream=1
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.4918350Z INFO         | Saving snapshot 'default_boot' took 3054 ms
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.7939757Z ERROR        | stop: Not implemented
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.7941167Z WARNING      | Emulator client has not yet been configured.. Call configure me first!
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.8134262Z INFO         | removeAll
+build	Runtime smoke tests on Android emulator	2026-10-29T03:40:52.8760507Z WARNING      | Netsim Wifi dns:///localhost:35319 is gone due to Stream removed (CANCELLED)
