@@ -36,7 +36,7 @@ class JarvisRuntimeController(context: Context) {
         onProgress("Русский ASR готов")
     }
 
-    suspend fun listenOnce(onProgress: (String) -> Unit, onReply: (String) -> Unit = {}): String {
+    suspend fun listenOnce(onReply: (String) -> Unit = {}, onProgress: (String) -> Unit): String {
         val samples = ArrayList<ShortArray>()
         val started = System.nanoTime()
         onProgress("Микрофон активен — говорите")
