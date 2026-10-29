@@ -80,12 +80,15 @@ jobs:
           echo "boot timeout"; exit 1
       - name: Runtime smoke tests on Android emulator
         timeout-minutes: 30
-        run: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle-test.log"
       - name: Diagnose emulator failure (annotations)
         if: failure()
         shell: bash
         run: |
           set +e
+          grep -iE "what went wrong|FAILED|Exception|Caused by|error:|INSTRUMENTATION|No connected|tests completed|failed" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 25 | cut -c1-260 | sed "s#^#::error::gradle: #"
           grep -iE "fatal|crash|abort|panic|error|fail|kvm|gpu|boot" "$RUNNER_TEMP/emu.log" 2>/dev/null | tail -n 25 | cut -c1-220 | sed 's#^#::error::emu: #'
           adb devices 2>/dev/null | sed 's#^#::error::devices: #'
           ADB="$ANDROID_HOME/platform-tools/adb"
