@@ -90,6 +90,7 @@ jobs:
         shell: bash
         run: |
           set +e
+          tail -n 30 "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | cut -c1-230 | sed "s#^#::error::gt: #"
           echo "::error::logcat lines: $(wc -l < "$RUNNER_TEMP/logcat.txt" 2>/dev/null)"
           grep -E " [EF]/" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | grep -iE "jarvis|instrument|uiautomation|died|crash|Process|FATAL|AndroidRuntime" | grep -v "Sending oneway" | head -n 40 | cut -c1-230 | sed "s#^#::error::jv: #"
           grep -n -A 14 "FAILED" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 40 | cut -c1-240 | sed "s#^#::error::fail: #"
