@@ -14,10 +14,36 @@ import java.util.Locale
  */
 class TextCommandRouter(private val context: Context) {
 
+    companion object {
+        /** Известные приложения: название → пакет. Пакеты перечислены в <queries> манифеста. */
+        val APPS = mapOf(
+            "яндекс карты" to "ru.yandex.yandexmaps",
+            "яндекс навигатор" to "ru.yandex.yandexnavi",
+            "телеграм" to "org.telegram.messenger",
+            "telegram" to "org.telegram.messenger",
+            "хром" to "com.android.chrome",
+            "chrome" to "com.android.chrome",
+            "гугл карты" to "com.google.android.apps.maps",
+            "ютуб" to "com.google.android.youtube",
+            "youtube" to "com.google.android.youtube",
+            "ватсап" to "com.whatsapp",
+            "whatsapp" to "com.whatsapp"
+        )
+    }
+
+
     fun handle(text: String): String {
         val t = text.trim()
         if (t.isEmpty()) return "Скажите или напишите команду"
 
+        val openApp = Regex("^открой\\s+(.+)$", RegexOption.IGNORE_CASE).find(t)
+        if (openApp != null) {
+            val name = openApp.groupValues[1].trim().lowercase(Locale.getDefault())
+            val pkg = APPS[name] ?: return "Не знаю приложение: $name"
+            val launch = context.packageManager.getLaunchIntentForPackage(pkg)
+                ?: return "Приложение не установлено: $name"
+            return open(launch, "Открываю: $name", "Не удалось открыть: $name")
+        }
         val search = Regex("^(найди|поиск)\\s*(.*)", RegexOption.IGNORE_CASE).find(t)
         if (search != null) {
             val query = search.groupValues[2].trim()

@@ -65,4 +65,13 @@
                 android:resource="@xml/widget_info" />
         </receiver>
     </application>
+    <queries>
+        <package android:name="ru.yandex.yandexmaps" />
+        <package android:name="ru.yandex.yandexnavi" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.whatsapp" />
+    </queries>
 </manifest>
