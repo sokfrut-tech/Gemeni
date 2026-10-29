@@ -33,7 +33,7 @@ class JarvisRuntimeSmokeTest {
     @Test
     fun microphoneRequestsPermissionAndEntersRuntimeState() {
         launchJarvis()
-        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
+        val mic = device.wait(Until.findObject(By.desc("Говорить с Джарвисом")), 10_000)
         assertNotNull("Microphone button is missing", mic)
         device.executeShellCommand("pm grant $packageName android.permission.RECORD_AUDIO")
         mic!!.click()

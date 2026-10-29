@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.filled.Send
+import com.jarvis.breeno.assistant.core.LocalLlmEngine
 import com.jarvis.breeno.assistant.core.TextCommandRouter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -196,6 +197,7 @@ class MainActivity : ComponentActivity() {
     private fun JarvisOrbHome() {
         var orbState by remember { mutableStateOf(OrbState.IDLE) }
         var input by remember { mutableStateOf("") }
+        val aiReady = remember { LocalLlmEngine().isInstalled }
 
         DisposableEffect(Unit) {
             statusSink = { value ->
@@ -215,10 +217,11 @@ class MainActivity : ComponentActivity() {
         }
 
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF05080C))) {
-            JarvisOrb(
+            JarvisArmorScreen(
                 state = orbState,
-                onClick = { if (orbState == OrbState.IDLE) requestAndListen() },
-                modifier = Modifier.align(Alignment.Center),
+                aiReady = aiReady,
+                onTap = { if (orbState == OrbState.IDLE) requestAndListen() },
+                modifier = Modifier.fillMaxSize(),
             )
             TextField(
                 value = input,
