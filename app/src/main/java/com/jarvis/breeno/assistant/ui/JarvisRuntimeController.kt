@@ -36,7 +36,7 @@ class JarvisRuntimeController(context: Context) {
         onProgress("Русский ASR готов")
     }
 
-    suspend fun listenOnce(onProgress: (String) -> Unit): String {
+    suspend fun listenOnce(onProgress: (String) -> Unit, onReply: (String) -> Unit = {}): String {
         val samples = ArrayList<ShortArray>()
         val started = System.nanoTime()
         onProgress("Микрофон активен — говорите")
@@ -72,10 +72,14 @@ class JarvisRuntimeController(context: Context) {
             }
             else -> "Вы сказали: $text"
         }
+        onReply(response)
         speaker.speak(response)
         onProgress(response)
         return text
     }
+
+    /** Озвучивает ответ через общий JarvisSpeaker (используется и текстовым вводом). */
+    fun say(text: String) = speaker.speak(text)
 
     private fun launch(intent: Intent) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

@@ -12,7 +12,10 @@ import java.util.Locale
  * Используется каналом AIDL (submitText). Голосовой путь (JarvisRuntimeController) не меняется.
  * Возвращает короткий ответ для показа или озвучки.
  */
-class TextCommandRouter(private val context: Context) {
+class TextCommandRouter(
+    private val context: Context,
+    private val languageModel: LanguageModel = LocalLlmEngine(),
+) {
 
     companion object {
         /** Известные приложения: название → пакет. Пакеты перечислены в <queries> манифеста. */
@@ -66,7 +69,8 @@ class TextCommandRouter(private val context: Context) {
         if (t.contains("время", true)) {
             return "Сейчас " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         }
-        return "Не поняла команду: $t"
+        // Команда не распознана: спрашиваем языковую модель (сейчас она не установлена).
+        return languageModel.complete(t)
     }
 
     private fun open(intent: Intent, ok: String, fail: String = "Не удалось открыть"): String {

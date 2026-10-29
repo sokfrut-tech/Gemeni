@@ -33,6 +33,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.material.icons.filled.Send
+import com.jarvis.breeno.assistant.core.TextCommandRouter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -71,7 +79,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runtime = JarvisRuntimeHolder.get(this)
-        setContent { JarvisTheme { JarvisHome() } }
+        setContent { JarvisTheme { JarvisOrbHome() } }
     }
 
     private fun requestAndListen() {
@@ -166,6 +174,78 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private val textRouter by lazy { TextCommandRouter(this) }
+
+    /** Текстовая команда с клавиатуры: тот же маршрутизатор, ответ озвучивается. */
+    private fun sendText(text: String) {
+        val query = text.trim()
+        if (query.isEmpty()) return
+        val reply = textRouter.handle(query)
+        statusSink?.invoke(reply)
+        runtime.say(reply)
+    }
+
+    /**
+     * Экран только с шаром по центру и полем ввода внизу.
+     * Нажатие на шар запускает запись голоса; текст отправляется клавиатурой.
+     */
+    @Composable
+    private fun JarvisOrbHome() {
+        var orbState by remember { mutableStateOf(OrbState.IDLE) }
+        var input by remember { mutableStateOf("") }
+
+        DisposableEffect(Unit) {
+            statusSink = { value ->
+                orbState = when {
+                    value.contains("Микрофон активен") || value.contains("говорите") -> OrbState.LISTENING
+                    value.startsWith("Подготавливаю") || value.startsWith("Распознано") || value.startsWith("Ошибка") -> OrbState.IDLE
+                    value.isNotBlank() -> OrbState.SPEAKING
+                    else -> OrbState.IDLE
+                }
+            }
+            onDispose { statusSink = null }
+        }
+
+        val send = {
+            sendText(input)
+            input = ""
+        }
+
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF05080C))) {
+            JarvisOrb(
+                state = orbState,
+                onClick = { if (orbState == OrbState.IDLE) requestAndListen() },
+                modifier = Modifier.align(Alignment.Center),
+            )
+            TextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xCC111824),
+                    unfocusedContainerColor = Color(0xCC111824),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    cursorColor = Color(0xFF5BE7FF),
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { send() }),
+                trailingIcon = {
+                    IconButton(onClick = { send() }) {
+                        Icon(Icons.Default.Send, contentDescription = "Отправить", tint = Color(0xFF5BE7FF))
+                    }
+                },
+            )
         }
     }
 
