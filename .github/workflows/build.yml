@@ -59,9 +59,8 @@ jobs:
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "emulator" "system-images;android-35;google_apis;x86_64"
           echo "no" | "$AVDMANAGER" create avd -n test -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
-          echo "HOME=$HOME ANDROID_AVD_HOME=${ANDROID_AVD_HOME:-unset}"
-          "$AVDMANAGER" list avd || true
-          ls -la "$HOME/.android/avd" || true
+          { echo "::error::HOME=$HOME AVDHOME=${ANDROID_AVD_HOME:-unset}"; "$AVDMANAGER" list avd 2>&1 | head -20 | sed "s#^#::error::avdlist: #"; ls -la "$HOME/.android/avd" 2>&1 | sed "s#^#::error::ls: #"; } || true
+          test -f "$HOME/.android/avd/test.ini" || { echo "::error::test.ini missing after create"; exit 1; }
       - name: Start emulator and wait for boot
         timeout-minutes: 20
         run: |
