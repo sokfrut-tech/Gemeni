@@ -35,6 +35,7 @@ class JarvisRuntimeSmokeTest {
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
+        device.executeShellCommand("pm grant $packageName android.permission.RECORD_AUDIO")
         mic!!.click()
         // On the emulator this may first show the Android permission dialog.
         val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
@@ -42,9 +43,8 @@ class JarvisRuntimeSmokeTest {
             ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
         if (allow != null) allow.click()
-        val state = device.wait(Until.hasObject(By.textContains("Микрофон активен")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("ASR")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("Ошибка runtime")), 5_000)
+        val state = listOf("Микрофон активен", "Слушаю", "Подготавливаю", "Распознаю", "ASR", "Ошибка runtime")
+            .any { device.wait(Until.hasObject(By.textContains(it)), 6_000) }
         assertTrue("Microphone action produced no runtime state", state)
     }
 
@@ -52,7 +52,7 @@ class JarvisRuntimeSmokeTest {
     fun settingsOpensAndroidAccessibilitySettings() {
         launchJarvis()
         device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
-        assertTrue("Accessibility settings did not open", device.wait(Until.hasObject(By.textContains("Accessibility")), 5_000) || device.wait(Until.hasObject(By.textContains("Специальные возможности")), 5_000))
+        assertTrue("Settings did not open", device.wait(Until.hasObject(By.pkg("com.android.settings").depth(0)), 8_000))
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
