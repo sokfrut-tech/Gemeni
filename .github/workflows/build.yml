@@ -82,6 +82,7 @@ jobs:
         timeout-minutes: 30
         run: |
           set -o pipefail
+          "$ANDROID_HOME/platform-tools/adb" logcat -c || true
           "$ANDROID_HOME/platform-tools/adb" logcat -v time > "$RUNNER_TEMP/logcat.txt" 2>&1 &
           gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle-test.log"
       - name: Diagnose emulator failure (annotations)
@@ -90,7 +91,7 @@ jobs:
         run: |
           set +e
           grep -n -A 14 "FAILED" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 40 | cut -c1-240 | sed "s#^#::error::fail: #"
-          grep -E "FATAL EXCEPTION|Process: com.jarvis|com\.jarvis\.[a-zA-Z.]*(Exception|Error)|UnsatisfiedLink|Fatal signal|SIGSEGV|SIGABRT|dlopen failed.*jarvis|libjarvis|sherpa|onnx" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | tail -n 40 | cut -c1-240 | sed "s#^#::error::crash: #"
+          grep -E "am_crash|am_proc_died|am_kill|am_anr|has died|Process .*crash|Instrumentation|InstrumentationTestRunner|AndroidJUnitRunner|JarvisRuntimeSmokeTest|assistant\.test|FATAL|ANR in|killed|Killing|lowmem|Fatal signal" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | tail -n 40 | cut -c1-240 | sed "s#^#::error::crash: #"
           tail -n 45 "$RUNNER_TEMP/emu.log" 2>/dev/null | cut -c1-220 | sed "s#^#::error::emuTail: #"
           grep -iE "what went wrong|FAILED|Exception|Caused by|error:|INSTRUMENTATION|No connected|tests completed|failed" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 25 | cut -c1-260 | sed "s#^#::error::gradle: #"
           grep -iE "fatal|crash|abort|panic|error|fail|kvm|gpu|boot" "$RUNNER_TEMP/emu.log" 2>/dev/null | tail -n 25 | cut -c1-220 | sed 's#^#::error::emu: #'
