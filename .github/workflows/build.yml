@@ -82,12 +82,14 @@ jobs:
         timeout-minutes: 30
         run: |
           set -o pipefail
+          "$ANDROID_HOME/platform-tools/adb" logcat -v time > "$RUNNER_TEMP/logcat.txt" 2>&1 &
           gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle-test.log"
       - name: Diagnose emulator failure (annotations)
         if: failure()
         shell: bash
         run: |
           set +e
+          grep -E "FATAL|AndroidRuntime|Process .* has died|Caused by|UnsatisfiedLink|dlopen|Fatal signal|SIGSEGV|SIGABRT" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | head -n 30 | cut -c1-240 | sed "s#^#::error::crash: #"
           tail -n 45 "$RUNNER_TEMP/emu.log" 2>/dev/null | cut -c1-220 | sed "s#^#::error::emuTail: #"
           grep -iE "what went wrong|FAILED|Exception|Caused by|error:|INSTRUMENTATION|No connected|tests completed|failed" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 25 | cut -c1-260 | sed "s#^#::error::gradle: #"
           grep -iE "fatal|crash|abort|panic|error|fail|kvm|gpu|boot" "$RUNNER_TEMP/emu.log" 2>/dev/null | tail -n 25 | cut -c1-220 | sed 's#^#::error::emu: #'
