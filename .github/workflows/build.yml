@@ -60,6 +60,8 @@ jobs:
           target: default
           force-avd-creation: true
           disable-animations: true
+          emulator-boot-timeout: 900
+          disable-linux-hw-accel: false
           emulator-options: -no-window -no-boot-anim
           script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Diagnose emulator failure (annotations)
