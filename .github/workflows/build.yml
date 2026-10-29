@@ -88,6 +88,7 @@ jobs:
         shell: bash
         run: |
           set +e
+          tail -n 45 "$RUNNER_TEMP/emu.log" 2>/dev/null | cut -c1-220 | sed "s#^#::error::emuTail: #"
           grep -iE "what went wrong|FAILED|Exception|Caused by|error:|INSTRUMENTATION|No connected|tests completed|failed" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 25 | cut -c1-260 | sed "s#^#::error::gradle: #"
           grep -iE "fatal|crash|abort|panic|error|fail|kvm|gpu|boot" "$RUNNER_TEMP/emu.log" 2>/dev/null | tail -n 25 | cut -c1-220 | sed 's#^#::error::emu: #'
           adb devices 2>/dev/null | sed 's#^#::error::devices: #'
