@@ -59,11 +59,15 @@ jobs:
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "emulator" "system-images;android-35;google_apis;x86_64"
           echo "no" | "$AVDMANAGER" create avd -n test -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
+          echo "HOME=$HOME ANDROID_AVD_HOME=${ANDROID_AVD_HOME:-unset}"
+          "$AVDMANAGER" list avd || true
+          ls -la "$HOME/.android/avd" || true
       - name: Start emulator and wait for boot
         timeout-minutes: 20
         run: |
           set -uo pipefail
           ADB="$ANDROID_HOME/platform-tools/adb"
+          echo "start HOME=$HOME"; ls -la "$HOME/.android/avd" || true
           nohup "$ANDROID_HOME/emulator/emulator" -avd test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 4096 -cores 2 > "$RUNNER_TEMP/emu.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/emu.pid"
           for i in $(seq 1 150); do
