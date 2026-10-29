@@ -1,7 +1,6 @@
 package com.jarvis.breeno.assistant
 
 import android.content.Intent
-import android.graphics.Bitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -46,7 +45,10 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
         // On the emulator this may first show the Android permission dialog.
-        val allow = device.wait(Until.findObject(By.textMatches("(?i)(while using the app|only this time|разрешить|при использовании)")), 3_000)
+        val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
+            ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
+            ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
+            ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
         if (allow != null) allow.click()
         val state = device.wait(Until.hasObject(By.textContains("Микрофон активен")), 5_000) ||
             device.wait(Until.hasObject(By.textContains("ASR")), 5_000) ||
@@ -78,6 +80,7 @@ class JarvisRuntimeSmokeTest {
     private fun saveFailureScreenshot(name: String) {
         val dir = File("/sdcard/Download/jarvis-test")
         device.executeShellCommand("mkdir -p ${dir.absolutePath}")
-        device.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, File(dir, "$name.png").outputStream())
+        dir.mkdirs()
+        device.takeScreenshot(File(dir, "$name.png"))
     }
 }
