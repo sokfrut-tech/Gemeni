@@ -21,8 +21,6 @@ class JarvisRuntimeSmokeTest {
     @Before
     fun setUp() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
     }
 
     @Test
