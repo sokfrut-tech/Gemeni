@@ -2,7 +2,7 @@ name: Jarvis Test-to-Technician Loop
 
 on:
   workflow_run:
-    workflows: ["Jarvis Test Factory"]
+    workflows: ["Jarvis Test Factory", "Build Jarvis"]
     types: [completed]
 
 permissions:
