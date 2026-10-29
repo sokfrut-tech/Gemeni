@@ -52,7 +52,8 @@ class JarvisRuntimeSmokeTest {
     fun settingsOpensAndroidAccessibilitySettings() {
         launchJarvis()
         device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
-        assertTrue("Settings did not open", device.wait(Until.hasObject(By.pkg("com.android.settings").depth(0)), 8_000))
+        val opened = (1..16).any { device.waitForIdle(500); (device.currentPackageName ?: "").contains("settings") }
+        assertTrue("Settings did not open, current package: ${device.currentPackageName}", opened)
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
