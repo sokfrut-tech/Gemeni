@@ -9,6 +9,7 @@ import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.takeWhile
 
 /** Real runtime bridge: microphone -> local Russian ASR -> intent -> device action -> speech. */
@@ -20,10 +21,18 @@ class JarvisRuntimeController(context: Context) {
     private val intents = RussianIntentDispatcher()
     private val speaker = JarvisSpeaker(appContext)
 
-    suspend fun prepare(onProgress: (String) -> Unit) {
+    private val prepareLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var ready = false
+
+    suspend fun prepare(onProgress: (String) -> Unit) = prepareLock.withLock {
+        if (ready) {
+            onProgress("Русский ASR готов")
+            return@withLock
+        }
         onProgress("Проверяю русскую модель…")
         val dir = models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
         asr.load(dir)
+        ready = true
         onProgress("Русский ASR готов")
     }
 
@@ -74,4 +83,13 @@ class JarvisRuntimeController(context: Context) {
     }
 
     fun close() { asr.close() }
+}
+
+/** Один общий экземпляр на процесс: экран приложения и канал AIDL используют одну модель. */
+object JarvisRuntimeHolder {
+    @Volatile private var instance: JarvisRuntimeController? = null
+    fun get(context: Context): JarvisRuntimeController =
+        instance ?: synchronized(this) {
+            instance ?: JarvisRuntimeController(context.applicationContext).also { instance = it }
+        }
 }

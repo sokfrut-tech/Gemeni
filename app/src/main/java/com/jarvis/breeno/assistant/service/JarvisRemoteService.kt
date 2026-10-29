@@ -6,7 +6,7 @@ import android.os.IBinder
 import com.jarvis.breeno.assistant.IJarvisCallback
 import com.jarvis.breeno.assistant.IJarvisService
 import com.jarvis.breeno.assistant.core.TextCommandRouter
-import com.jarvis.breeno.assistant.ui.JarvisRuntimeController
+import com.jarvis.breeno.assistant.ui.JarvisRuntimeHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,7 +23,7 @@ class JarvisRemoteService : Service() {
     private val callbacks = mutableSetOf<IJarvisCallback>()
     private val router by lazy { TextCommandRouter(this) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val runtime by lazy { JarvisRuntimeController(this) }
+    private val runtime by lazy { JarvisRuntimeHolder.get(this) }
     private var listenJob: Job? = null
 
     private fun reply(text: String) {
@@ -75,7 +75,6 @@ class JarvisRemoteService : Service() {
     override fun onDestroy() {
         stopVoice()
         scope.coroutineContext[Job]?.cancel()
-        runCatching { runtime.close() }
         super.onDestroy()
     }
 }

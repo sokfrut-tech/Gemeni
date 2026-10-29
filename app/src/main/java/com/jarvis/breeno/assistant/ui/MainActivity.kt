@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runtime = JarvisRuntimeController(this)
+        runtime = JarvisRuntimeHolder.get(this)
         setContent { JarvisTheme { JarvisHome() } }
     }
 
@@ -107,7 +107,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         statusSink = null
-        runtime.close()
         super.onDestroy()
     }
 
