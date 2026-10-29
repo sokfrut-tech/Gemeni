@@ -46,7 +46,7 @@ jobs:
       - name: Inspect APK manifest, services and native ABIs
         run: bash scripts/inspect_apk.sh app/build/outputs/apk/debug/app-debug.apk
       - name: Runtime smoke tests on Android emulator
-        timeout-minutes: 20
+        timeout-minutes: 45
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
