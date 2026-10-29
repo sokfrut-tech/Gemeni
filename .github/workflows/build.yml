@@ -52,10 +52,12 @@ jobs:
           api-level: 35
           arch: x86_64
           # Omit profile so avdmanager uses the runner's default hardware profile.
-          target: default
+          target: google_apis
+          ram-size: 4096M
+          cores: 2
           force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-window -no-boot-anim
+          emulator-options: -no-window -no-boot-anim -no-snapshot -gpu swiftshader_indirect -noaudio -camera-back none
           script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
       - name: Upload runtime test results
         if: always()
