@@ -91,7 +91,7 @@ jobs:
         run: |
           set +e
           echo "::error::logcat lines: $(wc -l < "$RUNNER_TEMP/logcat.txt" 2>/dev/null)"
-          grep -E " [EWF]/" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | grep -iE "jarvis|instrument|uiautomation|ActivityManager|died|crash|Process" | tail -n 30 | cut -c1-230 | sed "s#^#::error::jv: #"
+          grep -E " [EF]/" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | grep -iE "jarvis|instrument|uiautomation|died|crash|Process|FATAL|AndroidRuntime" | grep -v "Sending oneway" | head -n 40 | cut -c1-230 | sed "s#^#::error::jv: #"
           grep -n -A 14 "FAILED" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 40 | cut -c1-240 | sed "s#^#::error::fail: #"
           grep -E "am_crash|am_proc_died|am_kill|am_anr|has died|Process .*crash|Instrumentation|InstrumentationTestRunner|AndroidJUnitRunner|JarvisRuntimeSmokeTest|assistant\.test|FATAL|ANR in|killed|Killing|lowmem|Fatal signal" "$RUNNER_TEMP/logcat.txt" 2>/dev/null | tail -n 40 | cut -c1-240 | sed "s#^#::error::crash: #"
           tail -n 45 "$RUNNER_TEMP/emu.log" 2>/dev/null | cut -c1-220 | sed "s#^#::error::emuTail: #"
