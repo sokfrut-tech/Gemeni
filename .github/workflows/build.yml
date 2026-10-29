@@ -91,6 +91,7 @@ jobs:
           grep -iE "what went wrong|FAILED|Exception|Caused by|error:|INSTRUMENTATION|No connected|tests completed|failed" "$RUNNER_TEMP/gradle-test.log" 2>/dev/null | head -n 25 | cut -c1-260 | sed "s#^#::error::gradle: #"
           grep -iE "fatal|crash|abort|panic|error|fail|kvm|gpu|boot" "$RUNNER_TEMP/emu.log" 2>/dev/null | tail -n 25 | cut -c1-220 | sed 's#^#::error::emu: #'
           adb devices 2>/dev/null | sed 's#^#::error::devices: #'
+          adb logcat -d 2>/dev/null | grep -E "FATAL|AndroidRuntime|Process .* has died|Caused by|Exception" | grep -v "kotlin" | tail -n 30 | cut -c1-260 | sed "s#^#::error::crash: #"
           ADB="$ANDROID_HOME/platform-tools/adb"
           echo "::error::adb devices: $($ADB devices -l 2>&1 | tr '\n' ' ' | cut -c1-900)"
           echo "::error::kvm: $(ls -l /dev/kvm 2>&1 | head -1)"
