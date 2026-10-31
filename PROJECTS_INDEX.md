@@ -41,3 +41,8 @@ This file is the starting point for resuming the user's active and supporting pr
 ## Scope note
 
 This hub stores project continuity information and verified technical checkpoints, not a verbatim dump of every chat message. The project repositories and Git history remain authoritative for source code and changes. Where an item is marked unverified or unknown, the next agent must inspect it rather than guess.
+
+
+## Mandatory continuity workflow (added 2026-10-31)
+
+Every repository listed above now has an `AGENTS.md` with mandatory instructions for AI agents and contributors. Before work, read `AGENTS.md` and `docs/CONTINUATION.md`. After every material work session, update `docs/CONTINUATION.md` with date, branch, commit SHA, changed files, test evidence, artifact links/checksums, blockers and next action. Update this index when project status or next checkpoint changes. These rules currently live on each repository's `docs/continuity-2026-10-31` branch; they have not been merged into default branches.
