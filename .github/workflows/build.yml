@@ -63,14 +63,14 @@ jobs:
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -no-boot-anim
-          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
-      - name: Dump emulator logcat on failure
-        if: failure()
-        run: |
-          ADB="$ANDROID_HOME/platform-tools/adb"
-          "$ADB" logcat -d -v time *:E AndroidRuntime:E JarvisRuntime:V 2>/dev/null | tail -300 || true
-          echo '--- FATAL / crash lines ---'
-          "$ADB" logcat -d 2>/dev/null | grep -iE 'FATAL|AndroidRuntime|com.jarvis|Process .* has died' | tail -200 || true
+          script: |
+            set +e
+            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+            rc=$?
+            mkdir -p app/build/jarvis-logs
+            timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
+            grep -iE 'FATAL|AndroidRuntime|com.jarvis|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
+            exit $rc
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -79,6 +79,7 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/
             app/build/outputs/connected_android_test_additional_output/
+            app/build/jarvis-logs/
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always() && steps.build-apk.outcome == 'success'
