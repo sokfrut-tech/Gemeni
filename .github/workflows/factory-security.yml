@@ -64,10 +64,15 @@ jobs:
         with:
           category: /language:java-kotlin
           upload: false
+      - name: Stage CodeQL SARIF results
+        if: success()
+        run: |
+          mkdir -p codeql-artifacts
+          cp ../results/*.sarif codeql-artifacts/
       - name: Archive CodeQL SARIF results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif-${{ github.sha }}
-          path: ../results/*.sarif
+          path: codeql-artifacts/*.sarif
           if-no-files-found: warn
