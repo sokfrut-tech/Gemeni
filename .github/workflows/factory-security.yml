@@ -63,3 +63,11 @@ jobs:
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:java-kotlin
+          upload: false
+      - name: Archive CodeQL SARIF results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ github.sha }}
+          path: results/*.sarif
+          if-no-files-found: warn
