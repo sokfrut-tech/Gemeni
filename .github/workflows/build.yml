@@ -70,6 +70,11 @@ jobs:
             mkdir -p app/build/jarvis-logs
             timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
             grep -iE 'FATAL|AndroidRuntime|com.jarvis|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
+            echo "=== LOGCAT SIZE: $(wc -c < app/build/jarvis-logs/logcat-full.txt 2>/dev/null) bytes ==="
+            echo '=== CRASH LINES ==='
+            cat app/build/jarvis-logs/crash-lines.txt || true
+            echo '=== LOGCAT TAIL ==='
+            tail -n 150 app/build/jarvis-logs/logcat-full.txt || true
             exit $rc
       - name: Upload runtime test results
         if: always()
