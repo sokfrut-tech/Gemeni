@@ -20,9 +20,10 @@ class JarvisRuntimeSmokeTest {
 
     @Before
     fun setUp() {
+        // Не чистим данные приложения и не останавливаем его: тест работает в том же процессе,
+        // и "pm clear" убивал процесс инструментации ("Process crashed"). Запуск ниже сам
+        // очищает задачу через FLAG_ACTIVITY_CLEAR_TASK.
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
     }
 
     @Test
