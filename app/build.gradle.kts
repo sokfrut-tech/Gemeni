@@ -48,7 +48,11 @@ dependencies {
     implementation("com.google.code.gson:gson:2.12.1")
 
     // Official Sherpa-ONNX Android API and bundled native runtimes (ASR, TTS, KWS, VAD).
-    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8")
+    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
+        // The Android AAR already contains the Kotlin API classes; JitPack's
+        // generated transitive JVM JAR duplicates those classes at packaging.
+        exclude(group = "com.github.k2-fsa", module = "sherpa-onnx-jvm")
+    }
 
     // Runtime UI smoke tests. UI Automator is intentionally kept in androidTest only.
     androidTestImplementation("androidx.test:runner:1.6.2")
