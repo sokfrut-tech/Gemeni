@@ -58,7 +58,8 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          # Omit profile so avdmanager uses the runner's default hardware profile.
+          # Телефонный профиль (≈411x914 dp). На дефолтном 320x640 dp нижняя часть экрана не видна тестам.
+          profile: pixel_6
           target: default
           force-avd-creation: true
           disable-animations: true
