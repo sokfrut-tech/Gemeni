@@ -64,9 +64,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-boot-anim
           script: |
-            set +e
-            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
-            rc=$?
+            rc=0
+            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace || rc=$?
             mkdir -p app/build/jarvis-logs
             timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
             grep -iE 'FATAL|AndroidRuntime|com.jarvis|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
