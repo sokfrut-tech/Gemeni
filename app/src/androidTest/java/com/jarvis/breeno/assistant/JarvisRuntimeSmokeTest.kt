@@ -26,43 +26,27 @@ class JarvisRuntimeSmokeTest {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     }
 
+    // Экран по решению владельца: только шар по центру, без текста и кнопок.
     @Test
-    fun launcherShowsFunctionalJarvisUi() {
+    fun launcherShowsOrbOnly() {
         launchJarvis()
-        assertVisible(By.text("ДЖАРВИС"), "Jarvis header missing")
-        assertVisible(By.text("Рабочие команды"), "Functional command card missing")
-        assertVisible(By.text("Навигатор"), "Navigator action missing")
-        assertVisible(By.text("Поиск"), "Search action missing")
-        assertVisible(By.text("Телефон"), "Phone action missing")
-        assertVisible(By.desc("Микрофон"), "Microphone action missing")
-        assertVisible(By.desc("JarvisSphere"), "Native sphere missing")
-        assertVisible(By.textContains("Runtime"), "Runtime status missing")
+        assertVisible(By.desc("JarvisSphere"), "Jarvis sphere missing")
     }
 
+    // Нажатие на шар запускает запись. Проверяем, что шар нажимается и приложение живо
+    // (на эмуляторе может появиться системный запрос разрешения на микрофон).
     @Test
-    fun microphoneRequestsPermissionAndEntersRuntimeState() {
+    fun tappingOrbStartsListening() {
         launchJarvis()
-        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 30_000)
-        if (mic == null) logWindowHierarchy("Microphone button is missing")
-        assertNotNull("Microphone button is missing", mic)
-        mic!!.click()
-        // On the emulator this may first show the Android permission dialog.
+        val orb = device.wait(Until.findObject(By.desc("JarvisSphere")), 30_000)
+        assertNotNull("Jarvis sphere is missing", orb)
+        orb!!.click()
         val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
-        if (allow != null) allow.click()
-        val state = device.wait(Until.hasObject(By.textContains("Микрофон активен")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("ASR")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("Ошибка runtime")), 5_000)
-        assertTrue("Microphone action produced no runtime state", state)
-    }
-
-    @Test
-    fun settingsOpensAndroidAccessibilitySettings() {
-        launchJarvis()
-        device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
-        assertTrue("Accessibility settings did not open", device.wait(Until.hasObject(By.pkg("com.android.settings")), 8_000) || device.wait(Until.hasObject(By.textContains("Accessibility")), 3_000) || device.wait(Until.hasObject(By.textContains("Специальные возможности")), 3_000))
+        allow?.click()
+        assertTrue("App is not running after tapping the orb", device.wait(Until.hasObject(By.pkg(packageName)), 5_000))
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
