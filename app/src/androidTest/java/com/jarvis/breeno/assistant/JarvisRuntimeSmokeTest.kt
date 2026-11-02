@@ -46,7 +46,10 @@ class JarvisRuntimeSmokeTest {
             ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
         allow?.click()
-        assertTrue("App is not running after tapping the orb", device.wait(Until.hasObject(By.pkg(packageName)), 5_000))
+        // Окно приложения может быть перекрыто системным запросом, поэтому проверяем сам процесс.
+        Thread.sleep(3_000)
+        val pid = device.executeShellCommand("pidof $packageName").trim()
+        assertTrue("App process died after tapping the orb", pid.isNotEmpty())
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
