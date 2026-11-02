@@ -20,7 +20,14 @@ class PiperTtsEngine {
         val config = getOfflineTtsConfig(
             modelDir = modelDir.absolutePath,
             modelName = model.name,
+            acousticModelName = "",
+            vocoder = "",
+            voices = "",
+            lexicon = "",
             dataDir = data.absolutePath,
+            dictDir = "",
+            ruleFsts = "",
+            ruleFars = "",
             numThreads = 2,
         )
         tts = OfflineTts(config = config)
