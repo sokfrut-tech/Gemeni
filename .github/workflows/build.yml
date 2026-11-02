@@ -65,18 +65,13 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-boot-anim
           script: |
-            rc=0
-            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace || rc=$?
             mkdir -p app/build/jarvis-logs
-            echo "$rc" > app/build/jarvis-logs/gradle-rc.txt
+            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace; echo $? > app/build/jarvis-logs/gradle-rc.txt
             timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
             grep -iE 'FATAL|AndroidRuntime|com.jarvis|JarvisTest|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
-            echo "=== LOGCAT SIZE: $(wc -c < app/build/jarvis-logs/logcat-full.txt 2>/dev/null) bytes ==="
             echo '=== CRASH LINES ==='
             cat app/build/jarvis-logs/crash-lines.txt || true
-            echo '=== LOGCAT TAIL ==='
-            tail -n 150 app/build/jarvis-logs/logcat-full.txt || true
-            exit $rc
+            echo "=== GRADLE EXIT: $(cat app/build/jarvis-logs/gradle-rc.txt) ==="
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,11 +84,7 @@ jobs:
           if-no-files-found: ignore
       - name: Fail the job if runtime smoke tests failed
         if: always()
-        run: |
-          pwd
-          ls -la app/build/jarvis-logs || true
-          echo "rc-file: [$(cat app/build/jarvis-logs/gradle-rc.txt 2>/dev/null)]"
-          test "$(cat app/build/jarvis-logs/gradle-rc.txt 2>/dev/null || echo 1)" = "0"
+        run: test "$(cat app/build/jarvis-logs/gradle-rc.txt 2>/dev/null || echo 1)" = "0"
       - uses: actions/upload-artifact@v4
         if: always() && steps.build-apk.outcome == 'success'
         with:
