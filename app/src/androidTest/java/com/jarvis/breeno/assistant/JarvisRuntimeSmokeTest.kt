@@ -42,7 +42,7 @@ class JarvisRuntimeSmokeTest {
     @Test
     fun microphoneRequestsPermissionAndEntersRuntimeState() {
         launchJarvis()
-        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
+        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 30_000)
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
         // On the emulator this may first show the Android permission dialog.
@@ -65,7 +65,8 @@ class JarvisRuntimeSmokeTest {
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
-        val visible = device.wait(Until.hasObject(selector), 10_000)
+        // Эмулятор рисует сферу программно (SwiftShader), поэтому интерфейс появляется медленнее: ждём дольше.
+        val visible = device.wait(Until.hasObject(selector), 30_000)
         if (!visible) saveFailureScreenshot(message.replace(" ", "-"))
         assertTrue(message, visible)
     }
