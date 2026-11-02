@@ -69,5 +69,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif-${{ github.sha }}
-          path: results/*.sarif
+          path: ../results/*.sarif
           if-no-files-found: warn
