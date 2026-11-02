@@ -47,6 +47,9 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
     implementation("com.google.code.gson:gson:2.12.1")
 
+    // Official Sherpa-ONNX Android API and bundled native runtimes (ASR, TTS, KWS, VAD).
+    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8")
+
     // Runtime UI smoke tests. UI Automator is intentionally kept in androidTest only.
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
