@@ -43,6 +43,7 @@ class JarvisRuntimeSmokeTest {
     fun microphoneRequestsPermissionAndEntersRuntimeState() {
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 30_000)
+        if (mic == null) logWindowHierarchy("Microphone button is missing")
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
         // On the emulator this may first show the Android permission dialog.
@@ -67,7 +68,10 @@ class JarvisRuntimeSmokeTest {
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
         // Эмулятор рисует сферу программно (SwiftShader), поэтому интерфейс появляется медленнее: ждём дольше.
         val visible = device.wait(Until.hasObject(selector), 30_000)
-        if (!visible) saveFailureScreenshot(message.replace(" ", "-"))
+        if (!visible) {
+            saveFailureScreenshot(message.replace(" ", "-"))
+            logWindowHierarchy(message)
+        }
         assertTrue(message, visible)
     }
 
@@ -77,6 +81,15 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Launcher activity is missing", launchIntent)
         launchIntent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(launchIntent)
+    }
+
+    // Пишет дерево экрана в logcat (тег JarvisTest), чтобы видеть в логе CI, что реально на экране.
+    private fun logWindowHierarchy(message: String) {
+        val out = java.io.ByteArrayOutputStream()
+        device.dumpWindowHierarchy(out)
+        val xml = out.toString(Charsets.UTF_8.name())
+        android.util.Log.e("JarvisTest", "FAIL: $message")
+        xml.chunked(3000).forEachIndexed { i, part -> android.util.Log.e("JarvisTest", "[$i] $part") }
     }
 
     private fun saveFailureScreenshot(name: String) {

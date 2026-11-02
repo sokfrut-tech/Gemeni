@@ -69,7 +69,7 @@ jobs:
             mkdir -p app/build/jarvis-logs
             echo "$rc" > app/build/jarvis-logs/gradle-rc.txt
             timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
-            grep -iE 'FATAL|AndroidRuntime|com.jarvis|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
+            grep -iE 'FATAL|AndroidRuntime|com.jarvis|JarvisTest|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
             echo "=== LOGCAT SIZE: $(wc -c < app/build/jarvis-logs/logcat-full.txt 2>/dev/null) bytes ==="
             echo '=== CRASH LINES ==='
             cat app/build/jarvis-logs/crash-lines.txt || true
