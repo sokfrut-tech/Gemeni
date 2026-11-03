@@ -29,6 +29,7 @@ class Worker:
         try:
             # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated operator configuration, never user prompt data.
             req = Request(self._validated_endpoint('/health'))
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated trusted deployment configuration.
             with urlopen(req, timeout=self.timeout) as r:
                 return 200 <= r.status < 300
         except Exception:
