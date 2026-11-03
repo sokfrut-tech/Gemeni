@@ -46,6 +46,7 @@ class Worker:
             headers["Authorization"] = "Bearer " + os.environ[self.token_env]
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated operator configuration, never user prompt data.
         req = Request(self._validated_endpoint('/v1/chat/completions'), data=body, headers=headers)
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated trusted deployment configuration.
         with urlopen(req, timeout=120) as r:
             data = json.load(r)
         return data["choices"][0]["message"]["content"]
