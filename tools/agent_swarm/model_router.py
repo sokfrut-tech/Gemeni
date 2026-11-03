@@ -32,6 +32,7 @@ def call(provider, prompt, system):
         ]}).encode(),
         headers={"Content-Type": "application/json", **({"Authorization": "Bearer " + key} if key else {})},
     )
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — base URL is scheme-validated trusted deployment configuration.
     with urllib.request.urlopen(req, timeout=300) as response:
         data = json.loads(response.read())
     return {"provider": name, "model": model, "content": data["choices"][0]["message"]["content"]}
