@@ -8,6 +8,7 @@ from __future__ import annotations
 import json, os, sys, time
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 @dataclass
 class Worker:
@@ -18,9 +19,16 @@ class Worker:
     token_env: str | None = None
     timeout: float = 8.0
 
+    def _validated_endpoint(self, suffix: str) -> str:
+        parsed = urlsplit(self.endpoint)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("Worker endpoint must be an operator-configured HTTP(S) base URL without credentials")
+        return self.endpoint.rstrip("/") + suffix
+
     def health(self) -> bool:
         try:
-            req = Request(self.endpoint.rstrip('/') + '/health')
+            # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated operator configuration, never user prompt data.
+            req = Request(self._validated_endpoint('/health'))
             with urlopen(req, timeout=self.timeout) as r:
                 return 200 <= r.status < 300
         except Exception:
@@ -35,7 +43,8 @@ class Worker:
         headers = {"Content-Type": "application/json"}
         if self.token_env and os.getenv(self.token_env):
             headers["Authorization"] = "Bearer " + os.environ[self.token_env]
-        req = Request(self.endpoint.rstrip('/') + '/v1/chat/completions', data=body, headers=headers)
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated operator configuration, never user prompt data.
+        req = Request(self._validated_endpoint('/v1/chat/completions'), data=body, headers=headers)
         with urlopen(req, timeout=120) as r:
             data = json.load(r)
         return data["choices"][0]["message"]["content"]
