@@ -18,6 +18,7 @@ for name, base in workers.items():
             print(name, r.status, r.read().decode()[:500])
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — same validated operator-configured endpoint as the health request.
         req = urllib.request.Request(base.rstrip('/') + '/v1/models')
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — same validated operator-configured endpoint as the health request.
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.load(r)
             print(name, 'models=', [x.get('id') for x in data.get('data', [])])
