@@ -5,6 +5,7 @@ Supports any OpenAI-compatible endpoint (Qwen, DeepSeek, local vLLM/Ollama gatew
 etc.). Credentials are environment variables only; never commit keys.
 """
 import json, os, sys, urllib.request
+from urllib.parse import urlsplit
 
 PROVIDERS = [
     ("qwen", "JARVIS_QWEN_BASE_URL", "JARVIS_QWEN_API_KEY", "JARVIS_QWEN_MODEL"),
@@ -19,6 +20,10 @@ def call(provider, prompt, system):
     model = os.getenv(model_var) or ("qwen3.5" if name == "qwen" else "deepseek" if name == "deepseek" else "qwen3.5")
     if not base:
         return None
+    parsed = urlsplit(base)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("Model endpoint must be an operator-configured HTTP(S) base URL without credentials")
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint comes from trusted deployment configuration and is scheme-validated; never from prompt/user input.
     req = urllib.request.Request(
         base.rstrip("/") + "/chat/completions",
         data=json.dumps({"model": model, "temperature": 0, "messages": [
