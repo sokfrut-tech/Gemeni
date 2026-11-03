@@ -13,6 +13,7 @@ for name, base in workers.items():
             raise ValueError("Worker endpoint must be HTTP(S) without embedded credentials")
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoints are fixed defaults or trusted operator environment configuration.
         req = urllib.request.Request(base.rstrip('/') + '/health')
+        # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — endpoint is validated trusted deployment configuration.
         with urllib.request.urlopen(req, timeout=10) as r:
             print(name, r.status, r.read().decode()[:500])
         # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — same validated operator-configured endpoint as the health request.
