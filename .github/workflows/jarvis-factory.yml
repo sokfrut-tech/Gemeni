@@ -26,7 +26,7 @@ jobs:
     outputs:
       sha: ${{ steps.state.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - id: state
         name: Record production state
         run: |
@@ -34,7 +34,7 @@ jobs:
           SHA=$(git rev-parse HEAD)
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           printf '%s\n' "JARVIS FACTORY" "commit=$SHA" "time=$(date -u +%FT%TZ)" > build/factory/intake.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: factory-intake
           path: build/factory
@@ -56,8 +56,8 @@ jobs:
           - qa
           - research
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: Run deterministic evidence collector
@@ -67,7 +67,7 @@ jobs:
           mkdir -p "build/factory/${ROLE}"
           python3 tools/agent_swarm/run_swarm.py --repo . --out "build/factory/${ROLE}"
           printf '%s\n' "role=${ROLE}" "commit=${GITHUB_SHA}" "time=$(date -u +%FT%TZ)" > "build/factory/${ROLE}/handoff.txt"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: factory-${{ matrix.role }}
           path: build/factory/${{ matrix.role }}
@@ -77,8 +77,8 @@ jobs:
     needs: director
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: Detect configured model workers
@@ -113,7 +113,7 @@ jobs:
           mkdir -p build/factory
           if [ -f build/multi-model-review.json ]; then cp build/multi-model-review.json build/factory/model-workers-review.json; fi
           test -f build/factory/model-workers-status.txt || echo "Live model review completed." > build/factory/model-workers-status.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: factory-model-workers
           path: build/factory
@@ -124,7 +124,7 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify specialist lanes
         run: test "${{ needs.specialist.result }}" = success
       - name: Report model-worker state
@@ -146,7 +146,7 @@ jobs:
           - rule: build success alone never means release
           - next: Android runtime/e2e/device evidence before APK release
           EOF
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: factory-director-handoff
           path: build/factory/DIRECTOR_HANDOFF.md
