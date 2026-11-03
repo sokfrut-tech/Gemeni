@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 concurrency:
@@ -19,10 +19,11 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact tested revision
+      - name: Checkout trusted default-branch dispatcher code only
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.repository.default_branch || 'main' }}
+          persist-credentials: false
 
       - name: Collect failure context
         env:
@@ -62,11 +63,5 @@ jobs:
           name: jarvis-repair-evidence-${{ github.run_id }}
           path: repair-evidence/
 
-      - name: Commit dispatcher evidence only
-        run: |
-          git config user.name "jarvis-technician"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add repair-evidence || true
-          git diff --cached --quiet && exit 0
-          git commit -m "chore(factory): record automated repair queue"
-          git push origin HEAD:${GITHUB_REF_NAME}
+      # Do not execute or check out workflow_run head code in this privileged context.
+      # Repair evidence is retained as an Actions artifact and issue body, not pushed from this job.
