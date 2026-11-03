@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse, json, os, pathlib, re, subprocess, urllib.request
+from urllib.parse import urlsplit
 
 ROLES = [
     ("android_coloros", "VoiceInteractionService, VoiceInteractionSession, ColorOS integration, permissions, lifecycle"),
@@ -51,8 +52,12 @@ def deterministic(repo, out):
 def llm_call(prompt):
     base=os.environ.get('JARVIS_LLM_BASE_URL')
     if not base: return None
+    parsed = urlsplit(base)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("Model endpoint must be an operator-configured HTTP(S) base URL without credentials")
     url=base.rstrip('/')+'/chat/completions'
     body={'model':os.environ.get('JARVIS_LLM_MODEL','qwen3.5'),'temperature':0,'messages':[{'role':'system','content':'You are an independent release auditor. Never claim success without concrete evidence. Return JSON with verdict, blockers, required_fixes, evidence_queries.'},{'role':'user','content':prompt}]}
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected — URL is validated operator configuration, not prompt-controlled input.
     req=urllib.request.Request(url,data=json.dumps(body).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+os.environ.get('JARVIS_LLM_API_KEY','')})
     with urllib.request.urlopen(req,timeout=180) as r:
         data=json.loads(r.read())
