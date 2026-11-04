@@ -84,7 +84,7 @@ class AndroidJarvisToolRegistry(private val context: Context) {
 
     private fun navigate(destination: String): ToolResult {
         val uri = if (destination.isBlank()) Uri.parse("geo:0,0?q=")
-        else Uri.parse("google.navigation:q=${Uri.encode(destination)}")
+        else Uri.parse("geo:0,0?q=${Uri.encode(destination)}")
         val intent = Intent(Intent.ACTION_VIEW, uri)
         return launch(intent, if (destination.isBlank()) "Открываю навигацию" else "Строю маршрут до $destination")
     }
