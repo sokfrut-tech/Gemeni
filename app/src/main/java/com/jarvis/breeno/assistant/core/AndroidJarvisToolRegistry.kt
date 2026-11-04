@@ -25,32 +25,17 @@ sealed interface ToolResult {
  */
 class AndroidJarvisToolRegistry(private val context: Context) {
 
-    fun executeUtterance(rawText: String): ToolResult {
-        val text = rawText.trim()
-        if (text.isEmpty()) return ToolResult.Failure("Не расслышал команду")
-
-        val open = Regex("^(?:джарвис[, ]*)?(?:открой|запусти)\\s+(.+)$", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)?.trim()
-        if (!open.isNullOrBlank()) return openApp(open)
-
-        val search = Regex("^(?:джарвис[, ]*)?(?:найди|поищи|поиск)\\s+(.+)$", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)?.trim()
-        if (!search.isNullOrBlank()) return webSearch(search)
-
-        val destination = Regex("^(?:джарвис[, ]*)?(?:построй маршрут|маршрут|навигатор)\\s*(?:до|в)?\\s*(.*)$", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)?.trim()
-        if (destination != null) return navigate(destination)
-
-        val phone = Regex("^(?:джарвис[, ]*)?(?:позвони|набери)\\s*(.*)$", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)?.trim()
-        if (phone != null) return openDialer(phone)
-
-        if (text.contains("который час", true) || text.contains("сколько времени", true)) {
+    fun executeUtterance(rawText: String): ToolResult = when (val command = JarvisCommandParser.parse(rawText)) {
+        JarvisCommand.Empty -> ToolResult.Failure("Не расслышал команду")
+        is JarvisCommand.OpenApp -> openApp(command.name)
+        is JarvisCommand.Search -> webSearch(command.query)
+        is JarvisCommand.Navigate -> navigate(command.destination)
+        is JarvisCommand.Dial -> openDialer(command.number)
+        JarvisCommand.TellTime -> {
             val time = java.text.SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date())
-            return ToolResult.Success("Сейчас $time")
+            ToolResult.Success("Сейчас $time")
         }
-
-        return ToolResult.Failure("Команда пока не подключена. Распознано: $text")
+        is JarvisCommand.Unsupported -> ToolResult.Failure("Команда пока не подключена. Распознано: ${command.original}")
     }
 
     private fun openApp(query: String): ToolResult {
