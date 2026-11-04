@@ -70,3 +70,15 @@ Do not provide an APK to the user as “ready” unless:
 - Safety: dialer opens ACTION_DIAL only. No automatic calls/SMS, hidden recording, purchases or destructive actions.
 
 **Next:** recheck exact-head CI for PR #59; resolve failures; only then integrate opt-in foreground microphone service, acoustic KWS and VAD with visible notification/stop control. See docs/JARVIS_VOICE_RUNTIME_GAP_ANALYSIS_2026-11-04.md and docs/CONTINUATION_STATE.md.
+
+
+## 2026-11-04 — open-source AI integration research
+
+New research branch: feat/jarvis-multi-ai-foundation-2026-11-04.
+
+- Source review and decision matrix saved in docs/OPEN_SOURCE_AI_INTEGRATION_REVIEW_2026-11-04.md.
+- Scoped Phase A implementation brief saved in docs/agents/BRIEF_JARVIS_MULTI_PROVIDER_FOUNDATION_2026-11-04.md.
+- Selected reusable ideas: Qwen-Agent's typed function/tool calling and MCP patterns; Kimi Code's scoped subagents, approval gates and checkpoints; zagent's permission prompts and rewind concepts.
+- Rejected for direct APK embedding: Python Qwen-Agent/Kimi-Audio stacks and desktop Kimi Code/ZCode runtimes. Kimi-Audio remains a benchmark candidate, not a replacement for Sherpa-ONNX.
+- No cloud provider adapter or credentials are active yet. Current Jarvis remains local-first; any cloud use must be opt-in and never bypass AndroidJarvisToolRegistry.
+- No tests or runtime build are claimed for this docs-only research branch. PR #59 remains separate; no merge or release.
