@@ -1,5 +1,8 @@
 package com.jarvis.breeno.assistant.core.ai
 
+import com.jarvis.breeno.assistant.core.JarvisCommand
+import com.jarvis.breeno.assistant.core.JarvisCommandParser
+
 /**
  * Provider-neutral reasoning boundary. Implementations receive plain text only:
  * never Android Context, PackageManager, filesystem handles or executable callbacks.
