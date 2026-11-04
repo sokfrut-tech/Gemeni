@@ -248,3 +248,22 @@ Existing source files include AudioRecordPipeline, SileroVadEngine, SherpaJarvis
 5. Keep no-hidden-recording rule; no raw audio persistence by default.
 6. Test emulator then physical OPPO/ColorOS. No Google Play release planned.
 7. Do not merge PR #58/#59 or publish a release without explicit user authorization.
+
+
+## 17. Checkpoint — 2026-11-04: open-source AI integration research
+
+Branch: feat/jarvis-multi-ai-foundation-2026-11-04 (based on PR #59 head 3906797fec36438dae6a35449f117142edc069d9).
+
+- Added docs/OPEN_SOURCE_AI_INTEGRATION_REVIEW_2026-11-04.md with source review of Qwen-Agent, Kimi Code, Kimi-Audio, GLM ecosystem and unofficial zagent.
+- Added docs/agents/BRIEF_JARVIS_MULTI_PROVIDER_FOUNDATION_2026-11-04.md for the next bounded implementation slice.
+- Main architecture decision: reuse Qwen tool-calling/MCP/memory patterns, Kimi Code approval/checkpoint/subagent patterns, and zagent permission/checkpoint ideas; do not embed their Python/desktop runtimes in the Android APK.
+- Kimi-Audio is research-only pending device-compatible benchmark, model/weight license review, RAM/latency measurement. Keep Sherpa-ONNX as mobile speech backbone.
+- Future GLM/Qwen/Kimi cloud support must use provider-neutral adapter, user-controlled credentials, explicit disclosure, TLS, timeouts/cancellation, redacted logs and local fallback. No provider key or endpoint has been added.
+- No source runtime implementation, cloud call, model download, external agent execution, merge or release was performed in this research slice. This boundary is explicit.
+
+### Next actions
+1. Implement Phase A exactly as scoped in the agent brief: provider-neutral contract + closed typed tool proposal schema + strict validation/risk policy + tests. Keep cloud disabled.
+2. Preserve AndroidJarvisToolRegistry as the only action executor; no provider receives Android Context.
+3. Recheck exact-head CI and tests for PR #59 separately; do not confuse research branch with passing build evidence.
+4. After Phase A, add one remote provider only after confirming official endpoint/model terms and implementing secure key storage and privacy UI.
+5. Update all handoff docs and test evidence after each implementation slice.
