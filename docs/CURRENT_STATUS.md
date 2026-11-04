@@ -57,3 +57,16 @@ Do not provide an APK to the user as “ready” unless:
 - security/ABI/manifest checks pass;
 - emulator smoke tests pass;
 - OPPO device test is documented when available.
+
+
+## 2026-11-04 update — active handoff
+
+**Current PRs:** [#55 orb visualizer](https://github.com/sokfrut-tech/Gemeni/pull/55), [#57 architecture roadmap](https://github.com/sokfrut-tech/Gemeni/pull/57), [#58 Android tool gateway](https://github.com/sokfrut-tech/Gemeni/pull/58), [#59 parser tests/package visibility](https://github.com/sokfrut-tech/Gemeni/pull/59). All are still review/draft work; none is declared merged or release-ready here.
+
+- Added tested pure Russian command parser and JUnit coverage in PR #59.
+- Added Android launcher package visibility declaration.
+- Existing VAD/KWS engine wrappers are present in source but are not wired to JarvisRuntimeController. Current runtime uses a fixed 4.5-second one-shot recording. No connected foreground microphone service or persistent listening yet.
+- CI run 41903416302 on earlier PR #59 head: secret scan passed and Kotlin compile passed; APK build was in progress at last evidence. Docs then changed branch head; recheck exact-head CI. Emulator/OPPO tests not confirmed.
+- Safety: dialer opens ACTION_DIAL only. No automatic calls/SMS, hidden recording, purchases or destructive actions.
+
+**Next:** recheck exact-head CI for PR #59; resolve failures; only then integrate opt-in foreground microphone service, acoustic KWS and VAD with visible notification/stop control. See docs/JARVIS_VOICE_RUNTIME_GAP_ANALYSIS_2026-11-04.md and docs/CONTINUATION_STATE.md.
