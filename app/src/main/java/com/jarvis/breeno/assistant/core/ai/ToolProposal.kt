@@ -34,41 +34,50 @@ object ToolProposalCodec {
         return root.toString()
     }
 
-    fun validate(json: String): ValidatedToolProposal? = try {
+    fun validate(json: String): ValidatedToolProposal? {
         if (json.length > 2048) return null
-        val root = JsonParser.parseString(json)
-        if (!root.isJsonObject) return null
-        val obj = root.asJsonObject
-        if (obj.keySet() != setOf("tool", "arguments")) return null
-        if (!obj.get("tool").isJsonPrimitive || !obj.getAsJsonPrimitive("tool").isString) return null
-        if (!obj.get("arguments").isJsonObject) return null
 
-        val tool = obj.get("tool").asString
-        val schema = schemas[tool] ?: return null
-        val argsObject = obj.getAsJsonObject("arguments")
-        if (argsObject.keySet() != schema) return null
+        return try {
+            val root = JsonParser.parseString(json)
+            if (!root.isJsonObject) return null
+            val obj = root.asJsonObject
+            if (obj.keySet() != setOf("tool", "arguments")) return null
 
-        val args = linkedMapOf<String, String>()
-        for ((key, value) in argsObject.entrySet()) {
-            if (!value.isJsonPrimitive || !value.asJsonPrimitive.isString) return null
-            val text = value.asString
-            if (text.length > 240 || text.any { it == '\u0000' }) return null
-            if (key == "number" && text.any { !(it.isDigit() || it == '+' || it == ' ' || it == '-' || it == '(' || it == ')') }) return null
-            args[key] = text
+            val toolElement = obj.get("tool") ?: return null
+            if (!toolElement.isJsonPrimitive || !toolElement.asJsonPrimitive.isString) return null
+            val argumentsElement = obj.get("arguments") ?: return null
+            if (!argumentsElement.isJsonObject) return null
+
+            val tool = toolElement.asString
+            val schema = schemas[tool] ?: return null
+            val argsObject = argumentsElement.asJsonObject
+            if (argsObject.keySet() != schema) return null
+
+            val args = linkedMapOf<String, String>()
+            for ((key, value) in argsObject.entrySet()) {
+                if (!value.isJsonPrimitive || !value.asJsonPrimitive.isString) return null
+                val argumentText = value.asString
+                if (argumentText.length > 240 || argumentText.any { it == '\u0000' }) return null
+                if (key == "number" && argumentText.any {
+                        !(it.isDigit() || it == '+' || it == ' ' || it == '-' || it == '(' || it == ')')
+                    }) return null
+                args[key] = argumentText
+            }
+
+            if (tool == "open_app" && args.getValue("name").isBlank()) return null
+            if (tool == "web_search" && args.getValue("query").isBlank()) return null
+            if (tool == "navigate" && args.getValue("destination").isBlank()) return null
+            if (tool == "open_dialer" && args.getValue("number").count(Char::isDigit) > 20) return null
+
+            val proposal = ToolProposal(tool, args)
+            val risk = when (tool) {
+                "open_dialer" -> ProposalRisk.CONFIRM
+                "open_app", "web_search", "navigate", "tell_time" -> ProposalRisk.SAFE
+                else -> ProposalRisk.BLOCK
+            }
+            ValidatedToolProposal(proposal, risk)
+        } catch (_: Exception) {
+            null
         }
-        if (tool == "open_app" && args.getValue("name").isBlank()) return null
-        if (tool == "web_search" && args.getValue("query").isBlank()) return null
-        if (tool == "navigate" && args.getValue("destination").isBlank()) return null
-        if (tool == "open_dialer" && args.getValue("number").filter { it.isDigit() }.length > 20) return null
-
-        val proposal = ToolProposal(tool, args)
-        val risk = when (tool) {
-            "open_dialer" -> ProposalRisk.CONFIRM
-            "open_app", "web_search", "navigate", "tell_time" -> ProposalRisk.SAFE
-            else -> ProposalRisk.BLOCK
-        }
-        ValidatedToolProposal(proposal, risk)
-    } catch (_: Exception) {
-        null
     }
 }
