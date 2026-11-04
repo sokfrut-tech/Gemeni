@@ -3,7 +3,6 @@ package com.jarvis.breeno.assistant.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -51,6 +50,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.jarvis.breeno.assistant.BuildConfig
+import com.jarvis.breeno.assistant.core.AssistantState
 import com.jarvis.breeno.assistant.R
 import com.jarvis.breeno.assistant.ui.render.AlphaVideoSurfaceView
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var runtime: JarvisRuntimeController
     private var pendingListen = false
     private var statusSink: ((String) -> Unit)? = null
+    private var stateSink: ((AssistantState) -> Unit)? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && pendingListen) startRealListening()
@@ -89,24 +90,27 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
                 withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
-                val text = withContext(Dispatchers.IO) { runtime.listenOnce { status -> runOnUiThread { statusSink?.invoke(status) } } }
+                val text = withContext(Dispatchers.IO) {
+                    runtime.listenOnce(
+                        onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
+                        onState = { state -> runOnUiThread { stateSink?.invoke(state) } }
+                    )
+                }
                 if (text.isNotBlank()) statusSink?.invoke("Распознано: $text")
-            }.onFailure { error -> statusSink?.invoke("Ошибка runtime: ${error.message ?: error.javaClass.simpleName}") }
+            }.onFailure { error ->
+                stateSink?.invoke(AssistantState.ERROR)
+                statusSink?.invoke("Ошибка runtime: ${error.message ?: error.javaClass.simpleName}")
+            }
         }
     }
 
     private fun openSettings() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
-    private fun runQuickCommand(command: String) {
-        when (command) {
-            "Навигатор" -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map"))) }
-            "Поиск" -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=Jarvis+Android")))
-            "Телефон" -> startActivity(Intent(Intent.ACTION_DIAL))
-        }
-    }
+    private fun runQuickCommand(command: String): String = runtime.runQuickCommand(command)
 
     override fun onDestroy() {
         statusSink = null
+        stateSink = null
         runtime.close()
         super.onDestroy()
     }
@@ -116,11 +120,13 @@ class MainActivity : ComponentActivity() {
         var listening by remember { mutableStateOf(false) }
         var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
         var status by remember { mutableStateOf("Runtime не запускался") }
+        var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
         var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
 
         DisposableEffect(Unit) {
-            statusSink = { value -> status = value; listening = value.contains("Микрофон активен") || value.contains("говорите") }
-            onDispose { statusSink = null }
+            statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
+            stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
+            onDispose { statusSink = null; stateSink = null }
         }
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
@@ -144,7 +150,21 @@ class MainActivity : ComponentActivity() {
                         Image(painter = painterResource(R.drawable.assistant_mascot), contentDescription = "Джарвис", modifier = Modifier.size(92.dp), contentScale = ContentScale.Fit)
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(if (listening) "Слушаю…" else "Я рядом", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                when (assistantState) {
+                                    AssistantState.LISTENING -> "Слушаю…"
+                                    AssistantState.TRANSCRIBING -> "Распознаю речь…"
+                                    AssistantState.UNDERSTANDING -> "Думаю…"
+                                    AssistantState.EXECUTING -> "Выполняю команду…"
+                                    AssistantState.SPEAKING -> "Отвечаю…"
+                                    AssistantState.WAITING_FOR_APPROVAL -> "Жду подтверждения…"
+                                    AssistantState.ERROR -> "Нужна проверка"
+                                    AssistantState.IDLE -> "Я рядом"
+                                },
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
                             Text(transcript, color = Color(0xFF9AA7B8), textAlign = TextAlign.Start)
                             Text(status, color = Color(0xFF6ED8F5), style = MaterialTheme.typography.labelSmall)
                         }
@@ -155,9 +175,9 @@ class MainActivity : ComponentActivity() {
                             Text("Рабочие команды", color = Color(0xFFB8C5D6), style = MaterialTheme.typography.labelLarge)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                QuickCommand("Навигатор") { runQuickCommand("Навигатор"); transcript = "Запускаю навигацию" }
-                                QuickCommand("Поиск") { runQuickCommand("Поиск"); transcript = "Открываю поиск" }
-                                QuickCommand("Телефон") { runQuickCommand("Телефон"); transcript = "Открываю телефон" }
+                                QuickCommand("Навигатор") { transcript = runQuickCommand("Навигатор") }
+                                QuickCommand("Поиск") { transcript = runQuickCommand("Поиск") }
+                                QuickCommand("Телефон") { transcript = runQuickCommand("Телефон") }
                             }
                         }
                     }
