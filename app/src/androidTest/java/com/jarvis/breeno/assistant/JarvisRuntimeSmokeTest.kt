@@ -50,10 +50,14 @@ class JarvisRuntimeSmokeTest {
             ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
         if (allow != null) allow.click()
-        val state = device.wait(Until.hasObject(By.textContains("Микрофон активен")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("ASR")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("Ошибка runtime")), 5_000)
-        assertTrue("Microphone action produced no runtime state", state)
+        // A loading message or runtime error is not a successful microphone test.
+        // The app reaches this state only after permission is granted and the ASR
+        // model is prepared; allow time for first-run model downloads.
+        val listening = device.wait(
+            Until.hasObject(By.textContains("Микрофон активен")),
+            180_000
+        )
+        assertTrue("Microphone permission/ASR preparation did not reach active listening", listening)
     }
 
     @Test

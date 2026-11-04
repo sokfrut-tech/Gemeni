@@ -57,3 +57,28 @@ Do not provide an APK to the user as “ready” unless:
 - security/ABI/manifest checks pass;
 - emulator smoke tests pass;
 - OPPO device test is documented when available.
+
+
+## 2026-11-04 update — active handoff
+
+**Current PRs:** [#55 orb visualizer](https://github.com/sokfrut-tech/Gemeni/pull/55), [#57 architecture roadmap](https://github.com/sokfrut-tech/Gemeni/pull/57), [#58 Android tool gateway](https://github.com/sokfrut-tech/Gemeni/pull/58), [#59 parser tests/package visibility](https://github.com/sokfrut-tech/Gemeni/pull/59). All are still review/draft work; none is declared merged or release-ready here.
+
+- Added tested pure Russian command parser and JUnit coverage in PR #59.
+- Added Android launcher package visibility declaration.
+- Existing VAD/KWS engine wrappers are present in source but are not wired to JarvisRuntimeController. Current runtime uses a fixed 4.5-second one-shot recording. No connected foreground microphone service or persistent listening yet.
+- CI run 41903416302 on earlier PR #59 head: secret scan passed and Kotlin compile passed; APK build was in progress at last evidence. Docs then changed branch head; recheck exact-head CI. Emulator/OPPO tests not confirmed.
+- Safety: dialer opens ACTION_DIAL only. No automatic calls/SMS, hidden recording, purchases or destructive actions.
+
+**Next:** recheck exact-head CI for PR #59; resolve failures; only then integrate opt-in foreground microphone service, acoustic KWS and VAD with visible notification/stop control. See docs/JARVIS_VOICE_RUNTIME_GAP_ANALYSIS_2026-11-04.md and docs/CONTINUATION_STATE.md.
+
+
+## 2026-11-04 — open-source AI integration research
+
+New research branch: feat/jarvis-multi-ai-foundation-2026-11-04.
+
+- Source review and decision matrix saved in docs/OPEN_SOURCE_AI_INTEGRATION_REVIEW_2026-11-04.md.
+- Scoped Phase A implementation brief saved in docs/agents/BRIEF_JARVIS_MULTI_PROVIDER_FOUNDATION_2026-11-04.md.
+- Selected reusable ideas: Qwen-Agent's typed function/tool calling and MCP patterns; Kimi Code's scoped subagents, approval gates and checkpoints; zagent's permission prompts and rewind concepts.
+- Rejected for direct APK embedding: Python Qwen-Agent/Kimi-Audio stacks and desktop Kimi Code/ZCode runtimes. Kimi-Audio remains a benchmark candidate, not a replacement for Sherpa-ONNX.
+- No cloud provider adapter or credentials are active yet. Current Jarvis remains local-first; any cloud use must be opt-in and never bypass AndroidJarvisToolRegistry.
+- No tests or runtime build are claimed for this docs-only research branch. PR #59 remains separate; no merge or release.

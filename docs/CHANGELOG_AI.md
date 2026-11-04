@@ -26,3 +26,10 @@ For every fix, record:
 6. Commit SHA.
 
 Do not record secrets, API keys, tokens, private credentials, or personal data.
+
+
+## 2026-11-04 — Kimi / Qwen / Z.ai open-source review
+- Reviewed MoonshotAI/kimi-code (MIT), MoonshotAI/Kimi-Audio, QwenLM/Qwen-Agent (Apache-2.0), THUDM/GLM-4 and unofficial agent-next/zagent (MIT with stated non-commercial/personal interoperability restriction).
+- Chose to adapt protocols and safety patterns rather than copy desktop/Python stacks into Android.
+- Added docs/OPEN_SOURCE_AI_INTEGRATION_REVIEW_2026-11-04.md and docs/agents/BRIEF_JARVIS_MULTI_PROVIDER_FOUNDATION_2026-11-04.md.
+- No runtime code, provider endpoint, API key, audio upload, model weights or external agent execution in this research slice. Next implementation is Phase A with strict typed proposals, risk policy and offline tests.
