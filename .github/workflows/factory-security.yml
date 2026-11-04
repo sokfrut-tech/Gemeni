@@ -125,10 +125,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-boot-anim -no-snapshot
           script: |
-            set -euo pipefail
-            adb wait-for-device
-            adb shell getprop sys.boot_completed | grep -q 1
-            gradle --no-daemon :app:connectedDebugAndroidTest
+            bash -euo pipefail -c '
+              adb wait-for-device
+              adb shell getprop sys.boot_completed | grep -q 1
+              gradle --no-daemon :app:connectedDebugAndroidTest
+            '
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
