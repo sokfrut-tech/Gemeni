@@ -159,3 +159,41 @@ The next agent must be able to continue from these files without seeing the prev
 
 ## 13. User's explicit product goal
 The final product should be beautiful, Russian-speaking, functional, installable, and suitable for the user's Chinese OPPO/ColorOS device. The user wants the implementation to be based on their supplied/reference Breeno materials and source analysis, while remaining an original implementation rather than pretending to be the proprietary Breeno source.
+
+
+## 14. Checkpoint — 2026-11-04
+
+### Current code observed on main
+
+- Launcher Activity is `.ui.MainActivity` and Compose now renders the Russian Jarvis UI, animated/native sphere view, mascot, quick actions and microphone control.
+- Microphone action is connected to `JarvisRuntimeController`: permission request → model preparation/download → Sherpa Russian ASR → intent dispatch → Android action → speech response.
+- Native sphere uses `GLSurfaceView` + JNI + GLES2; native methods are present in `alphavideo_gl_engine.cpp` and library target `jarvis_native` is defined in CMake.
+- This source-level connection is not proof that the user's OPPO device renders the sphere or completes the voice path. Black-screen regression remains NOT VERIFIED on physical hardware.
+
+### Model integrity correction
+
+PR #51 corrects the decoder model SHA-256 from a malformed 60-character value to the verified 64-character SHA-256:
+`89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0`.
+The corrected digest is independently confirmed by Hugging Face file metadata and the model repository's original LFS pointer:
+- https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-small-ru-vosk-2025-08-16/blob/main/decoder.onnx
+- https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-small-ru-vosk-2025-08-16/commit/0902de36fdd10768f5b36acc8865ffa3ee7cb8ef
+
+### Emulator test result — important limitation
+
+PR #51 adds launcher UI and microphone smoke tests, but its only observed workflow run [41530520998](https://github.com/sokfrut-tech/Gemeni/actions/runs/41530520998) failed before the tests started:
+- Gradle reported `Finished 0 tests`.
+- `AndroidTestApkInstallerPlugin` failed to install `app-debug.apk` on emulator-5554.
+- Root diagnostic: `ShellCommandUnresponsiveException` during split APK installation.
+- Therefore this run proves neither UI pass nor UI failure. It is an emulator/ADB installation failure, not an observed black-screen screenshot.
+- A review comment has been posted to PR #51 requesting bounded emulator install diagnostics and a rerun where the launcher UI assertion actually executes.
+
+### Next actions
+
+1. Stabilize emulator installation in CI (preflight adb/device health, capture install logs and device storage, use a bounded retry only for installation; do not weaken UI assertions).
+2. Ensure the launcher test verifies visible header, quick commands, microphone and native sphere; save screenshot and logcat on failure.
+3. Add native renderer diagnostics for shader compile/link status and JNI/native exceptions; test pause/resume and non-black frame.
+4. Add a separate ASR runtime test that does not silently count a permission prompt or loading label as successful listening. Model download/network must be bounded and report exact file/hash failure.
+5. Build and install the candidate APK on the user's actual Chinese OPPO/ColorOS device before claiming the black-screen issue fixed.
+6. Keep Google Play publication out of scope.
+
+Last known status: PR #51 open, CI not green; physical OPPO not tested.
