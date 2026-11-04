@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
         var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
 
         DisposableEffect(Unit) {
-            statusSink = { value -> status = value }
+            statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
             onDispose { statusSink = null; stateSink = null }
         }
