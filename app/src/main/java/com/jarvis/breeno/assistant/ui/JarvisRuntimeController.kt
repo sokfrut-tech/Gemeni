@@ -68,5 +68,21 @@ class JarvisRuntimeController(context: Context) {
         return text
     }
 
+    fun runQuickCommand(label: String): String {
+        val utterance = when (label) {
+            "Навигатор" -> "навигатор"
+            "Поиск" -> "найди новости"
+            "Телефон" -> "позвони"
+            else -> return "Эта команда пока не подключена"
+        }
+        val response = when (val result = tools.executeUtterance(utterance)) {
+            is ToolResult.Success -> result.message
+            is ToolResult.NeedsConfirmation -> result.description
+            is ToolResult.Failure -> result.message
+        }
+        speaker.speak(response)
+        return response
+    }
+
     fun close() { asr.close() }
 }
