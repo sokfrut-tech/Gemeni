@@ -16,7 +16,7 @@ class ModelDownloadManager(private val context: Context) {
 
         private val FILES = listOf(
             ModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d"),
-            ModelFile("decoder.onnx", "89b3088a20e1ef7f85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
+            ModelFile("decoder.onnx", "89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
             ModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5"),
             ModelFile("tokens.txt", null),
         )
