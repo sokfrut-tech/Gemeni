@@ -197,3 +197,19 @@ PR #51 adds launcher UI and microphone smoke tests, but its only observed workfl
 6. Keep Google Play publication out of scope.
 
 Last known status: PR #51 open, CI not green; physical OPPO not tested.
+
+
+## 15. Checkpoint — 2026-11-04: Android tool gateway
+
+Branch: `feat/jarvis-tool-registry-safety-core-2026-11-04`
+Base: orbital renderer PR #55 head `7dc7430dd2808e0bbefad2714b2be0ae77b8927c`
+
+- Added `AndroidJarvisToolRegistry` with typed results and centralized Android intent dispatch.
+- Voice transcript now routes through the registry instead of the prior ad-hoc dispatcher.
+- Supported intents: open a uniquely matched installed app, web search, navigation, open dialer, local time.
+- Dialer uses ACTION_DIAL only; no direct call or SMS is sent.
+- Added AssistantState lifecycle enum and connected state callbacks to Compose labels.
+- Quick action buttons now use the same tool gateway.
+- Implementation details and limitations: `docs/JARVIS_TOOL_GATEWAY_IMPLEMENTATION.md`.
+
+Not yet verified: exact-head CI, emulator runtime, real OPPO/ColorOS, app package visibility, actual navigation app handling. Do not call this release-ready.
