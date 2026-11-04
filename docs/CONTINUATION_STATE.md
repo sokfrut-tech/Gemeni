@@ -213,3 +213,38 @@ Base: orbital renderer PR #55 head `7dc7430dd2808e0bbefad2714b2be0ae77b8927c`
 - Implementation details and limitations: `docs/JARVIS_TOOL_GATEWAY_IMPLEMENTATION.md`.
 
 Not yet verified: exact-head CI, emulator runtime, real OPPO/ColorOS, app package visibility, actual navigation app handling. Do not call this release-ready.
+
+
+## 16. Checkpoint — 2026-11-04: parser tests and Android package visibility
+
+PR: https://github.com/sokfrut-tech/Gemeni/pull/59
+Branch: test/jarvis-command-parser-package-visibility-2026-11-04
+
+- Extracted pure Russian voice command parser to app/src/main/java/com/jarvis/breeno/assistant/core/JarvisCommandParser.kt.
+- Added JUnit tests in app/src/test/java/com/jarvis/breeno/assistant/core/JarvisCommandParserTest.kt for app launch, search, navigation, dialer, time, empty and unsupported phrases.
+- Added JUnit 4.13.2 test dependency.
+- Added Android 11+ launcher intent package visibility query in the manifest.
+- Android tool gateway now delegates command interpretation to the pure parser.
+- Added docs/JARVIS_VOICE_RUNTIME_GAP_ANALYSIS_2026-11-04.md documenting existing audio/VAD/KWS building blocks and missing integration.
+
+### CI evidence at checkpoint
+
+- Workflow run 41903416302 on original PR #59 head 50e71e8d92991ae7bbee13df7967beaf34701f8b.
+- Secret scanning passed.
+- Kotlin compile step passed.
+- Full debug APK build was running when this checkpoint was written; APK hash/upload, emulator tests and CodeQL analysis were not confirmed.
+- A documentation-only commit was added after that run, so that run is not exact-head evidence for the updated PR. Recheck CI against current PR head before declaring green.
+
+### Voice runtime inspection — critical handoff
+
+Existing source files include AudioRecordPipeline, SileroVadEngine, SherpaJarvisKwsEngine, HotwordDetector, JarvisVoiceInteractionService and JarvisSessionService. However, JarvisRuntimeController.listenOnce currently captures a fixed 4.5-second window and does not connect VAD/KWS/HotwordDetector. VoiceInteractionService is only a lifecycle shell. There is no connected foreground microphone service for continuous listening. See the gap analysis document before implementing the next stage.
+
+### Next steps for any agent
+
+1. Fetch PR #59 current head SHA and inspect exact-head CI. Diagnose failures from logs; do not weaken tests.
+2. Verify APK build and instrumentation tests before adding more runtime features.
+3. Then implement opt-in foreground microphone service, explicit persistent notification and stop action; connect acoustic KWS first, VAD endpointing second, local ASR third.
+4. Add model lifecycle/checksum verification for VAD/KWS before attempting runtime integration. Do not invent model URLs or hashes.
+5. Keep no-hidden-recording rule; no raw audio persistence by default.
+6. Test emulator then physical OPPO/ColorOS. No Google Play release planned.
+7. Do not merge PR #58/#59 or publish a release without explicit user authorization.
