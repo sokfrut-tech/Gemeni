@@ -31,3 +31,8 @@ No secret in Git/APK/logs, no permission bypass, no Play publishing or destructi
 
 ## Resume
 Refresh PR #51/#35/#53 and CI first. If Gemini/Claude are unavailable, ChatGPT continues direct implementation; do not fake model review or cloud availability.
+
+
+## Documentation handoff PR
+- Continuation brief PR: [#54](https://github.com/sokfrut-tech/Gemeni/pull/54) (draft; not merged).
+- Review this brief against current main before code changes.
