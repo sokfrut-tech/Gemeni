@@ -173,3 +173,15 @@ Critical verified source gaps on main: LocalLlmEngine is an echo placeholder; Ja
 Preserve and reconcile the open PR dependency chain #58 -> #59 -> #60 and Phase A sibling PRs #61/#62 plus CI follow-up #63. PR #61 has an observed Kotlin compilation failure; PR #62 has an observed emulator split-APK install/ADB failure. No draft PR was merged during this audit. Build/CI workflow success is not equivalent to real AI reasoning or OPPO runtime validation.
 
 Next: create one integration branch that combines the typed Android gateway/parser with the corrected local provider/proposal/task coordinator; resolve compilation and emulator test reliability; then implement a real local inference engine, persistent memory, and connected voice/action/verification loop. Keep all risky actions behind explicit confirmation and user-controlled permissions.
+
+## 2026-11-06 — PR integration diagnosis refreshed
+
+Read [the exact PR integration checkpoint](engineering/2026-11-06-pr-integration-checkpoint.md) before changing branches.
+
+Important correction to older notes:
+- PR #61 exact-head Kotlin compilation fails because the parser branch (#59) is not included in its base and because `ToolProposal.kt` uses early returns inside an expression-bodied function.
+- PR #62 is the compile repair: exact-head logs show `:app:compileDebugKotlin` and `:app:assembleDebug` succeeded. Its later connected instrumentation test failed.
+- PR #63 separates the CI jobs. Its CodeQL and secret-scan jobs passed; emulator smoke test failed with `Timeout waiting for emulator to boot`.
+- PR #65 is docs-only and its checks passed, but GitHub refused merging while it remained draft. Do not bypass draft state or merge it by force.
+
+Do not describe #62 as a Kotlin compile failure. Preserve its compile correction. Next work is a carefully reconciled integration branch combining the #58/#59/#60 gateway/parser dependency chain with the corrected Phase A implementation from #62, retaining the #61 tests and documentation where they add value. Refresh all branch heads and inspect exact diffs before any branch mutation. No PRs were merged and no app source was changed in this checkpoint.
