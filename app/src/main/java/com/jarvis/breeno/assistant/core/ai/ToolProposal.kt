@@ -67,7 +67,12 @@ object ToolProposalCodec {
             if (tool == "open_app" && args.getValue("name").isBlank()) return null
             if (tool == "web_search" && args.getValue("query").isBlank()) return null
             if (tool == "navigate" && args.getValue("destination").isBlank()) return null
-            if (tool == "open_dialer" && args.getValue("number").count(Char::isDigit) > 20) return null
+            if (tool == "open_dialer") {
+                val number = args.getValue("number")
+                val digits = number.count(Char::isDigit)
+                if (digits !in 1..20) return null
+                if (number.count { it == '+' } > 1 || ('+' in number && !number.startsWith('+'))) return null
+            }
 
             val proposal = ToolProposal(tool, args)
             val risk = when (tool) {
