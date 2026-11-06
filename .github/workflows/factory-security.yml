@@ -93,7 +93,7 @@ jobs:
   emulator-smoke:
     name: Android emulator smoke tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -115,7 +115,7 @@ jobs:
       - name: Build debug APK before emulator launch
         run: gradle --no-daemon :app:assembleDebug
       - name: Android emulator smoke tests
-        timeout-minutes: 20
+        timeout-minutes: 30
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -123,7 +123,8 @@ jobs:
           target: google_apis
           force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-window -no-boot-anim -no-snapshot
+          emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -no-snapshot -no-metrics
+          emulator-boot-timeout: 900
           script: |
             bash -euo pipefail -c '
               adb wait-for-device
