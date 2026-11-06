@@ -4,6 +4,10 @@ import android.content.Context
 import com.jarvis.breeno.assistant.core.AndroidJarvisToolRegistry
 import com.jarvis.breeno.assistant.core.AssistantState
 import com.jarvis.breeno.assistant.core.ToolResult
+import com.jarvis.breeno.assistant.core.LlamaCppRuntime
+import com.jarvis.breeno.assistant.core.QwenModelInstaller
+import com.jarvis.breeno.assistant.core.ai.JarvisModelProvider
+import com.jarvis.breeno.assistant.core.ai.LlamaCppJarvisModelProvider
 import com.jarvis.breeno.assistant.core.ai.JarvisModelRequest
 import com.jarvis.breeno.assistant.core.ai.JarvisModelResult
 import com.jarvis.breeno.assistant.core.ai.LocalOnlyJarvisModelProvider
@@ -21,9 +25,46 @@ class JarvisRuntimeController(context: Context) {
     private val audio = AudioRecordPipeline(appContext)
     private val asr = SherpaRussianAsrEngine()
     private val tools = AndroidJarvisToolRegistry(appContext)
-    private val reasoning = LocalOnlyJarvisModelProvider()
+    private var reasoning: JarvisModelProvider = LocalOnlyJarvisModelProvider()
+    private val qwenRuntime = LlamaCppRuntime()
+    private val qwenInstaller = QwenModelInstaller(appContext)
     private var pendingConfirmationJson: String? = null
     private val speaker = JarvisSpeaker(appContext)
+
+    fun hasQwenModelFile(): Boolean = qwenInstaller.installedModelFile().isFile
+
+    suspend fun installAndActivateQwen(
+        userConsent: Boolean,
+        onProgress: (QwenModelInstaller.Progress) -> Unit
+    ): String {
+        val installed = qwenInstaller.install(userConsent, onProgress)
+        return activateQwenFile(installed.file)
+    }
+
+    fun activateInstalledQwen(): String = activateQwenFile(qwenInstaller.installedModelFile())
+
+    private fun activateQwenFile(file: java.io.File): String {
+        return when (val result = qwenRuntime.loadVerifiedModel(
+            file,
+            QwenModelInstaller.MODEL_SHA256
+        )) {
+            is LlamaCppRuntime.LoadResult.Loaded -> {
+                reasoning = LlamaCppJarvisModelProvider(qwenRuntime)
+                "Qwen загружена и подключена. Запросы обрабатываются локально."
+            }
+            is LlamaCppRuntime.LoadResult.Rejected -> result.reason
+        }
+    }
+
+    suspend fun removeQwenModel(): String {
+        reasoning = LocalOnlyJarvisModelProvider()
+        qwenRuntime.close()
+        return if (qwenInstaller.removeInstalledModel()) {
+            "Файл Qwen удалён. Остались офлайн-команды."
+        } else {
+            "Не удалось полностью удалить файл модели."
+        }
+    }
 
     suspend fun prepare(onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
@@ -123,5 +164,5 @@ class JarvisRuntimeController(context: Context) {
         return response
     }
 
-    fun close() { pendingConfirmationJson = null; asr.close() }
+    fun close() { pendingConfirmationJson = null; qwenRuntime.close(); asr.close() }
 }
