@@ -27,6 +27,9 @@ class LlamaCppRuntime : AutoCloseable {
     @Volatile
     private var loaded = false
 
+    val isModelLoaded: Boolean
+        get() = loaded
+
     @Synchronized
     fun loadVerifiedModel(modelFile: File, expectedSha256: String): LoadResult {
         if (!expectedSha256.matches(Regex("[0-9a-fA-F]{64}"))) {
