@@ -56,6 +56,13 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- Security probe only: separate isolated UID, no inherited app permissions. -->
+        <service
+            android:name=".service.JarvisPythonWorkerProbeService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:stopWithTask="true" />
+
         <service android:name=".service.JarvisRemoteService" android:exported="false" />
         <receiver android:name=".updater.RomUpdateReceiver" android:exported="false" />
         <receiver android:name=".service.BreenoIpcHookReceiver" android:exported="false" />
