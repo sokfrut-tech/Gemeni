@@ -144,9 +144,10 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeLoadModel(
     modelParams.progress_callback = modelLoadProgress; // portable CPU baseline; GPU offload is a later measured profile
     g_model = llama_model_load_from_file(pathValue.c_str(), modelParams);
     if (g_model == nullptr) {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Model load failed");
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Model load failed or was cancelled");
         return 0;
     }
+    if (g_cancelled.load()) { releaseLocked(); return 0; }
 
     llama_context_params contextParams = llama_context_default_params();
     contextParams.n_ctx = static_cast<uint32_t>(std::clamp(contextTokens, 512, 8192));
@@ -159,12 +160,11 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeLoadModel(
     contextParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
     contextParams.abort_callback = abortIfCancelled;
     g_context = llama_init_from_model(g_model, contextParams);
-    if (g_context == nullptr) {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Context creation failed");
+    if (g_context == nullptr || g_cancelled.load()) {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Context creation failed or was cancelled");
         releaseLocked();
         return 0;
     }
-    g_cancelled.store(false);
     __android_log_print(ANDROID_LOG_INFO, TAG, "Pinned llama.cpp model loaded");
     return 1;
 }
