@@ -55,7 +55,7 @@ Every result must distinguish ACTION_STARTED from STATE_VERIFIED. Only return ve
 
 ## Android and ColorOS compatibility
 
-- Current Gemeni branch manifest declares the app's actual minSdk in Gradle; inspect and record it before coding. Do not claim Android 7/API 24 support from a manifest or design note alone.
+- Verified on `main` on 2026-11-06: `app/build.gradle.kts` declares `minSdk = 29` and `targetSdk = 35`. This build does NOT support Android 7/API 24. Do not claim Android 7 support unless minSdk is deliberately lowered and all dependencies/native ABIs are proven compatible.
 - Android 10+ restricts ordinary apps from directly toggling Wi-Fi; use supported system UI such as the Wi-Fi panel where appropriate.
 - Android 13+ restricts ordinary apps from enabling/disabling Bluetooth; use supported system UI.
 - Special access (write settings, notification listener, accessibility, role/default-handler status) must be requested through explicit user-facing setup screens and checked again at execution time.
@@ -109,6 +109,6 @@ Every result must distinguish ACTION_STARTED from STATE_VERIFIED. Only return ve
 8. Physical OPPO Find X6 Pro acceptance is documented separately from emulator results.
 9. No paid/cloud dependency is required for core control.
 
-## Immediate next implementation step
+## Source audit findings (2026-11-06)\n\n- `app/build.gradle.kts`: `minSdk = 29`, `targetSdk = 35`, compileSdk 35. Android 7/API 24 is currently out of support. Any backward-compatibility effort is a separate engineering task with dependency and native-runtime verification.\n- `JarvisAccessibilityService` is currently an empty service. Its XML config requests all accessibility event types and window-content retrieval; this is broader than needed for an empty implementation and should be reduced before adding behavior.\n- `JarvisVoiceInteractionService` currently only overrides lifecycle callbacks; it does not yet implement a full assistant session workflow.\n\n## Immediate next implementation step
 
 After PR #78's currently running CI finishes, create a focused implementation PR from the reconciled integration base (do not merge the open PR dependency chain blindly). Start with P0 typed contracts and P1 diagnostics/volume/torch. Keep native LLM/JNI work independent so phone-control progress does not wait on model inference.
