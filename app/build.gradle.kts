@@ -48,11 +48,11 @@ dependencies {
     implementation("com.google.code.gson:gson:2.12.1")
 
     // Offline video trim/transcode/export pipeline (keep Media3 artifacts version-aligned).
-    implementation("androidx.media3:media3-exoplayer:1.11.1")
-    implementation("androidx.media3:media3-ui:1.11.1")
-    implementation("androidx.media3:media3-transformer:1.11.1")
-    implementation("androidx.media3:media3-effect:1.11.1")
-    implementation("androidx.media3:media3-common:1.11.1")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
 
     testImplementation("junit:junit:4.13.2")
 
