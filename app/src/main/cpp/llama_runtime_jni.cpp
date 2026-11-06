@@ -8,6 +8,44 @@
 #include <string>
 #include <vector>
 
+jstring toJavaString(JNIEnv* env, const std::string& value) {
+    std::vector<jchar> utf16;
+    utf16.reserve(value.size());
+    for (size_t i = 0; i < value.size();) {
+        const unsigned char first = static_cast<unsigned char>(value[i]);
+        uint32_t cp = 0xfffd;
+        size_t count = 1;
+        if (first < 0x80) { cp = first; }
+        else if (first >= 0xc2 && first <= 0xdf && i + 1 < value.size()) {
+            const unsigned char b1 = static_cast<unsigned char>(value[i + 1]);
+            if ((b1 & 0xc0) == 0x80) { cp = ((first & 0x1f) << 6) | (b1 & 0x3f); count = 2; }
+        } else if (first >= 0xe0 && first <= 0xef && i + 2 < value.size()) {
+            const unsigned char b1 = static_cast<unsigned char>(value[i + 1]);
+            const unsigned char b2 = static_cast<unsigned char>(value[i + 2]);
+            if ((b1 & 0xc0) == 0x80 && (b2 & 0xc0) == 0x80) {
+                const uint32_t candidate = ((first & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f);
+                if (candidate >= 0x800 && !(candidate >= 0xd800 && candidate <= 0xdfff)) { cp = candidate; count = 3; }
+            }
+        } else if (first >= 0xf0 && first <= 0xf4 && i + 3 < value.size()) {
+            const unsigned char b1 = static_cast<unsigned char>(value[i + 1]);
+            const unsigned char b2 = static_cast<unsigned char>(value[i + 2]);
+            const unsigned char b3 = static_cast<unsigned char>(value[i + 3]);
+            if ((b1 & 0xc0) == 0x80 && (b2 & 0xc0) == 0x80 && (b3 & 0xc0) == 0x80) {
+                const uint32_t candidate = ((first & 0x07) << 18) | ((b1 & 0x3f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f);
+                if (candidate >= 0x10000 && candidate <= 0x10ffff) { cp = candidate; count = 4; }
+            }
+        }
+        i += count;
+        if (cp <= 0xffff) utf16.push_back(static_cast<jchar>(cp));
+        else {
+            cp -= 0x10000;
+            utf16.push_back(static_cast<jchar>(0xd800 + (cp >> 10)));
+            utf16.push_back(static_cast<jchar>(0xdc00 + (cp & 0x3ff)));
+        }
+    }
+    return env->NewString(utf16.data(), static_cast<jsize>(utf16.size()));
+}
+
 namespace {
 constexpr const char* TAG = "JarvisLlama";
 std::mutex g_mutex;
@@ -31,7 +69,7 @@ bool appendToken(JNIEnv* env, jobject listener, jmethodID onToken, const char* b
     if (length <= 0) return true;
     output.append(bytes, static_cast<size_t>(length));
     if (listener == nullptr || onToken == nullptr) return true;
-    jstring piece = env->NewStringUTF(std::string(bytes, static_cast<size_t>(length)).c_str());
+    jstring piece = toJavaString(env, std::string(bytes, static_cast<size_t>(length)));
     if (piece == nullptr) return false;
     const jboolean keepGoing = env->CallBooleanMethod(listener, onToken, piece);
     env->DeleteLocalRef(piece);
@@ -161,7 +199,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
     output.reserve(2048);
     const int limit = std::clamp(maxTokens, 1, 512);
     for (int i = 0; i < limit && !g_cancelled.load(); ++i) {
-        const llama_token token = llama_sampler_sample(sampler, g_context, -1);
+        llama_token token = llama_sampler_sample(sampler, g_context, -1);
         if (llama_vocab_is_eog(vocab, token)) break;
         char piece[512];
         const int pieceLength = llama_token_to_piece(vocab, token, piece,
@@ -172,12 +210,12 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
                 break;
             }
         }
-        llama_batch next = llama_batch_get_one(const_cast<llama_token*>(&token), 1);
+        llama_batch next = llama_batch_get_one(&token, 1);
         if (llama_decode(g_context, next) != 0) break;
     }
     llama_sampler_free(sampler);
     if (listenerClass != nullptr) env->DeleteLocalRef(listenerClass);
-    return env->NewStringUTF(output.c_str());
+    return toJavaString(env, output);
 }
 
 extern "C" JNIEXPORT void JNICALL
