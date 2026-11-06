@@ -109,6 +109,7 @@ private fun JarvisVideoEditorScreen() {
             return
         }
         val outputFile = File(context.cacheDir, "jarvis-trim-${System.currentTimeMillis()}.mp4")
+        outputTempFile = outputFile
         val mediaItem = MediaItem.Builder()
             .setUri(uri)
             .setClippingConfiguration(
@@ -139,6 +140,7 @@ private fun JarvisVideoEditorScreen() {
                             errorMessage = "Файл создан во временной папке приложения, но перенос в галерею не удался."
                         }
                         outputFile.delete()
+                        outputTempFile = null
                     }
                 }
 
@@ -152,6 +154,7 @@ private fun JarvisVideoEditorScreen() {
                     status = "Ошибка экспорта"
                     errorMessage = exportException.message ?: "Media3 не смог обработать этот файл."
                     outputFile.delete()
+                    outputTempFile = null
                 }
             })
             .build()
@@ -164,6 +167,7 @@ private fun JarvisVideoEditorScreen() {
                 status = "Не удалось начать экспорт"
                 errorMessage = it.message ?: it.javaClass.simpleName
                 outputFile.delete()
+                outputTempFile = null
             }
     }
 
