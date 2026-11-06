@@ -204,3 +204,12 @@ Branch: `integration/jarvis-safe-agent-runtime-2026-11-06`, created from PR #62 
 ## Phase B handoff — real local reasoning model
 
 Before implementing neural inference, read `docs/agents/BRIEF_LOCAL_REASONING_RUNTIME_PHASE_B_2026-11-06.md`. It defines the runtime evaluation (llama.cpp / MLC / ONNX Runtime GenAI), model licensing, on-device benchmark, structured planning, offline/privacy gates and acceptance tests. Current provider remains deterministic parser logic; do not call it a local LLM.
+
+
+## Phase B runtime evidence update — 2026-11-06
+- Read `docs/engineering/2026-11-06-local-inference-runtime-decision.md` before adding an LLM runtime.
+- Preferred first spike is app-owned JNI over pinned llama.cpp commit `954de248ac6907dd05dc19f0f511ab18f2807a54`; upstream code license is MIT. Model weights retain separate licenses.
+- Do not import the current Arm AI Chat Kotlin library unchanged: upstream example library currently declares minSdk 33, NDK 29, compileSdk 36. The generic upstream Android NDK guide's example uses Android API 28. API24 support is therefore not proven.
+- MLC is a later GPU acceleration experiment; its Android guide requires model-specific packaging and a physical device for meaningful GPU tests. Base ONNX Runtime Android availability does not prove an LLM generation stack.
+- Replaced `LocalLlmEngine`'s prompt-echo placeholder with an explicit “model not connected” response and added a regression test. Do not present this as neural inference.
+- Added `LocalLlmEngineTest` to guard against echoing user prompts as model completions. New exact-head CI must run against the latest PR #78 head.
