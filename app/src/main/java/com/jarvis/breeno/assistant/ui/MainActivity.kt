@@ -158,6 +158,10 @@ class MainActivity : ComponentActivity() {
                                 QuickCommand("Навигатор") { runQuickCommand("Навигатор"); transcript = "Запускаю навигацию" }
                                 QuickCommand("Поиск") { runQuickCommand("Поиск"); transcript = "Открываю поиск" }
                                 QuickCommand("Телефон") { runQuickCommand("Телефон"); transcript = "Открываю телефон" }
+                                QuickCommand("Память") {
+                                    startActivity(Intent(this@MainActivity, JarvisMemoryActivity::class.java))
+                                    transcript = "Открываю локальную память"
+                                }
                             }
                         }
                     }
