@@ -54,6 +54,9 @@ std::once_flag g_backend_once;
 llama_model* g_model = nullptr;
 llama_context* g_context = nullptr;
 
+bool modelLoadProgress(float, void*) { return !g_cancelled.load(); }
+bool abortIfCancelled(void*) { return g_cancelled.load(); }
+
 void releaseLocked() {
     if (g_context != nullptr) {
         llama_free(g_context);
@@ -135,8 +138,10 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeLoadModel(
     releaseLocked();
     std::call_once(g_backend_once, [] { llama_backend_init(); });
 
+    g_cancelled.store(false);
     llama_model_params modelParams = llama_model_default_params();
-    modelParams.n_gpu_layers = 0; // portable CPU baseline; GPU offload is a later measured profile
+    modelParams.n_gpu_layers = 0;
+    modelParams.progress_callback = modelLoadProgress; // portable CPU baseline; GPU offload is a later measured profile
     g_model = llama_model_load_from_file(pathValue.c_str(), modelParams);
     if (g_model == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Model load failed");
@@ -152,6 +157,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeLoadModel(
     contextParams.offload_kqv = false;
     contextParams.op_offload = false;
     contextParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    contextParams.abort_callback = abortIfCancelled;
     g_context = llama_init_from_model(g_model, contextParams);
     if (g_context == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Context creation failed");
