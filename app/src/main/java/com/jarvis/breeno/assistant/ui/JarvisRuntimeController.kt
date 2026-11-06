@@ -11,6 +11,8 @@ import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
@@ -25,7 +27,7 @@ class JarvisRuntimeController(context: Context) {
     private var pendingConfirmationJson: String? = null
     private val speaker = JarvisSpeaker(appContext)
 
-    fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
+    suspend fun isRussianAsrReady(): Boolean = withContext(Dispatchers.IO) { models.isRussianAsrReady() }
 
     /** Called only after the user explicitly approves the model download dialog. */
     suspend fun downloadRussianAsrAfterConsent(onProgress: (String) -> Unit) {
