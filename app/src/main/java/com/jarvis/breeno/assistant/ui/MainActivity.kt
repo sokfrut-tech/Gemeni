@@ -54,6 +54,7 @@ import com.jarvis.breeno.assistant.BuildConfig
 import com.jarvis.breeno.assistant.R
 import com.jarvis.breeno.assistant.ui.render.AlphaVideoSurfaceView
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
+import com.jarvis.breeno.assistant.video.JarvisVideoEditorActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -161,6 +162,10 @@ class MainActivity : ComponentActivity() {
                                 QuickCommand("Память") {
                                     startActivity(Intent(this@MainActivity, JarvisMemoryActivity::class.java))
                                     transcript = "Открываю локальную память"
+                                }
+                                QuickCommand("Видео") {
+                                    startActivity(Intent(this@MainActivity, JarvisVideoEditorActivity::class.java))
+                                    transcript = "Открываю локальную видеостудию"
                                 }
                             }
                         }
