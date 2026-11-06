@@ -58,6 +58,8 @@ jobs:
         with:
           languages: java-kotlin
           build-mode: manual
+      - name: Run JVM unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Compile Kotlin sources for CodeQL
         run: gradle --no-daemon :app:compileDebugKotlin
       - name: Build full debug APK
