@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -202,7 +203,7 @@ private fun JarvisVideoEditorScreen() {
             Text(status, style = MaterialTheme.typography.bodyMedium)
             if (sourceUri != null) {
                 AndroidView(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    modifier = Modifier.fillMaxWidth().height(220.dp).padding(vertical = 6.dp),
                     factory = { viewContext -> PlayerView(viewContext).apply { player = previewPlayer; useController = true } },
                     update = { it.player = previewPlayer }
                 )
