@@ -22,6 +22,18 @@ class LlamaCppRuntimeTest {
     }
 
     @Test
+    fun mismatchedDigestIsRejectedBeforeNativeLibraryLoad() {
+        val file = File.createTempFile("jarvis-model-reject", ".bin")
+        try {
+            file.writeText("abc")
+            val result = LlamaCppRuntime().loadVerifiedModel(file, "0".repeat(64))
+            assertTrue(result is LlamaCppRuntime.LoadResult.Rejected)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun pinnedModelDigestHasExpectedShape() {
         assertTrue(LlamaCppRuntime.QWEN_08B_Q4_0_SHA256.matches(Regex("[0-9a-f]{64}")))
     }
