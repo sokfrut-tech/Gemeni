@@ -6,27 +6,33 @@ import org.junit.Test
 
 class ModelRuntimeBudgetTest {
     @Test
-    fun rejectsLargeModelWhenHeapOrStorageIsInsufficient() {
-        val budget = ModelRuntimeBudget.evaluate(appHeapLimitMb = 700, freeStorageMb = 5000)
-        assertEquals(ModelRuntimeBudget.Tier.NOT_RECOMMENDED, budget)
+    fun rejectsLargeModelWhenSystemRamOrStorageIsInsufficient() {
+        assertEquals(
+            ModelRuntimeBudget.Tier.NOT_RECOMMENDED,
+            ModelRuntimeBudget.evaluate(availableRamMb = 700, freeStorageMb = 5000)
+        )
+        assertEquals(
+            ModelRuntimeBudget.Tier.NOT_RECOMMENDED,
+            ModelRuntimeBudget.evaluate(availableRamMb = 2048, freeStorageMb = 500)
+        )
     }
 
     @Test
     fun recommendsSmallModelWhenOnlySmallBudgetIsAvailable() {
-        val budget = ModelRuntimeBudget.evaluate(appHeapLimitMb = 1024, freeStorageMb = 1500)
+        val budget = ModelRuntimeBudget.evaluate(availableRamMb = 1500, freeStorageMb = 1500)
         assertEquals(ModelRuntimeBudget.Tier.SMALL_MODEL_ONLY, budget)
     }
 
     @Test
     fun allowsMediumModelCandidateOnlyWithSufficientHeadroom() {
-        val budget = ModelRuntimeBudget.evaluate(appHeapLimitMb = 2048, freeStorageMb = 4096)
+        val budget = ModelRuntimeBudget.evaluate(availableRamMb = 4096, freeStorageMb = 4096)
         assertEquals(ModelRuntimeBudget.Tier.MEDIUM_MODEL_CANDIDATE, budget)
     }
 
     @Test
     fun thresholdsAreConservativeAndDeterministic() {
-        assertTrue(ModelRuntimeBudget.evaluate(767, 4096) == ModelRuntimeBudget.Tier.NOT_RECOMMENDED)
-        assertTrue(ModelRuntimeBudget.evaluate(768, 1023) == ModelRuntimeBudget.Tier.NOT_RECOMMENDED)
-        assertTrue(ModelRuntimeBudget.evaluate(768, 1024) == ModelRuntimeBudget.Tier.SMALL_MODEL_ONLY)
+        assertTrue(ModelRuntimeBudget.evaluate(1023, 4096) == ModelRuntimeBudget.Tier.NOT_RECOMMENDED)
+        assertTrue(ModelRuntimeBudget.evaluate(1024, 1023) == ModelRuntimeBudget.Tier.NOT_RECOMMENDED)
+        assertTrue(ModelRuntimeBudget.evaluate(1024, 1024) == ModelRuntimeBudget.Tier.SMALL_MODEL_ONLY)
     }
 }
