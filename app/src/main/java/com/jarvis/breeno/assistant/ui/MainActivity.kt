@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -122,11 +124,20 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Runtime не запускался") }
         var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
         var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
+        var showQwenPanel by remember { mutableStateOf(false) }
 
         DisposableEffect(Unit) {
             statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
             onDispose { statusSink = null; stateSink = null }
+        }
+
+        if (showQwenPanel) {
+            QwenModelPanel(
+                controller = runtime,
+                onClose = { showQwenPanel = false },
+                onMessage = { status = it; transcript = it }
+            )
         }
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
@@ -143,7 +154,7 @@ class MainActivity : ComponentActivity() {
                             Text("Русский ассистент • ColorOS", color = Color(0xFF9CA8B8), style = MaterialTheme.typography.bodySmall)
                             Text("BUILD ${BuildConfig.VERSION_CODE}", color = Color(0xFF566274), style = MaterialTheme.typography.labelSmall)
                         }
-                        IconButton(onClick = { openSettings() }) { Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Color(0xFFB8C5D6)) }
+                        IconButton(onClick = { showQwenPanel = true }) { Icon(Icons.Default.Settings, contentDescription = "Модель и настройки", tint = Color(0xFFB8C5D6)) }
                     }
                     Spacer(modifier = Modifier.height(330.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
