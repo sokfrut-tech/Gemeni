@@ -122,7 +122,7 @@ class LlamaCppRuntime : AutoCloseable {
                     digest.update(buffer, 0, count)
                 }
             }
-            return digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
+            return digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xff) }
         }
     }
 }
