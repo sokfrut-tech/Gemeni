@@ -25,10 +25,21 @@ class JarvisRuntimeController(context: Context) {
     private var pendingConfirmationJson: String? = null
     private val speaker = JarvisSpeaker(appContext)
 
+    fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
+
+    /** Called only after the user explicitly approves the model download dialog. */
+    suspend fun downloadRussianAsrAfterConsent(onProgress: (String) -> Unit) {
+        onProgress("Загружаю только файлы русской модели…")
+        models.ensureRussianAsr { percent -> onProgress("Загрузка модели: $percent%") }
+        onProgress("Модель загружена и проверена")
+    }
+
     suspend fun prepare(onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
-        val dir = models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
-        asr.load(dir)
+        check(models.isRussianAsrReady()) {
+            "Русская модель не установлена. Сначала подтвердите её отдельную загрузку."
+        }
+        asr.load(models.modelDir())
         onProgress("Русский ASR готов")
     }
 
