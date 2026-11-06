@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -31,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -76,11 +78,41 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startRealListening()
-        } else {
-            pendingListen = true
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        lifecycleScope.launch {
+            val modelReady = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+            if (!modelReady) {
+                modelDownloadConsentSink?.invoke(true)
+                return@launch
+            }
+            if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                startRealListening()
+            } else {
+                pendingListen = true
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    private var modelDownloadConsentSink: ((Boolean) -> Unit)? = null
+    private var modelDownloadBusySink: ((Boolean) -> Unit)? = null
+
+    private fun downloadModelAfterUserConsent() {
+        modelDownloadBusySink?.invoke(true)
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    runtime.downloadRussianAsrAfterConsent { value ->
+                        runOnUiThread { statusSink?.invoke(value) }
+                    }
+                }
+            }.onSuccess {
+                statusSink?.invoke("Модель установлена локально. Готов к работе.")
+                modelDownloadConsentSink?.invoke(false)
+                requestAndListen()
+            }.onFailure { error ->
+                statusSink?.invoke("Загрузка не выполнена: ${error.message ?: error.javaClass.simpleName}")
+            }
+            modelDownloadBusySink?.invoke(false)
         }
     }
 
@@ -122,11 +154,43 @@ class MainActivity : ComponentActivity() {
         var status by remember { mutableStateOf("Runtime не запускался") }
         var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
         var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
+        var showModelDownloadConsent by remember { mutableStateOf(false) }
+        var modelDownloadInProgress by remember { mutableStateOf(false) }
 
         DisposableEffect(Unit) {
             statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
-            onDispose { statusSink = null; stateSink = null }
+            modelDownloadConsentSink = { showModelDownloadConsent = it }
+            modelDownloadBusySink = { modelDownloadInProgress = it }
+            onDispose { statusSink = null; stateSink = null; modelDownloadConsentSink = null; modelDownloadBusySink = null }
+        }
+
+        if (showModelDownloadConsent) {
+            AlertDialog(
+                onDismissRequest = { if (!modelDownloadInProgress) showModelDownloadConsent = false },
+                title = { Text("Загрузить русскую модель?") },
+                text = {
+                    Text(
+                        "Для распознавания речи нужна локальная модель. Если продолжить, Джарвис подключится к Hugging Face и загрузит только файлы модели в память приложения. Ваш голос, сообщения, файлы и память Джарвиса не отправляются. Передача IP-адреса и технических данных соединения серверу неизбежна. Загрузка не начнётся без вашего нажатия."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !modelDownloadInProgress,
+                        onClick = {
+                            modelDownloadInProgress = true
+                            showModelDownloadConsent = false
+                            downloadModelAfterUserConsent()
+                        }
+                    ) { Text("Разрешить загрузку") }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !modelDownloadInProgress,
+                        onClick = { showModelDownloadConsent = false }
+                    ) { Text("Не сейчас") }
+                }
+            )
         }
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
