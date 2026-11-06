@@ -57,7 +57,7 @@ fun QwenModelPanel(
                 }
                 if (busy) {
                     LinearProgressIndicator(
-                        progress = { progress.fraction },
+                        progress = progress.fraction,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
