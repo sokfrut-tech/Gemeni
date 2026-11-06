@@ -76,6 +76,8 @@ jobs:
     name: Model workers / Qwen + DeepSeek
     needs: director
     runs-on: ubuntu-24.04
+    outputs:
+      state: ${{ steps.status.outputs.state }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -108,11 +110,33 @@ jobs:
           JARVIS_LLM_API_KEY: ${{ secrets.JARVIS_LLM_API_KEY }}
           JARVIS_LLM_MODEL: ${{ vars.JARVIS_LLM_MODEL || 'qwen/qwen3.6-plus:free' }}
         run: python3 tools/agent_swarm/multi_model_review.py .
-      - name: Record model-worker state
+      - name: Record truthful model-worker state
+        id: status
+        if: always()
         run: |
           mkdir -p build/factory
-          if [ -f build/multi-model-review.json ]; then cp build/multi-model-review.json build/factory/model-workers-review.json; fi
-          test -f build/factory/model-workers-status.txt || echo "Live model review completed." > build/factory/model-workers-status.txt
+          STATE=not_configured
+          if [ -f build/multi-model-review.json ]; then
+            cp build/multi-model-review.json build/factory/model-workers-review.json
+            STATE=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('build/multi-model-review.json').read_text())
+          good=[x for x in data if isinstance(x,dict) and x.get('content')]
+          bad=[x for x in data if isinstance(x,dict) and x.get('error')]
+          print('available' if good else 'degraded')
+          print(f"successful_providers={len(good)} failed_providers={len(bad)}", file=__import__('sys').stderr)
+          PY
+          )
+          elif [ "${{ steps.detect.outputs.configured }}" = "true" ]; then
+            STATE=degraded
+          fi
+          printf 'state=%s\\n' "$STATE" >> "$GITHUB_OUTPUT"
+          case "$STATE" in
+            available) echo 'AVAILABLE: at least one configured model provider returned a review.' > build/factory/model-workers-status.txt ;;
+            degraded) echo 'DEGRADED: configured model endpoints returned no usable review. Inspect model-workers-review.json. Offline deterministic checks remain separate.' > build/factory/model-workers-status.txt ;;
+            *) echo 'NOT_CONFIGURED: no optional cloud model endpoint was supplied; local/offline factory checks continue.' > build/factory/model-workers-status.txt ;;
+          esac
       - uses: actions/upload-artifact@v4
         with:
           name: factory-model-workers
@@ -128,7 +152,7 @@ jobs:
       - name: Verify specialist lanes
         run: test "${{ needs.specialist.result }}" = success
       - name: Report model-worker state
-        run: echo "model-workers=${{ needs.model-workers.result }}"
+        run: echo "model-workers-job=${{ needs.model-workers.result }} state=${{ needs.model-workers.outputs.state }}"
       - name: Check for placeholder implementation markers
         run: |
           if grep -RInE 'TODO|NotImplementedException|placeholder|stub|fake|dummy' app/src/main --include='*.kt' --include='*.cpp' --include='*.java' | grep -vE 'build|generated'; then
@@ -142,7 +166,8 @@ jobs:
           # Jarvis Factory handoff
           - commit: ${GITHUB_SHA}
           - specialist_result: ${{ needs.specialist.result }}
-          - model_workers: ${{ needs.model-workers.result }}
+          - model_workers_job: ${{ needs.model-workers.result }}
+          - model_workers_state: ${{ needs.model-workers.outputs.state }}
           - rule: build success alone never means release
           - next: Android runtime/e2e/device evidence before APK release
           EOF
