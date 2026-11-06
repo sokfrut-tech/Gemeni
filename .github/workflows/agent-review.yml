@@ -52,7 +52,32 @@ jobs:
           echo "OpenRouter endpoint is configured; API key secret is present."
       - name: Run model-backed independent reviewers
         run: python3 tools/agent_swarm/run_swarm.py --repo . --out build/agent-review-llm --llm
+      - name: Classify model-review availability
+        id: model-status
+        if: always()
+        run: |
+          mkdir -p build/agent-review-llm
+          STATE=degraded
+          if [ -f build/agent-review-llm/reviews.json ]; then
+            STATE=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('build/agent-review-llm/reviews.json')
+          data=json.loads(p.read_text())
+          values=list(data.values()) if isinstance(data,dict) else data
+          good=[v for v in values if isinstance(v,str) and not v.startswith('LLM unavailable:') and 'error' not in v.lower()]
+          print('available' if good else 'degraded')
+          PY
+          )
+          fi
+          printf 'state=%s\n' "$STATE" >> "$GITHUB_OUTPUT"
+          if [ "$STATE" = available ]; then
+            echo 'AVAILABLE: at least one model-backed reviewer returned a result.' > build/agent-review-llm/MODEL_REVIEW_STATUS.md
+          else
+            echo 'DEGRADED: model-backed reviewers did not return usable results. Inspect reviews.json. Deterministic review is separate and does not count as an LLM review.' > build/agent-review-llm/MODEL_REVIEW_STATUS.md
+          fi
       - name: Upload model reviews
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-agent-review-llm
