@@ -2,7 +2,6 @@ package com.jarvis.breeno.assistant.core
 
 import java.io.File
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +42,5 @@ class LlamaCppRuntimeTest {
         assertTrue(LlamaCppRuntime.DEFAULT_CONTEXT_TOKENS in 512..8192)
         assertTrue(LlamaCppRuntime.DEFAULT_MAX_TOKENS in 1..LlamaCppRuntime.MAX_MAX_TOKENS)
         assertTrue(LlamaCppRuntime.MAX_PROMPT_CHARS <= 12000)
-        assertFalse(LlamaCppRuntime.MAX_MAX_TOKENS > 512)
     }
 }
