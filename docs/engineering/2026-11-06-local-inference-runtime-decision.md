@@ -56,3 +56,37 @@ llama.cpp code is MIT at the inspected commit. This does **not** grant a license
 - llama.cpp license: https://github.com/ggml-org/llama.cpp/blob/954de248ac6907dd05dc19f0f511ab18f2807a54/LICENSE
 - MLC Android guide: https://llm.mlc.ai/docs/deploy/android.html
 - ONNX Runtime install matrix: https://onnxruntime.ai/docs/install/
+
+
+## Model shortlist update — Qwen3.5 (2026-11-06)
+
+Fresh model-card and GGUF checks found a better current candidate family than the earlier Qwen3-1.7B baseline.
+
+### Candidate A — small pipeline smoke-test
+- Upstream weights: https://huggingface.co/Qwen/Qwen3.5-0.8B
+- Official GGUF conversion: https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF
+- Candidate file: `Qwen3.5-0.8B-Q4_0.gguf`, 563 MB.
+- Exact GGUF revision: `4c11520cef475dd40ed72ec4a1e68b26721bd769`.
+- SHA-256 reported by Hugging Face Xet pointer: `57d1997790d1744fba5b40a7317df71ea5e2acee28c47e78f0cce39c0703f8cf`.
+- Use only as a small runtime bring-up / Russian prompt smoke-test model; 0.8B is not assumed sufficient for high-quality agent planning.
+- The upstream Qwen3.5-0.8B model card marks the model Apache-2.0. Preserve the model and GGUF attribution/licensing notices.
+
+### Candidate B — primary quality/size experiment
+- Upstream model: https://huggingface.co/Qwen/Qwen3.5-2B
+- Model card marks Apache-2.0; it is a post-trained instruction model, not the Base checkpoint.
+- Candidate GGUF conversion: https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF
+- Candidate quantization: `Qwen3.5-2B-Q4_K_M.gguf`, reported around 1.40 GB. The quantizer describes this as its recommended default size/quality balance.
+- This is a third-party conversion, not a Qwen or ggml-org official conversion. Before enabling downloads, pin the exact repository revision and verify the full-file SHA-256; do not use a floating `main` URL.
+- Candidate for OPPO Find X6 Pro benchmark, not yet approved as default.
+
+### Runtime compatibility cross-check
+- The current llama.cpp source tree identifies `qwen35` / `qwen35moe` architectures and the upstream README demonstrates the `ggml-org/Qwen3.5-0.8B-GGUF` model family. Still verify the exact pinned llama.cpp commit against the selected GGUF metadata during the spike.
+- Begin with context 4096 (then 8192 only if memory allows), low batch, bounded output tokens and explicit cancellation. Never assume the model's advertised maximum context is safe on a phone.
+- Model download stays outside APK, resumable where feasible, SHA-256 verified, user-cancellable and removable.
+- Russian quality, tool-schema compliance, latency, RAM, thermals and battery are not yet measured. No quality or speed claims are made.
+
+### Selection gate
+1. First load official 0.8B Q4_0 with the pinned runtime to prove JNI, tokenizer/chat template, streaming, cancellation and airplane-mode behavior.
+2. Evaluate the 2B Q4_K_M candidate after exact conversion revision + SHA pin.
+3. Run the fixed Russian prompt/tool-call benchmark on the physical OPPO Find X6 Pro.
+4. Keep deterministic parser fallback available even after model integration.
