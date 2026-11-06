@@ -1,6 +1,6 @@
 package com.jarvis.breeno.assistant.core.ai
 
-import com.jarvis.breeno.assistant.core.LlamaCppRuntime
+import com.jarvis.breeno.assistant.core.JarvisTextGenerationRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
  * owns all execution and confirmation decisions.
  */
 class LlamaCppJarvisModelProvider(
-    private val runtime: LlamaCppRuntime
+    private val runtime: JarvisTextGenerationRuntime
 ) : JarvisModelProvider {
     override val providerId: String = "llama.cpp-qwen-local"
     override val isLocalOnly: Boolean = true
@@ -35,7 +35,7 @@ class LlamaCppJarvisModelProvider(
 
             val prompt = buildPrompt(userText, request.localeTag)
             val generated = runCatching {
-                runtime.generate(prompt, maxTokens = MAX_PROPOSAL_TOKENS)
+                runtime.generateForPlanning(prompt, maxTokens = MAX_PROPOSAL_TOKENS)
             }.getOrElse {
                 return@withContext JarvisModelResult.Failure(
                     "Ошибка локальной модели: ${it.message ?: "неизвестная ошибка"}"
