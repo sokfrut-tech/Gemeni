@@ -101,11 +101,16 @@ fun QwenModelPanel(
                         onClick = {
                             scope.launch {
                                 busy = true
-                                message = withContext(Dispatchers.IO) {
-                                    controller.activateInstalledQwen()
+                                try {
+                                    message = withContext(Dispatchers.IO) {
+                                        controller.activateInstalledQwen()
+                                    }
+                                    onMessage(message)
+                                } catch (failure: Throwable) {
+                                    message = failure.message ?: "Не удалось активировать модель"
+                                } finally {
+                                    busy = false
                                 }
-                                onMessage(message)
-                                busy = false
                             }
                         }
                     ) { Text("Проверить и активировать файл") }
@@ -114,11 +119,16 @@ fun QwenModelPanel(
                         onClick = {
                             scope.launch {
                                 busy = true
-                                message = withContext(Dispatchers.IO) {
-                                    controller.removeQwenModel()
+                                try {
+                                    message = withContext(Dispatchers.IO) {
+                                        controller.removeQwenModel()
+                                    }
+                                    onMessage(message)
+                                } catch (failure: Throwable) {
+                                    message = failure.message ?: "Не удалось удалить модель"
+                                } finally {
+                                    busy = false
                                 }
-                                onMessage(message)
-                                busy = false
                             }
                         }
                     ) { Text("Удалить модель") }
