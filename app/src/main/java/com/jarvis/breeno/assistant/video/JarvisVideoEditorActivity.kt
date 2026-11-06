@@ -68,6 +68,7 @@ private fun JarvisVideoEditorScreen() {
     var exporting by remember { mutableStateOf(false) }
     var transformer by remember { mutableStateOf<Transformer?>(null) }
     var outputUri by remember { mutableStateOf<Uri?>(null) }
+    var outputTempFile by remember { mutableStateOf<File?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -198,7 +199,7 @@ private fun JarvisVideoEditorScreen() {
                 }
             }
             if (exporting) {
-                OutlinedButton(onClick = { transformer?.cancel(); transformer = null; exporting = false; status = "Экспорт отменён" }) {
+                OutlinedButton(onClick = { transformer?.cancel(); transformer = null; outputTempFile?.delete(); outputTempFile = null; exporting = false; status = "Экспорт отменён" }) {
                     Text("Отменить экспорт")
                 }
             }
