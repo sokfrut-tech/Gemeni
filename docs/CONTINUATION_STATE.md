@@ -185,3 +185,17 @@ Important correction to older notes:
 - PR #65 is docs-only and its checks passed, but GitHub refused merging while it remained draft. Do not bypass draft state or merge it by force.
 
 Do not describe #62 as a Kotlin compile failure. Preserve its compile correction. Next work is a carefully reconciled integration branch combining the #58/#59/#60 gateway/parser dependency chain with the corrected Phase A implementation from #62, retaining the #61 tests and documentation where they add value. Refresh all branch heads and inspect exact diffs before any branch mutation. No PRs were merged and no app source was changed in this checkpoint.
+
+
+## 2026-11-06 — safe agent runtime integration handoff
+
+Read [the implementation report](engineering/2026-11-06-safe-agent-runtime-integration.md) before continuing.
+
+Branch: `integration/jarvis-safe-agent-runtime-2026-11-06`, created from PR #62 exact head and intended for review against the PR #63 CI branch.
+- Restored full `CONTINUATION_STATE.md`, `CURRENT_STATUS.md` and `CHANGELOG_AI.md` from current main because PR #60 truncated those durable records.
+- Active microphone runtime now uses the provider-neutral `JarvisModelProvider` seam with `LocalOnlyJarvisModelProvider`, validates typed proposals, then routes to the sole Android action gateway.
+- The local provider remains deterministic parser logic, not an LLM. Do not claim local neural reasoning, autonomous planning or self-learning.
+- Only SAFE proposals execute automatically. Dialer proposals require explicit in-app approval and are executed with ACTION_DIAL only. Cancellation and controller close clear pending state.
+- Unit tests were added for proposal creation, unsupported commands and dialer validation. Exact branch CI is pending.
+- PR #63 emulator shell quoting was simplified in commit `82f2358a27415598deb35f742b33996a62719ca2`; inspect the new run. Earlier failure also showed ADB failures, color-buffer errors and instrumentation process crash.
+- Do not merge the original PR chain blindly. Keep the restored docs, compare exact source diffs and run JVM/build/security/emulator checks before any merge.
