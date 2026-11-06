@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 concurrency:
@@ -62,11 +62,5 @@ jobs:
           name: jarvis-repair-evidence-${{ github.run_id }}
           path: repair-evidence/
 
-      - name: Commit dispatcher evidence only
-        run: |
-          git config user.name "jarvis-technician"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add repair-evidence || true
-          git diff --cached --quiet && exit 0
-          git commit -m "chore(factory): record automated repair queue"
-          git push origin HEAD:${GITHUB_REF_NAME}
+      # Evidence is retained as a workflow artifact above. Never push repair-worker
+      # output to main from a workflow_run context; the tested SHA may be stale.
