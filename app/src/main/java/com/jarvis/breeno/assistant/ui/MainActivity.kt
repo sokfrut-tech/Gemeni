@@ -91,8 +91,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private var modelDownloadConsentSink: ((Boolean) -> Unit)? = null
+    private var modelDownloadBusySink: ((Boolean) -> Unit)? = null
 
     private fun downloadModelAfterUserConsent() {
+        modelDownloadBusySink?.invoke(true)
         lifecycleScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -107,6 +109,7 @@ class MainActivity : ComponentActivity() {
             }.onFailure { error ->
                 statusSink?.invoke("Загрузка не выполнена: ${error.message ?: error.javaClass.simpleName}")
             }
+            modelDownloadBusySink?.invoke(false)
         }
     }
 
@@ -155,7 +158,8 @@ class MainActivity : ComponentActivity() {
             statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
             modelDownloadConsentSink = { showModelDownloadConsent = it }
-            onDispose { statusSink = null; stateSink = null; modelDownloadConsentSink = null }
+            modelDownloadBusySink = { modelDownloadInProgress = it }
+            onDispose { statusSink = null; stateSink = null; modelDownloadConsentSink = null; modelDownloadBusySink = null }
         }
 
         if (showModelDownloadConsent) {
