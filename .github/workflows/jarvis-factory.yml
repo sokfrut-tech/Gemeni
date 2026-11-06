@@ -131,7 +131,7 @@ jobs:
           elif [ "${{ steps.detect.outputs.configured }}" = "true" ]; then
             STATE=degraded
           fi
-          printf 'state=%s\\n' "$STATE" >> "$GITHUB_OUTPUT"
+          printf 'state=%s\n' "$STATE" >> "$GITHUB_OUTPUT"
           case "$STATE" in
             available) echo 'AVAILABLE: at least one configured model provider returned a review.' > build/factory/model-workers-status.txt ;;
             degraded) echo 'DEGRADED: configured model endpoints returned no usable review. Inspect model-workers-review.json. Offline deterministic checks remain separate.' > build/factory/model-workers-status.txt ;;
