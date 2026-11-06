@@ -4,6 +4,9 @@ import android.content.Context
 import com.jarvis.breeno.assistant.core.AndroidJarvisToolRegistry
 import com.jarvis.breeno.assistant.core.AssistantState
 import com.jarvis.breeno.assistant.core.ToolResult
+import com.jarvis.breeno.assistant.core.ai.JarvisModelRequest
+import com.jarvis.breeno.assistant.core.ai.JarvisModelResult
+import com.jarvis.breeno.assistant.core.ai.LocalOnlyJarvisModelProvider
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
@@ -18,6 +21,8 @@ class JarvisRuntimeController(context: Context) {
     private val audio = AudioRecordPipeline(appContext)
     private val asr = SherpaRussianAsrEngine()
     private val tools = AndroidJarvisToolRegistry(appContext)
+    private val reasoning = LocalOnlyJarvisModelProvider()
+    private var pendingConfirmationJson: String? = null
     private val speaker = JarvisSpeaker(appContext)
 
     suspend fun prepare(onProgress: (String) -> Unit) {
@@ -53,18 +58,31 @@ class JarvisRuntimeController(context: Context) {
         }
 
         onState(AssistantState.UNDERSTANDING)
-        onProgress("Понимаю команду…")
+        onProgress("Формирую безопасное предложение действия…")
+        val modelResult = reasoning.propose(JarvisModelRequest(userText = text))
         onState(AssistantState.EXECUTING)
-        val response = when (val result = tools.executeUtterance(text)) {
-            is ToolResult.Success -> result.message
-            is ToolResult.NeedsConfirmation -> "Требуется подтверждение: ${result.description}"
-            is ToolResult.Failure -> result.message
+
+        var proposalJson: String? = null
+        val toolResult = when (modelResult) {
+            is JarvisModelResult.Proposal -> {
+                proposalJson = modelResult.json
+                tools.executeProposalJson(modelResult.json)
+            }
+            is JarvisModelResult.NoAction -> ToolResult.Failure(modelResult.reason)
+            is JarvisModelResult.Failure -> ToolResult.Failure(modelResult.reason)
+        }
+        pendingConfirmationJson = if (toolResult is ToolResult.NeedsConfirmation) proposalJson else null
+
+        val response = when (toolResult) {
+            is ToolResult.Success -> toolResult.message
+            is ToolResult.NeedsConfirmation -> "Требуется подтверждение: ${toolResult.description}"
+            is ToolResult.Failure -> toolResult.message
         }
 
-        onState(AssistantState.SPEAKING)
+        onState(if (pendingConfirmationJson != null) AssistantState.WAITING_FOR_APPROVAL else AssistantState.SPEAKING)
         speaker.speak(response)
         onProgress(response)
-        onState(AssistantState.IDLE)
+        if (pendingConfirmationJson == null) onState(AssistantState.IDLE)
         return text
     }
 
@@ -84,5 +102,26 @@ class JarvisRuntimeController(context: Context) {
         return response
     }
 
-    fun close() { asr.close() }
+    fun confirmPendingAction(): String {
+        val proposal = pendingConfirmationJson
+            ?: return "Нет действия, ожидающего подтверждения"
+        pendingConfirmationJson = null
+        val response = when (val result = tools.executeProposalJson(proposal, confirmed = true)) {
+            is ToolResult.Success -> result.message
+            is ToolResult.NeedsConfirmation -> "Действие всё ещё требует подтверждения: ${result.description}"
+            is ToolResult.Failure -> result.message
+        }
+        speaker.speak(response)
+        return response
+    }
+
+    fun cancelPendingAction(): String {
+        if (pendingConfirmationJson == null) return "Нет ожидающего действия"
+        pendingConfirmationJson = null
+        val response = "Действие отменено"
+        speaker.speak(response)
+        return response
+    }
+
+    fun close() { pendingConfirmationJson = null; asr.close() }
 }
