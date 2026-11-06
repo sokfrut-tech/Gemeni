@@ -181,6 +181,25 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    if (assistantState == AssistantState.WAITING_FOR_APPROVAL) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    transcript = runtime.confirmPendingAction()
+                                    status = transcript
+                                    assistantState = AssistantState.IDLE
+                                }
+                            ) { Text("Подтвердить", color = Color(0xFF8DEBFF)) }
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    transcript = runtime.cancelPendingAction()
+                                    status = transcript
+                                    assistantState = AssistantState.IDLE
+                                }
+                            ) { Text("Отмена", color = Color(0xFFFFB38A)) }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(14.dp))
                     FloatingActionButton(onClick = { requestAndListen() }, containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536), contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)) {
                         Icon(Icons.Default.Mic, contentDescription = "Микрофон", modifier = Modifier.size(28.dp))
