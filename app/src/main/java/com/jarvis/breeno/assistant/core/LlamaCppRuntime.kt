@@ -13,7 +13,7 @@ import java.util.Locale
  *
  * Call load/generate/close from a worker thread: native inference is CPU-bound.
  */
-class LlamaCppRuntime : AutoCloseable {
+class LlamaCppRuntime : AutoCloseable, JarvisTextGenerationRuntime {
     fun interface TokenListener {
         /** Return false to stop generation after the current token. */
         fun onToken(text: String): Boolean
@@ -66,6 +66,9 @@ class LlamaCppRuntime : AutoCloseable {
         check(loaded) { "Локальная модель не загружена" }
         return nativeGenerate(prompt, maxTokens, listener)
     }
+
+    override fun generateForPlanning(prompt: String, maxTokens: Int): String =
+        generate(prompt, maxTokens, listener = null)
 
     /** Safe to call from another thread while generate() is running. */
     fun cancel() {
