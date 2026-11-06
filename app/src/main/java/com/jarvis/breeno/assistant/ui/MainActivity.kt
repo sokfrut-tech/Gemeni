@@ -78,15 +78,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
-        if (!runtime.isRussianAsrReady()) {
-            modelDownloadConsentSink?.invoke(true)
-            return
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startRealListening()
-        } else {
-            pendingListen = true
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        lifecycleScope.launch {
+            val modelReady = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+            if (!modelReady) {
+                modelDownloadConsentSink?.invoke(true)
+                return@launch
+            }
+            if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                startRealListening()
+            } else {
+                pendingListen = true
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
     }
 
