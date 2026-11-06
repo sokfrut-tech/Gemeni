@@ -20,6 +20,7 @@
         </activity>
         <activity android:name=".ui.setup.SetupAssistantActivity" android:exported="false" />
         <activity android:name=".ui.JarvisMemoryActivity" android:exported="false" />
+        <activity android:name=".video.JarvisVideoEditorActivity" android:exported="false" />
 
         <service
             android:name=".service.JarvisVoiceInteractionService"
