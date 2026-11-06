@@ -57,3 +57,14 @@ Do not provide an APK to the user as “ready” unless:
 - security/ABI/manifest checks pass;
 - emulator smoke tests pass;
 - OPPO device test is documented when available.
+
+## 2026-11-06 — repository-wide AI architecture audit
+
+- Full recursive default-branch inventory completed for all 11 repositories visible in the connected GitHub installation; targeted source review across Kotlin, C++17, Python, Java, JavaScript, SQL, Bash, Protobuf, Gradle, YAML and XML is recorded in [REPOSITORY_WIDE_AI_AUDIT_2026-11-06.md](REPOSITORY_WIDE_AI_AUDIT_2026-11-06.md).
+- Product identity clarified: Jarvis is an AI agent with reasoning, planning, memory, tool use, perception, controlled learning and verified execution—not only voice command recognition.
+- Main-branch audit found real building blocks (AudioRecord, Sherpa ASR/VAD/KWS/TTS wrappers, native GLES, factory scripts) but also critical stubs: LocalLlmEngine echoes the prompt; JarvisToolRegistry mostly echoes commands; memory is simple SharedPreferences; Accessibility and parts of AIDL/VoiceInteraction are no-op.
+- Active Activity runtime uses bounded push-to-talk -> ASR -> basic intent routing -> limited Android actions -> system TTS. Standalone KWS/VAD/Piper classes are not connected end-to-end in this inspected runtime path.
+- minSdk=29 in Gemeni conflicts with the desired Android 7/API 24+ target.
+- PRs #58/#59/#60/#61/#62/#63 and #65 remain open/draft as observed; they contain useful implementation work but are branch-dependent and not safe to merge blindly. #61 exact-head compilation failed; #62 exact-head emulator split-APK install failed. See audit report for details.
+- Latest Director/Repair Crew workflow successes are not proof of autonomous coding agents: specialist lanes currently run deterministic evidence collectors; Test Factory is mostly static grep/file-contract checks.
+- Overall product remains NOT RELEASE READY. No physical OPPO runtime test was performed in this audit.
