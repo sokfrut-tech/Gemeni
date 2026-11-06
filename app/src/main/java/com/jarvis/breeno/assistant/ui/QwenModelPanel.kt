@@ -76,8 +76,10 @@ fun QwenModelPanel(
                             busy = true
                             message = "Подготовка безопасной загрузки…"
                             try {
-                                val result = controller.installAndActivateQwen(userConsent = true) { value ->
-                                    scope.launch { progress = value }
+                                val result = withContext(Dispatchers.IO) {
+                                    controller.installAndActivateQwen(userConsent = true) { value ->
+                                        scope.launch { progress = value }
+                                    }
                                 }
                                 message = result
                                 onMessage(result)
