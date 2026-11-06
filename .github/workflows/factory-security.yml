@@ -72,15 +72,6 @@ jobs:
         with:
           name: jarvis-debug-apk-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
-      - name: Run Android emulator smoke tests
-        timeout-minutes: 25
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          disable-animations: true
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:java-kotlin
@@ -97,3 +88,12 @@ jobs:
           name: codeql-sarif-${{ github.sha }}
           path: codeql-artifacts/*.sarif
           if-no-files-found: warn
+      - name: Run Android emulator smoke tests
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: gradle --no-daemon :app:connectedDebugAndroidTest
