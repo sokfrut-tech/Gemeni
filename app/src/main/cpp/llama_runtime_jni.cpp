@@ -196,7 +196,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
         tokenCount = llama_tokenize(vocab, formatted.data(),
                                     static_cast<int32_t>(formatted.size()),
                                     tokens.data(), static_cast<int32_t>(tokens.size()),
-                                    true, false);
+                                    true, true);
     }
     if (tokenCount <= 0 || static_cast<uint32_t>(tokenCount) >= llama_n_ctx(g_context)) {
         return env->NewStringUTF("");
