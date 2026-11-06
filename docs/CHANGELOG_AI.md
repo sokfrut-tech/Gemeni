@@ -26,3 +26,11 @@ For every fix, record:
 6. Commit SHA.
 
 Do not record secrets, API keys, tokens, private credentials, or personal data.
+
+
+## 2026-11-06 — safe provider-to-tool runtime slice
+- Created integration branch from PR #62, restoring complete project handoff documents that PR #60 had truncated.
+- Wired the active ASR transcript path through the provider-neutral model contract, strict proposal validation and the single Android action gateway.
+- Added explicit approval/cancel controls for CONFIRM-risk dialer actions; no direct call is placed.
+- Added unit tests for deterministic offline proposal generation, unsupported utterances and dialer-number validation.
+- Clarified that the current local provider is a deterministic parser adapter, not an LLM. Runtime integration and CI verification remain pending; no merge or release claimed.
