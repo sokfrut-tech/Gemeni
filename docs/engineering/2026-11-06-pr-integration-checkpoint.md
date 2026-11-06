@@ -62,3 +62,15 @@ The split correctly prevents emulator boot problems from suppressing CodeQL. It 
 Jarvis remains an AI-agent project, but its main branch still has echo/stub paths documented in the repository-wide audit. The Phase A provider is currently parser-backed and deterministic; it is not a neural model. Do not claim autonomous reasoning, self-learning, a working on-device hive, always-on wake word or full voice-to-tool pipeline until each is implemented and verified.
 
 No application code, permissions, secrets, deployments, releases or APK publication were changed by this checkpoint.
+
+
+## Follow-up action — emulator startup hardening
+
+A narrow CI change was pushed to the existing PR #63 branch:
+- Commit: `ef87a65dddcf507fc34149080910319d635b368b`
+- File: `.github/workflows/factory-security.yml`
+- Increased the emulator job budget from 35 to 45 minutes and the emulator step budget from 20 to 30 minutes.
+- Set the emulator boot timeout to 900 seconds and selected software GPU rendering, no audio, no boot animation, no snapshots and no metrics.
+- This is a mitigation for the previously observed emulator boot timeout, not a claimed fix until the new run completes.
+
+Fresh workflow run `42270167780` was queued for this exact PR #63 head at 2026-11-06 18:22 UTC. At checkpoint time its Android emulator smoke, CodeQL and secret-scan jobs were all in progress. Main-branch build run `42270105978` and Factory Director run `42270105109` were also in progress. Their results must be refreshed before claiming success.
