@@ -17,26 +17,39 @@ The first smoke candidate is the official ggml-org conversion `Qwen3.5-0.8B-Q4_0
 
 `57d1997790d1744fba5b40a7317df71ea5e2acee28c47e78f0cce39c0703f8cf`
 
-The model weights are not included in the APK or this repository. This branch does not download model files. A future model installer must require a clear user approval, pin the source revision, verify the full SHA-256, support cancellation and removal, and work without transmitting prompts, voice, files or memory.
+The model weights are not included in the APK or this repository. Installation is explicit-consent only, uses the pinned model revision and SHA-256, downloads to app-private storage, supports cancellation/removal and does not upload prompts, voice, files or memory.
+
+## Current PR #92 integration state (supersedes earlier integration notes below)
+
+- `JarvisRuntimeController` exposes the Qwen installer and can switch from the deterministic local parser to the llama.cpp-backed provider after a verified model load.
+- `QwenModelPanel` provides explicit consent, download progress/cancellation, verify-and-activate, and removal controls.
+- Generated model text is validated through `ToolProposalCodec.validate`; invalid output becomes `NoAction`. It is not allowed to execute Android actions directly.
+- The model installer and runtime have unit tests, but a passing CI build, successful real model download, on-device inference, and physical OPPO validation remain separate acceptance gates.
 
 ## Important boundaries
 
 - The native library is fetched during the developer/CI CMake build at an immutable commit. The installed app does not fetch source code or contact llama.cpp.
-- The runtime adapter is not yet connected to `LocalOnlyJarvisModelProvider`, the microphone controller, model-install UI or safe Android action pipeline. The existing deterministic provider remains the active assistant path.
-- The current JNI generation baseline uses greedy sampling and CPU inference, with context capped at 8192 (default 4096), output capped at 512 (default 256), and prompt text capped at 12,000 characters.
+- The runtime adapter uses bounded context/output limits; the baseline JNI generation path uses greedy sampling and CPU inference.
 - JNI load/generate operations are synchronous and must be invoked from a worker thread. Cancellation is callable from another thread; unload waits for active generation to leave the native lock.
-- This code has not yet been proven by an Android NDK build, emulator inference, airplane-mode inference, or a physical OPPO run. Do not claim neural inference is available until those gates pass.
-- API 24 support is not established. The app currently declares minSdk 29; the upstream Android guide baseline was API 28.
+- Do not claim neural inference is available until the Android NDK build, model installation, emulator/device inference and offline inference gates pass.
+- API 24 support is not established. The app currently declares minSdk 29.
 
-## Required verification before integration
+## Required verification before declaring this phase complete
 
 1. Exact-head Gradle/JVM tests, Kotlin compile, Android APK build, CodeQL and secret scan.
-2. Confirm CMake FetchContent configures and links the two enabled ABIs: arm64-v8a for OPPO Find X6 Pro and x86_64 for Android emulator coverage. 32-bit armeabi-v7a/x86 builds are intentionally excluded from this first native-runtime spike to reduce build time and unsupported combinations.
-3. Add a small test GGUF artifact in CI only if licensing and artifact-size policy permit; otherwise document the manual, consent-based device installation step.
-4. Verify model SHA rejection, successful load, prompt template, Russian output, token callback, cancellation during generation, unload and reload.
-5. Repeat generation in airplane mode after the model is installed.
-6. Benchmark cold-load time, time-to-first-token, tokens/sec, peak RAM, thermal behavior and battery on OPPO Find X6 Pro.
-7. Only then wire provider selection into Jarvis. All model text must still pass strict typed proposal validation and the existing risk policy before Android tools can execute.
+2. Confirm CMake FetchContent configures and links the enabled ABIs: arm64-v8a for OPPO Find X6 Pro and x86_64 for Android emulator coverage.
+3. Verify model SHA rejection, successful load, prompt template, Russian output, token callback, cancellation during generation, unload and reload.
+4. Repeat generation in airplane mode after the model is installed.
+5. Benchmark cold-load time, time-to-first-token, tokens/sec, peak RAM, thermal behavior and battery on OPPO Find X6 Pro.
+6. Only then consider this phase complete. All model text must still pass strict typed proposal validation and the existing risk policy before Android tools can execute.
+
+## CI retry record — 2026-11-07
+
+- Workflow run `42293532481` on PR #92 reached successful secret scanning, Android SDK/component setup, CodeQL initialization and Kotlin compilation.
+- The job then remained reported as `in_progress` at `Build full debug APK`; the run's `updated_at` timestamp stopped advancing and GitHub's job-log endpoint returned BlobNotFound.
+- No APK artifact was present at the last inspection. Therefore APK build, SHA verification, emulator smoke test and CodeQL analysis are not considered passed.
+- To avoid reporting a false success, a follow-up PR commit is used to trigger a fresh pull-request workflow run. Workflow concurrency is configured to cancel the previous run for the same branch when a new run starts.
+- Keep PR #92 open and draft until a fresh run completes all required gates. Do not merge or publish an APK on the basis of Kotlin compilation alone.
 
 ## License
 
