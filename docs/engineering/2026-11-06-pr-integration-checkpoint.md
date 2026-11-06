@@ -74,3 +74,20 @@ A narrow CI change was pushed to the existing PR #63 branch:
 - This is a mitigation for the previously observed emulator boot timeout, not a claimed fix until the new run completes.
 
 Fresh workflow run `42270167780` was queued for this exact PR #63 head at 2026-11-06 18:22 UTC. At checkpoint time its Android emulator smoke, CodeQL and secret-scan jobs were all in progress. Main-branch build run `42270105978` and Factory Director run `42270105109` were also in progress. Their results must be refreshed before claiming success.
+
+
+## Factory evidence review — 2026-11-06 18:24 UTC
+
+The Director workflow run `42270105109` completed its specialist lanes and release-gate job successfully. However, inspecting the actual uploaded artifacts shows the model-backed worker lane was NOT operational:
+- Artifact `factory-model-workers` (`13528458676`) contains only one Qwen result, `HTTP Error 404: Not Found`; no successful model answer is present.
+- Agent Review artifact `jarvis-agent-review-llm` (`13528128503`) records `LLM unavailable: HTTP Error 401: Unauthorized` for all seven role reviewers.
+- The deterministic review artifact `deterministic.json` scanned 118 files and reported several placeholder markers; its PASS entries are source-pattern presence checks, not proof that those services execute at runtime.
+- The release gate says `REQUIRES_RUNTIME_EVIDENCE`, correctly withholding release readiness.
+
+Therefore workflow job success must not be presented as proof that Qwen/DeepSeek or seven independent LLM reviewers actually completed work. At this checkpoint, deterministic evidence collection ran; live model review was degraded/unavailable.
+
+Two workflow reporting fixes were committed on main:
+- `d26cae1a8ee011aded184a525bfaf687bfd1105c` adds a truthful model-worker state (available/degraded/not_configured) to the Director workflow output/artifact.
+- `7b1feaf3033a57050a171c3c3882f71eebd756fd` adds a model-review availability classification and always uploads the diagnostic artifact for Agent Review.
+
+These are reporting/observability fixes, not a repair of the Qwen 404 or OpenRouter 401. The user-owned provider credentials/endpoints were not changed or exposed. Optional cloud model workers remain nonessential to the offline-first core; no paid provider or new key was configured.
