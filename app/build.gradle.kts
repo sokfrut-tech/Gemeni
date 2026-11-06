@@ -47,6 +47,13 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
     implementation("com.google.code.gson:gson:2.12.1")
 
+    // Offline video trim/transcode/export pipeline (keep Media3 artifacts version-aligned).
+    implementation("androidx.media3:media3-transformer:1.11.1")
+    implementation("androidx.media3:media3-effect:1.11.1")
+    implementation("androidx.media3:media3-common:1.11.1")
+
+    testImplementation("junit:junit:4.13.2")
+
     // Official Sherpa-ONNX Android API and bundled native runtimes (ASR, TTS, KWS, VAD).
     implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
         // The Android AAR already contains the Kotlin API classes; JitPack's
