@@ -199,3 +199,8 @@ Branch: `integration/jarvis-safe-agent-runtime-2026-11-06`, created from PR #62 
 - Unit tests were added for proposal creation, unsupported commands and dialer validation. Exact branch CI is pending.
 - PR #63 emulator shell quoting was simplified in commit `82f2358a27415598deb35f742b33996a62719ca2`; inspect the new run. Earlier failure also showed ADB failures, color-buffer errors and instrumentation process crash.
 - Do not merge the original PR chain blindly. Keep the restored docs, compare exact source diffs and run JVM/build/security/emulator checks before any merge.
+
+
+## Phase B handoff — real local reasoning model
+
+Before implementing neural inference, read `docs/agents/BRIEF_LOCAL_REASONING_RUNTIME_PHASE_B_2026-11-06.md`. It defines the runtime evaluation (llama.cpp / MLC / ONNX Runtime GenAI), model licensing, on-device benchmark, structured planning, offline/privacy gates and acceptance tests. Current provider remains deterministic parser logic; do not call it a local LLM.
