@@ -21,7 +21,7 @@ Replace the current deterministic `LocalOnlyJarvisModelProvider` as the primary 
 ## Runtime candidates to evaluate — do not select by name alone
 
 Evaluate at least:
-1. **llama.cpp Android/NDK** — native GGUF inference, quantized CPU/GPU paths, JNI integration. Verify exact upstream license, Android support, ABI requirements and build reproducibility at implementation time.
+1. **llama.cpp Android/NDK — preferred first spike**. Evidence and constraints are recorded in `docs/engineering/2026-11-06-local-inference-runtime-decision.md`. Pin upstream commit `954de248ac6907dd05dc19f0f511ab18f2807a54`; build a small app-owned JNI adapter. Do not import the current Arm AI Chat wrapper unchanged: its library currently declares minSdk 33.
 2. **MLC LLM / TVM-based mobile runtime** — evaluate model conversion, supported devices, package size, Vulkan/CPU support and maintenance state.
 3. **ONNX Runtime GenAI** — evaluate Android package availability, model compatibility, token streaming, native ABI footprint and coexistence with the existing Sherpa-ONNX runtime.
 
@@ -94,4 +94,4 @@ A model that destabilizes the phone or blocks voice capture must not become the 
 
 ## Next action
 
-After PR #78 has green JVM/build/security checks, implement a runtime spike behind a separate interface/feature flag. Compare candidate runtimes on CI first, then benchmark on OPPO. Keep the deterministic provider as fallback and do not replace it until the neural path passes all acceptance tests.
+After PR #78 has green JVM/build/security checks, implement a runtime spike behind a separate interface/feature flag using the pinned llama.cpp source and CPU-only arm64-v8a first. The generic upstream Android NDK guide's example uses Android API 28; API24 support is not yet proven. MLC is a later GPU experiment; ONNX Runtime base Android package is not by itself an LLM generation stack. See `docs/engineering/2026-11-06-local-inference-runtime-decision.md`. Keep the deterministic provider as fallback and do not replace it until the neural path passes all acceptance tests.
