@@ -25,16 +25,21 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
 import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -60,6 +65,8 @@ class JarvisVideoEditorActivity : ComponentActivity() {
 private fun JarvisVideoEditorScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val previewPlayer = remember(context) { ExoPlayer.Builder(context).build() }
+    DisposableEffect(previewPlayer) { onDispose { previewPlayer.release() } }
     var sourceUri by remember { mutableStateOf<Uri?>(null) }
     var durationMs by remember { mutableStateOf(0L) }
     var startMs by remember { mutableStateOf(0f) }
@@ -70,6 +77,17 @@ private fun JarvisVideoEditorScreen() {
     var outputUri by remember { mutableStateOf<Uri?>(null) }
     var outputTempFile by remember { mutableStateOf<File?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(sourceUri) {
+        val selected = sourceUri
+        if (selected != null) {
+            previewPlayer.setMediaItem(MediaItem.fromUri(selected))
+            previewPlayer.prepare()
+            previewPlayer.playWhenReady = false
+        } else {
+            previewPlayer.clearMediaItems()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -182,6 +200,13 @@ private fun JarvisVideoEditorScreen() {
                 Text("Выбрать видео")
             }
             Text(status, style = MaterialTheme.typography.bodyMedium)
+            if (sourceUri != null) {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    factory = { viewContext -> PlayerView(viewContext).apply { player = previewPlayer; useController = true } },
+                    update = { it.player = previewPlayer }
+                )
+            }
             if (durationMs >= VideoTrimRange.MIN_CLIP_MS) {
                 Text("Начало: ${formatDuration(startMs.toLong())}")
                 Slider(
