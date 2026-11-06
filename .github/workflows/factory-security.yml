@@ -126,11 +126,10 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -no-snapshot -no-metrics
           emulator-boot-timeout: 900
           script: |
-            bash -euo pipefail -c '
-              adb wait-for-device
-              adb shell getprop sys.boot_completed | grep -q 1
-              gradle --no-daemon :app:connectedDebugAndroidTest
-            '
+            adb wait-for-device
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
+            adb shell input keyevent 82 || true
+            gradle --no-daemon :app:connectedDebugAndroidTest
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
