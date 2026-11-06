@@ -192,3 +192,35 @@ Every result must distinguish ACTION_STARTED from STATE_VERIFIED. Only return ve
 ## Immediate next implementation step
 
 After PR #78's currently running CI finishes, create a focused implementation PR from the reconciled integration base (do not merge the open PR dependency chain blindly). Start with P0 typed contracts and a thin P1 offline vertical slice. Keep native LLM/JNI work independent so phone-control progress does not wait on model inference.
+
+
+## Non-negotiable privacy and local learning contract
+
+This is a product-level invariant, not an optional setting. The Jarvis intelligence core and its learning loop must operate on-device. Private user data and learning artifacts must never be transmitted outside the phone by default or through hidden background behavior.
+
+### Local intelligence growth
+- Improve through on-device memory, user corrections, approved preference learning, successful/failed task outcomes, local skill/rule refinement and locally evaluated model adaptation where technically feasible.
+- Separate durable user memory, episodic task history, skill definitions, model weights and temporary context. Each has its own retention and user controls.
+- Do not claim that model weights are being trained if the implementation only updates memory, retrieval indexes, prompts or rules. Report the actual learning mechanism.
+- Any fine-tuning or weight update must run locally, be versioned, validated against regression/safety tests, and support rollback to a known-good model.
+- Never let self-learning silently weaken safety policy, permission boundaries, confirmation requirements or privacy rules. Policy changes require an explicit reviewed software update, not autonomous model mutation.
+- Provide controls to inspect, correct, export locally, reset and delete learned memory. Local backups are user-initiated and encrypted where feasible.
+
+### Strict no-egress default
+- No telemetry, analytics, crash uploads, conversation uploads, remote memory sync, training-data uploads or background content transmission.
+- No private prompts, transcripts, contacts, calendar entries, messages, files, notification content, location history, task history or learned profiles sent to remote model providers or third parties.
+- Network tools may send only the minimum query or URL needed to fulfil the user's explicit online request. Warn when a query itself could reveal sensitive information; ask before sending it. Do not attach personal context automatically.
+- Browsing and radio are inbound/network features, not blanket permission to upload local data. Keep browser requests isolated from private memory and local stores.
+- Disable optional cloud-model fallback by default. If ever enabled by the user, make it per-request, show exactly what text/data would leave the device, and require explicit confirmation; never silently include memory or attachments.
+- Audit Android manifest permissions, SDKs, dependencies, network endpoints, background workers and build configuration for unexpected egress. Add automated tests that fail on unapproved network calls from local reasoning, memory and learning modules.
+- No third-party SDK with undisclosed telemetry. Pin and review dependencies; remove or configure telemetry libraries to be off.
+- Software/model updates must use verified sources, pinned versions and cryptographic integrity checks. Installing an update must not silently change privacy defaults.
+
+### Privacy acceptance gates
+1. Airplane-mode tests prove local conversation, memory retrieval, learning updates and local tools continue to work where their function does not inherently require a network.
+2. Network inspection shows no outbound traffic from local memory, learning, ASR/TTS or local inference modules.
+3. Explicit online search sends only the query necessary for that search; private memory is not appended.
+4. Cloud inference is disabled by default and cannot be activated by model output or an autonomous plan.
+5. User can inspect and erase local memory/learning records; deletion behavior is tested.
+6. Local model/skill updates are versioned, regression-tested and rollback-capable.
+7. Build and dependency review finds no undisclosed analytics, telemetry or content upload path.
