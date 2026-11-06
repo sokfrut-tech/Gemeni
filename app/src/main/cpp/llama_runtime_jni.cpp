@@ -65,11 +65,32 @@ void releaseLocked() {
     }
 }
 
-bool appendToken(JNIEnv* env, jobject listener, jmethodID onToken, const char* bytes, int length, std::string& output) {
+size_t completeUtf8Prefix(const std::string& text) {
+    size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char first = static_cast<unsigned char>(text[i]);
+        size_t count = first < 0x80 ? 1 : (first >= 0xc2 && first <= 0xdf ? 2
+                : (first >= 0xe0 && first <= 0xef ? 3
+                : (first >= 0xf0 && first <= 0xf4 ? 4 : 1)));
+        if (i + count > text.size()) break;
+        bool valid = true;
+        for (size_t j = 1; j < count; ++j) {
+            if ((static_cast<unsigned char>(text[i + j]) & 0xc0) != 0x80) valid = false;
+        }
+        if (!valid) count = 1;
+        i += count;
+    }
+    return i;
+}
+
+bool appendToken(JNIEnv* env, jobject listener, jmethodID onToken, const char* bytes,
+                 int length, std::string& output, size_t& emitted) {
     if (length <= 0) return true;
     output.append(bytes, static_cast<size_t>(length));
-    if (listener == nullptr || onToken == nullptr) return true;
-    jstring piece = toJavaString(env, std::string(bytes, static_cast<size_t>(length)));
+    const size_t complete = completeUtf8Prefix(output);
+    if (listener == nullptr || onToken == nullptr || complete <= emitted) return true;
+    jstring piece = toJavaString(env, output.substr(emitted, complete - emitted));
+    emitted = complete;
     if (piece == nullptr) return false;
     const jboolean keepGoing = env->CallBooleanMethod(listener, onToken, piece);
     env->DeleteLocalRef(piece);
@@ -197,6 +218,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
             : env->GetMethodID(listenerClass, "onToken", "(Ljava/lang/String;)Z");
     std::string output;
     output.reserve(2048);
+    size_t emitted = 0;
     const int limit = std::clamp(maxTokens, 1, 512);
     for (int i = 0; i < limit && !g_cancelled.load(); ++i) {
         llama_token token = llama_sampler_sample(sampler, g_context, -1);
@@ -205,7 +227,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
         const int pieceLength = llama_token_to_piece(vocab, token, piece,
                                                       static_cast<int32_t>(sizeof(piece)), 0, true);
         if (pieceLength > 0) {
-            if (!appendToken(env, listener, onToken, piece, pieceLength, output)) {
+            if (!appendToken(env, listener, onToken, piece, pieceLength, output, emitted)) {
                 g_cancelled.store(true);
                 break;
             }
