@@ -159,3 +159,17 @@ The next agent must be able to continue from these files without seeing the prev
 
 ## 13. User's explicit product goal
 The final product should be beautiful, Russian-speaking, functional, installable, and suitable for the user's Chinese OPPO/ColorOS device. The user wants the implementation to be based on their supplied/reference Breeno materials and source analysis, while remaining an original implementation rather than pretending to be the proprietary Breeno source.
+
+## 14. 2026-11-06 — repository-wide AI audit and product identity
+
+Read first: [docs/REPOSITORY_WIDE_AI_AUDIT_2026-11-06.md](REPOSITORY_WIDE_AI_AUDIT_2026-11-06.md).
+
+The owner clarified that Jarvis is an artificial intelligence, not merely a voice assistant. Its target architecture must include reasoning/planning, provider/model routing, user-controlled memory, typed tools/skills, device perception, voice pipeline, controlled learning, specialist-worker coordination and action verification. Free/local/offline-first operation remains mandatory for essential features; cloud providers are optional and paid usage is not assumed.
+
+All 11 repositories visible in the connected GitHub installation were inventoried by recursive default-branch tree, with targeted source inspection across Kotlin, C++17, Python, Java, JavaScript, SQL, Bash, Protobuf, Gradle, YAML and XML. Reusable work is mapped in the audit report. Do not restart from scratch or lose unmerged work.
+
+Critical verified source gaps on main: LocalLlmEngine is an echo placeholder; JarvisToolRegistry is mostly echo/clock; memory is SharedPreferences key/value; Accessibility callbacks are empty; AIDL start/stop listening are no-ops; VoiceInteraction service is only lifecycle boilerplate. Current Activity runtime is a short push-to-talk ASR path and does not wire KWS/VAD/Piper into one full pipeline. Current app minSdk 29 conflicts with the API 24+ goal. The product remains NOT RELEASE READY.
+
+Preserve and reconcile the open PR dependency chain #58 -> #59 -> #60 and Phase A sibling PRs #61/#62 plus CI follow-up #63. PR #61 has an observed Kotlin compilation failure; PR #62 has an observed emulator split-APK install/ADB failure. No draft PR was merged during this audit. Build/CI workflow success is not equivalent to real AI reasoning or OPPO runtime validation.
+
+Next: create one integration branch that combines the typed Android gateway/parser with the corrected local provider/proposal/task coordinator; resolve compilation and emulator test reliability; then implement a real local inference engine, persistent memory, and connected voice/action/verification loop. Keep all risky actions behind explicit confirmation and user-controlled permissions.
