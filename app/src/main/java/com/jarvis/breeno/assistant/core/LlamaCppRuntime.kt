@@ -27,7 +27,7 @@ class LlamaCppRuntime : AutoCloseable, JarvisTextGenerationRuntime {
     @Volatile
     private var loaded = false
 
-    val isModelLoaded: Boolean
+    override val isModelLoaded: Boolean
         get() = loaded
 
     @Synchronized
