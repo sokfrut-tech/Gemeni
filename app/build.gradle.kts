@@ -15,7 +15,7 @@ android {
         targetSdk = 35
         versionCode = 53
         versionName = "0.53-runtime-diagnostics"
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; aidl = true; buildConfig = true }
