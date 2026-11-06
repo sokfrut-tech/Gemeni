@@ -31,7 +31,7 @@ The model weights are not included in the APK or this repository. This branch do
 ## Required verification before integration
 
 1. Exact-head Gradle/JVM tests, Kotlin compile, Android APK build, CodeQL and secret scan.
-2. Confirm CMake FetchContent configures and links all enabled Android ABIs; if older secondary ABIs fail, scope the first inference build to arm64-v8a without removing emulator test coverage.
+2. Confirm CMake FetchContent configures and links the two enabled ABIs: arm64-v8a for OPPO Find X6 Pro and x86_64 for Android emulator coverage. 32-bit armeabi-v7a/x86 builds are intentionally excluded from this first native-runtime spike to reduce build time and unsupported combinations.
 3. Add a small test GGUF artifact in CI only if licensing and artifact-size policy permit; otherwise document the manual, consent-based device installation step.
 4. Verify model SHA rejection, successful load, prompt template, Russian output, token callback, cancellation during generation, unload and reload.
 5. Repeat generation in airplane mode after the model is installed.
