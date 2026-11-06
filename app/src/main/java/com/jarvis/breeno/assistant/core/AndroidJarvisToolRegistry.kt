@@ -44,18 +44,25 @@ class AndroidJarvisToolRegistry(private val context: Context) {
      * Validates untrusted model output and executes only SAFE proposals.
      * CONFIRM proposals are returned to the UI without launching anything.
      */
-    fun executeProposalJson(json: String): ToolResult {
+    fun executeProposalJson(json: String, confirmed: Boolean = false): ToolResult {
         val validated = ToolProposalCodec.validate(json)
             ?: return ToolResult.Failure("Предложение ИИ отклонено: неверный формат или неизвестная команда")
 
         return when (validated.risk) {
             ProposalRisk.BLOCK -> ToolResult.Failure("Действие заблокировано политикой безопасности")
             ProposalRisk.CONFIRM -> {
-                val description = when (validated.proposal.tool) {
-                    "open_dialer" -> "Открыть набор номера ${validated.proposal.arguments["number"].orEmpty()}? Сам звонок без вашего действия не выполняется."
-                    else -> "Требуется подтверждение перед выполнением действия"
+                if (!confirmed) {
+                    val description = when (validated.proposal.tool) {
+                        "open_dialer" -> "Открыть набор номера ${validated.proposal.arguments["number"].orEmpty()}? Сам звонок без вашего действия не выполняется."
+                        else -> "Требуется подтверждение перед выполнением действия"
+                    }
+                    ToolResult.NeedsConfirmation(validated.proposal.tool, description)
+                } else {
+                    when (validated.proposal.tool) {
+                        "open_dialer" -> openDialer(validated.proposal.arguments.getValue("number"))
+                        else -> ToolResult.Failure("Это действие нельзя подтвердить через текущий шлюз")
+                    }
                 }
-                ToolResult.NeedsConfirmation(validated.proposal.tool, description)
             }
             ProposalRisk.SAFE -> when (validated.proposal.tool) {
                 "open_app" -> openApp(validated.proposal.arguments.getValue("name"))
