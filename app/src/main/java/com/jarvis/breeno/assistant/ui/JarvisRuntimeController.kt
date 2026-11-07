@@ -135,7 +135,7 @@ class JarvisRuntimeController(context: Context) {
                     completedSegmentAvailable = emittedSegment
                 )
                 decision == VadCapturePolicy.Decision.CONTINUE
-            }.collect()
+            }.collect { /* Frames are processed in the takeWhile predicate. */ }
             if (decision == VadCapturePolicy.Decision.HARD_LIMIT) {
                 vad.flush()
                 while (true) {
