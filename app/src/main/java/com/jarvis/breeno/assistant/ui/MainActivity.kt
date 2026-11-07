@@ -131,9 +131,6 @@ class MainActivity : ComponentActivity() {
     private fun startRealListening() {
         lifecycleScope.launch {
             runCatching {
-                statusSink?.invoke("Подготавливаю локальные ASR и VAD…")
-                withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
-                statusSink?.invoke("Микрофон активен — говорите")
                 withContext(Dispatchers.IO) {
                     runtime.listenOnce(
                         onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
