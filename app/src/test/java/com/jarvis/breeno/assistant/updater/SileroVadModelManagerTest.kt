@@ -260,6 +260,7 @@ class SileroVadModelManagerTest {
         private val body: ByteArray,
         private val headers: Map<String, String> = emptyMap(),
         private val contentLength: Long = body.size.toLong(),
+        private val onInputStream: () -> Unit = {},
         private val inputStreamFactory: () -> InputStream = { ByteArrayInputStream(body) },
         private val onDisconnect: () -> Unit = {}
     ) : HttpURLConnection(url) {
@@ -270,6 +271,9 @@ class SileroVadModelManagerTest {
         override fun getContentLengthLong(): Long = contentLength
         override fun getHeaderField(name: String?): String? =
             headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
-        override fun getInputStream(): InputStream = inputStreamFactory()
+        override fun getInputStream(): InputStream {
+            onInputStream()
+            return inputStreamFactory()
+        }
     }
 }
