@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -uo pipefail
+mkdir -p emulator-diagnostics
+capture_diagnostics() {
+  local suffix="\${1:-failure}"
+  adb devices -l > "emulator-diagnostics/devices-\${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell getprop > "emulator-diagnostics/getprop-\${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell dumpsys package > "emulator-diagnostics/package-service-\${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell dumpsys activity > "emulator-diagnostics/activity-service-\${suffix}.txt" 2>&1 || true
+  timeout 20s adb logcat -d -v threadtime > "emulator-diagnostics/logcat-\${suffix}.txt" 2>&1 || true
+}
+echo "Restarting host ADB server before emulator service checks."
+adb kill-server || true
+adb start-server
+if ! timeout 60s adb wait-for-device; then
+  echo "ERROR: ADB did not reconnect to the emulator within 60 seconds."
+  capture_diagnostics "adb-reconnect"
+  exit 1
+fi
+ready=0
+for attempt in $(seq 1 90); do
+  device_state="$(adb get-state 2>/dev/null || true)"
+  boot_completed="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  if [[ "$device_state" == "device" && "$boot_completed" == "1" ]] \
+    && timeout 5s adb shell cmd package list packages >/dev/null 2>&1 \
+    && timeout 5s adb shell cmd activity get-current-user >/dev/null 2>&1; then
+    ready=1
+    echo "Android emulator and framework services are ready (attempt $attempt)."
+    break
+  fi
+  adb reconnect offline >/dev/null 2>&1 || true
+  sleep 2
+done
+if [[ "$ready" -ne 1 ]]; then
+  echo "ERROR: PackageManager/ActivityManager did not become ready within 180 seconds."
+  capture_diagnostics "framework-readiness"
+  exit 1
+fi
+adb logcat -c >/dev/null 2>&1 || true
+set +e
+gradle --no-daemon :app:connectedDebugAndroidTest
+test_status=$?
+set -e
+if [[ -d app/build/reports/androidTests/connected ]]; then
+  cp -R app/build/reports/androidTests/connected emulator-diagnostics/test-reports
+fi
+if [[ -d app/build/outputs/androidTest-results/connected ]]; then
+  cp -R app/build/outputs/androidTest-results/connected emulator-diagnostics/test-results
+fi
+if [[ -d app/build/outputs/androidTest-results ]]; then
+  cp -R app/build/outputs/androidTest-results emulator-diagnostics/all-test-results
+fi
+if [[ "$test_status" -eq 0 ]]; then
+  python3 - <<'PY' || test_status=$?
+import glob
+import sys
+import xml.etree.ElementTree as ET
+paths = glob.glob("app/build/outputs/androidTest-results/connected/**/*.xml", recursive=True)
+if not paths:
+    print("ERROR: no Android instrumentation XML reports were produced")
+    sys.exit(1)
+total = 0
+for path in paths:
+    root = ET.parse(path).getroot()
+    total += int(root.attrib.get("tests", "0"))
+print(f"Android instrumentation executed tests: {total}")
+if total < 1:
+    sys.exit(1)
+PY
+fi
+if [[ "$test_status" -ne 0 ]]; then
+  capture_diagnostics "instrumentation-failure"
+fi
+exit "$test_status"

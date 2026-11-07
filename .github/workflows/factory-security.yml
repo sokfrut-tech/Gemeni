@@ -101,7 +101,7 @@ jobs:
 
   emulator-smoke:
     name: Android emulator smoke tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [codeql]
     timeout-minutes: 35
     permissions:
@@ -123,74 +123,11 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis
+          target: aosp_atd
           emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -wipe-data
           disable-animations: false
-          script: |
-            set +e
-            # ADB transport readiness is not sufficient: system_server may still be
-            # restarting, or the emulator can briefly go offline after boot. Wait until
-            # both PackageManager and ActivityManager answer before installing APKs.
-            mkdir -p emulator-diagnostics
-            ready=0
-            for attempt in $(seq 1 90); do
-              if adb get-state >/dev/null 2>&1 \\
-                && [ "$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ] \\
-                && timeout 5s adb shell cmd package list packages >/dev/null 2>&1 \\
-                && timeout 5s adb shell cmd activity get-current-user >/dev/null 2>&1; then
-                ready=1
-                echo "Android emulator services are ready (attempt $attempt)."
-                break
-              fi
-              adb reconnect offline >/dev/null 2>&1 || true
-              sleep 2
-            done
-            if [ "$ready" -ne 1 ]; then
-              echo "ERROR: emulator did not expose PackageManager and ActivityManager within 180 seconds."
-              adb devices -l > emulator-diagnostics/devices.txt 2>&1 || true
-              timeout 12s adb shell getprop > emulator-diagnostics/getprop.txt 2>&1 || true
-              timeout 12s adb shell dumpsys package > emulator-diagnostics/package-service.txt 2>&1 || true
-              timeout 12s adb shell dumpsys activity > emulator-diagnostics/activity-service.txt 2>&1 || true
-              timeout 20s adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1 || true
-              exit 1
-            fi
-            # Clear old logs only after the Android framework is responsive.
-            adb logcat -c >/dev/null 2>&1 || true
-            gradle --no-daemon :app:connectedDebugAndroidTest
-            test_status=$?
-            mkdir -p emulator-diagnostics
-            if [ -d app/build/reports/androidTests/connected ]; then cp -R app/build/reports/androidTests/connected emulator-diagnostics/test-reports; fi
-            if [ -d app/build/outputs/androidTest-results/connected ]; then cp -R app/build/outputs/androidTest-results/connected emulator-diagnostics/test-results; fi
-            if [ -d app/build/outputs/androidTest-results ]; then cp -R app/build/outputs/androidTest-results emulator-diagnostics/all-test-results; fi
-            if [ "$test_status" -eq 0 ]; then
-              python3 - <<'PY' || test_status=$?
-            import glob
-            import sys
-            import xml.etree.ElementTree as ET
-
-            paths = glob.glob("app/build/outputs/androidTest-results/connected/**/*.xml", recursive=True)
-            if not paths:
-                print("ERROR: no Android instrumentation XML reports were produced")
-                sys.exit(1)
-            total = 0
-            for path in paths:
-                root = ET.parse(path).getroot()
-                total += int(root.attrib.get("tests", "0"))
-            print(f"Android instrumentation executed tests: {total}")
-            if total < 1:
-                print("ERROR: instrumentation reported zero executed tests")
-                sys.exit(1)
-            PY
-            fi
-            if [ "$test_status" -ne 0 ]; then
-              adb devices -l > emulator-diagnostics/devices.txt 2>&1 || true
-              timeout 12s adb shell getprop > emulator-diagnostics/getprop.txt 2>&1 || true
-              timeout 12s adb shell dumpsys package com.jarvis.breeno.assistant > emulator-diagnostics/app-package.txt 2>&1 || true
-              timeout 12s adb shell dumpsys activity processes > emulator-diagnostics/activity-processes.txt 2>&1 || true
-              timeout 20s adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1 || true
-            fi
-            exit "$test_status"
+          script: bash .github/scripts/run-android-emulator-smoke.sh
       - name: Capture bounded emulator diagnostics on failure
         if: failure()
         timeout-minutes: 4
