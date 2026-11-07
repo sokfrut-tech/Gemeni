@@ -207,3 +207,17 @@ Remaining validation: ensure UI cancellation test passes, verify exact instrumen
 - PR #104 exact head: `023446aeafbf20f9f368322a4b513b60a7fdfd94`; Factory Security Baseline run #193 (42386800592) started. Secret scanning passed; CodeQL/build and emulator instrumentation are pending.
 - PR #95 exact head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`; run #191 (42386652892) has secret scanning passed; CodeQL is still running before compile/build steps have completed.
 - Neither PR is merge-ready. Keep #95 and #104 Draft until their exact-head required checks finish green and emulator test reports show a non-zero test count.
+
+
+## 13. Android compatibility target gap (2026-11-07)
+
+The current `app/build.gradle.kts` on the PR #95 stack declares `minSdk = 29` (Android 10). This does not meet the previously requested Android 7+ compatibility goal (API 24+). Do not simply lower `minSdk` without an API/dependency audit.
+
+Compatibility work is a separate release track:
+1. Inventory every Android API call and library native ABI/minimum-OS requirement across the app, Sherpa-ONNX, llama.cpp JNI, Compose and background/service components.
+2. Replace or guard APIs introduced after API 24; use runtime feature detection and backward-compatible alternatives where safe.
+3. Confirm NDK native libraries are built for the intended ABIs and supported API level; inspect ELF dependencies and linker symbols.
+4. Add API 24 emulator/build coverage (if supported by dependencies), then test API 24–28 permission/background behavior and ColorOS-specific restrictions.
+5. Lower `minSdk` only after all build, static, instrumentation and native-load checks pass. If a core dependency genuinely requires a newer API, document the minimum accurately rather than claiming Android 7 support.
+
+Current verified state: Android 10+ only is declared by Gradle; Android 7+ compatibility has not been implemented or tested.
