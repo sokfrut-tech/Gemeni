@@ -221,3 +221,17 @@ Compatibility work is a separate release track:
 5. Lower `minSdk` only after all build, static, instrumentation and native-load checks pass. If a core dependency genuinely requires a newer API, document the minimum accurately rather than claiming Android 7 support.
 
 Current verified state: Android 10+ only is declared by Gradle; Android 7+ compatibility has not been implemented or tested.
+
+
+## 14. ASR downloader security hardening started (2026-11-07)
+
+- Created PR #105, stacked on PR #104, to bring the stronger download guarantees already present in the Qwen installer to the Russian ASR downloader.
+- The ASR downloader now uses manual HTTPS redirects with an explicit Hugging Face redirect-host allowlist, a bounded redirect count, declared-length and streamed-byte limits, in-stream SHA-256 verification, preflight storage checks, fsync + same-directory atomic install, partial-file cleanup, and active-connection disconnection on coroutine cancellation.
+- Added deterministic unit tests for verified installation, untrusted redirect rejection, approved redirect handling, oversized and truncated responses, digest mismatch, low storage, redirect loops and cancellation cleanup.
+- PR #105 exact head: `977d0fabc725b1af394439f949560c1f113a8c91`; Factory Security Baseline run #195 (42387110040) is queued. These changes are not yet CI-verified.
+
+## 15. PR #95 first successful build gate (2026-11-07)
+
+- PR #95 exact head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`.
+- Factory Security Baseline run #191 (42386652892): Secret scanning passed; CodeQL static analysis passed; Kotlin compile passed; full debug APK assembly passed; APK existence/hash check passed; SARIF analysis and archive passed.
+- Android emulator smoke job is still running. Therefore PR #95 is **not** fully verified and remains Draft. Await emulator terminal result and ensure its test report shows a non-zero test count before treating this as a successful end-to-end check.
