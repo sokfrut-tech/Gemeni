@@ -364,3 +364,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 
 - Added an explicit entry to the repository `NOTICE` for the optional user-downloaded Alpha Cephei Russian streaming ASR model, with full immutable revision, source link and Apache-2.0 license link.
 - Clarifies the model is not bundled in the APK, is downloaded only after explicit consent, and retains its third-party licensing rather than being relicensed by Gemeni.
+
+
+## 31. Unknown-length storage preflight refined (2026-11-07)
+
+- Static review found the unknown-length branch used a fixed 256 MiB free-space requirement even for small files, and did not guarantee the configured file cap plus the safety margin for larger files.
+- Changed it to require `item.maxBytes + MIN_FREE_MARGIN_BYTES` before opening the body. This scales to the per-file cap and avoids an arbitrary 256 MiB requirement for the small token file.
+- Added a deterministic test asserting insufficient storage is rejected before the response body is opened for an unknown-length response.
