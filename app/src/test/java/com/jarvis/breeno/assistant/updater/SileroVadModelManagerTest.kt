@@ -176,6 +176,25 @@ class SileroVadModelManagerTest {
     }
 
     @Test
+    fun rejectsTruncatedResponseAndCleansPartialFile() {
+        val root = tempDirectory()
+        try {
+            val manager = manager(root) { url ->
+                FakeConnection(url, 200, payload, contentLength = payload.size.toLong() + 10L)
+            }
+            val failure = runCatching {
+                runBlocking { manager.ensure(userConsent = true) }
+            }.exceptionOrNull()
+
+            assertTrue(failure?.message.orEmpty().contains("incomplete"))
+            assertFalse(manager.modelFile().exists())
+            assertFalse(File(root, "vad/silero_vad.onnx.part").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsDigestMismatchAndCleansPartialFile() {
         val root = tempDirectory()
         try {
