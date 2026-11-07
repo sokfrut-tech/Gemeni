@@ -34,3 +34,9 @@ Do not record secrets, API keys, tokens, private credentials, or personal data.
 - Added explicit approval/cancel controls for CONFIRM-risk dialer actions; no direct call is placed.
 - Added unit tests for deterministic offline proposal generation, unsupported utterances and dialer-number validation.
 - Clarified that the current local provider is a deterministic parser adapter, not an LLM. Runtime integration and CI verification remain pending; no merge or release claimed.
+
+## 2026-11-07 — deterministic microphone permission test and CI checkpoint
+- PR #97 adds an offline deterministic instrumentation test for the Android microphone permission prompt. It denies the permission and verifies return to the Jarvis screen; it deliberately does not start ASR model downloads.
+- Corrected the settings smoke test selector to the real accessibility description `Модель и настройки` (previously it searched for `Настройки`, which did not match MainActivity).
+- Latest PR #97 head: `138940d9fa0edc8d28e4dd90284487c07278b1e2`; run #166 (42341238471) was pending at checkpoint. Earlier emulator jobs remained non-terminal at the instrumentation step, and log retrieval returned Azure BlobNotFound.
+- This change improves determinism but does not validate microphone capture, ASR, TTS, Qwen inference or OPPO device behavior. No merge/release claimed.
