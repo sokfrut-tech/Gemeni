@@ -47,7 +47,7 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
 
-        val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
+        val consent = device.wait(Until.findObject(By.text("Загрузить голосовые модели?")), 10_000)
         assertNotNull("Explicit model-download consent dialog is missing", consent)
         assertNotNull("Consent dialog must offer a clear decline action", device.wait(Until.findObject(By.text("Не сейчас")), 5_000))
         device.findObject(By.text("Не сейчас")).click()
@@ -95,7 +95,7 @@ class JarvisRuntimeSmokeTest {
         val runtime = JarvisRuntimeController(context)
         try {
             val deniedDownload = runCatching {
-                runtime.downloadRussianAsrAfterConsent(userConsent = false) {}
+                runtime.downloadVoiceModelsAfterConsent(userConsent = false) {}
             }.exceptionOrNull()
             assertNotNull("Downloader must reject a missing explicit consent flag", deniedDownload)
             assertTrue(
@@ -107,7 +107,7 @@ class JarvisRuntimeSmokeTest {
             assertNotNull("Runtime must reject preparation when ASR is not installed", failure)
             assertTrue(
                 "Runtime must explain that separate model-download consent is required",
-                failure!!.message.orEmpty().contains("отдельно подтвердите")
+                failure!!.message.orEmpty().contains("Русская ASR-модель не установлена")
             )
             val modelFiles = File(context.filesDir, "models").walkTopDown().filter { it.isFile }.toList()
             assertTrue("prepare() and denied download must not create model files or access the network", modelFiles.isEmpty())
