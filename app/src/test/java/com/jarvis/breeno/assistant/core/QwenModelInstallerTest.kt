@@ -2,9 +2,39 @@ package com.jarvis.breeno.assistant.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.Job
 import org.junit.Test
 
 class QwenModelInstallerTest {
+    @Test
+    fun cancellingDownloadOwnerDisconnectsActiveHttpConnection() {
+        val job = Job()
+        val connection = DisconnectTrackingConnection()
+        val activeConnection = AtomicReference<HttpURLConnection?>(connection)
+        val handle = disconnectActiveConnectionOnCancellation(job, activeConnection)
+
+        job.cancel()
+
+        assertTrue("Cancellation must disconnect the active HTTP request", connection.disconnected)
+        assertEquals(null, activeConnection.get())
+        handle?.dispose()
+    }
+
+    private class DisconnectTrackingConnection : HttpURLConnection(URL("https://localhost/test")) {
+        var disconnected = false
+            private set
+
+        override fun disconnect() {
+            disconnected = true
+        }
+
+        override fun usingProxy(): Boolean = false
+        override fun connect() = Unit
+    }
+
     @Test
     fun installerDigestMatchesRuntimeDigest() {
         assertEquals(LlamaCppRuntime.QWEN_08B_Q4_0_SHA256, QwenModelInstaller.MODEL_SHA256)
