@@ -704,3 +704,9 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - Added JVM coverage for deferred cleanup, immediate cleanup, idempotent close requests, and rejection of new sessions after shutdown, in addition to the 16-contender concurrency test.
 - Latest PR #112 source commit: `62f02df2493c7e4fd749cc9ecc27d6a1213761ef` (test addition; PR head should be read from GitHub before attributing CI). This change is not yet qualified until exact-head checks finish.
 - This is shutdown-order hardening, not proof that Android lifecycle cancellation or AudioRecord HAL release works on every OPPO/ColorOS build. The physical-device lifecycle test remains open.
+
+### PR #111 exact-head JVM artifact parsed (2026-11-07)
+
+- Downloaded and parsed all JUnit XML files from PR #111 workflow run #300 / `42407613350`, artifact `13588465984` (merge-ref SHA `570d297737c4cbea2f5827a1ce292ed44014948f`).
+- Result: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. This independently confirms the same 69-test JVM baseline on PR #111's merge ref; it does not include Android instrumentation.
+- The run's secret scan and CodeQL completed successfully and its Debug APK artifact was uploaded. Android emulator smoke remains in progress; no non-zero instrumentation count is established yet.
