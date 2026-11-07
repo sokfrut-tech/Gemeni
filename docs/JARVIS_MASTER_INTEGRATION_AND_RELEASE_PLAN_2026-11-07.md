@@ -371,3 +371,11 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Static review found the unknown-length branch used a fixed 256 MiB free-space requirement even for small files, and did not guarantee the configured file cap plus the safety margin for larger files.
 - Changed it to require `item.maxBytes + MIN_FREE_MARGIN_BYTES` before opening the body. This scales to the per-file cap and avoids an arbitrary 256 MiB requirement for the small token file.
 - Added a deterministic test asserting insufficient storage is rejected before the response body is opened for an unknown-length response.
+
+
+## 32. PR #105 latest exact-head pipeline after expanded hardening (2026-11-07)
+
+- Current PR #105 head: `46013ce1ddd09dd6281ef72248a6288a478c12e2`.
+- Run #233 (`42388091023`) is the current exact-head pipeline. Secret scanning has passed; CodeQL is still provisioning the Android SDK. It includes: cancellation checks after blocking reads and immediately before atomic install; final-file absence assertion after cancellation; unknown-length streaming size-cap test; per-file-cap-plus-margin storage preflight test; all-int8 upstream model manifest; and optional-model attribution in NOTICE.
+- Previous run #214 (43 tests, one cancellation race failure) is historical and must not be used as the final verdict. The next successful exact-head run must show the full unit test count and finish all build/security gates.
+- PR #95 run #191 and PR #104 run #195 have Secret scanning and CodeQL/APK build passed, but their emulator smoke jobs remain in progress at this snapshot.
