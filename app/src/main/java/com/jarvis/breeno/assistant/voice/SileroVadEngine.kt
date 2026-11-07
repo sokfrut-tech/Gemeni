@@ -14,7 +14,9 @@ class SileroVadEngine {
     @Synchronized
     fun load(modelFile: File) {
         require(modelFile.isFile) { "Silero VAD model is missing: ${modelFile.absolutePath}" }
-        vad?.release()
+        val previous = vad
+        vad = null
+        previous?.release()
         vad = Vad(
             config = VadModelConfig(
                 sileroVadModelConfig = SileroVadModelConfig(
