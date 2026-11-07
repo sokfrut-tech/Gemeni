@@ -61,30 +61,33 @@ class JarvisRuntimeController(context: Context) {
         }
     }
 
-    /** Safe direct inference probe; call only from a worker thread. It never executes tools or downloads weights. */
+    /** Three sequential local inference probes; call only from a worker thread. Never executes tools or downloads weights. */
     fun runQwenSelfTest(): String {
         if (!qwenRuntime.isModelLoaded) return "Диагностика: модель Qwen не активирована."
         return try {
             val version = qwenRuntime.runtimeVersion()
-            val started = System.nanoTime()
-            val output = qwenRuntime.generate(
-                prompt = "You are running a local runtime self-test. Reply with exactly: JARVIS_OK",
-                maxTokens = 48
-            ).trim()
-            val elapsedMs = (System.nanoTime() - started) / 1_000_000L
-            if (output.isBlank()) {
-                "Диагностика НЕ ПРОЙДЕНА: движок не вернул текст. llama.cpp: $version; время: ${elapsedMs} мс."
-            } else if (!isQwenSelfTestResponseValid(output)) {
-                val preview = output.replace(Regex("\\s+"), " ").take(180)
-                "Диагностика НЕ ПРОЙДЕНА: ответ не совпал с контрольной фразой. Время: ${elapsedMs} мс; ответ: $preview"
-            } else {
-                val preview = output.replace(Regex("\\s+"), " ").take(180)
-                "Диагностика пройдена: контрольная фраза получена за ${elapsedMs} мс. llama.cpp: $version. Ответ: $preview"
+            val durations = mutableListOf<Long>()
+            repeat(3) { index ->
+                val started = System.nanoTime()
+                val output = qwenRuntime.generate(
+                    prompt = "You are running a local runtime self-test. Reply with exactly: JARVIS_OK",
+                    maxTokens = 48
+                ).trim()
+                val elapsedMs = (System.nanoTime() - started) / 1_000_000L
+                durations += elapsedMs
+                if (!isQwenSelfTestResponseValid(output)) {
+                    val preview = output.replace(Regex("\\s+"), " ").take(180)
+                    return "Диагностика НЕ ПРОЙДЕНА: запрос ${index + 1}/3 вернул неверный ответ. Время: ${elapsedMs} мс; ответ: $preview"
+                }
             }
+            val averageMs = durations.average().toLong()
+            val maxMs = durations.maxOrNull() ?: 0L
+            "Диагностика пройдена: 3/3 последовательных запроса. Среднее: ${averageMs} мс; максимум: ${maxMs} мс. llama.cpp: $version."
         } catch (failure: Throwable) {
             "Диагностика НЕ ПРОЙДЕНА: ${failure.message ?: failure.javaClass.simpleName}"
         }
     }
+
     suspend fun removeQwenModel(): String {
         reasoning = LocalOnlyJarvisModelProvider()
         qwenRuntime.close()
