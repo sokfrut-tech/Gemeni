@@ -120,6 +120,8 @@ class JarvisRuntimeController(context: Context) {
             return ""
         }
         return try {
+            onProgress("Подготавливаю локальные ASR и VAD…")
+            prepare(onProgress)
             listenOnceInternal(onProgress, onState, onConversation)
         } finally {
             listenSessionGate.leave()
