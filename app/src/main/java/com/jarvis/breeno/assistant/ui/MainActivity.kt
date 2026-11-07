@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && pendingListen) {
-            startRealListening()
+            checkVoiceModelsThenContinue()
         } else if (!granted && pendingListen) {
             statusSink?.invoke("Доступ к микрофону не предоставлен. Разрешите его в настройках приложения, чтобы пользоваться голосом.")
         }
@@ -85,13 +85,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
+        requestMicrophonePermissionOrListen()
+    }
+
+    private fun checkVoiceModelsThenContinue() {
         lifecycleScope.launch {
             val modelReady = withContext(Dispatchers.IO) { runtime.areVoiceModelsReady() }
             if (!modelReady) {
                 modelDownloadConsentSink?.invoke(true)
                 return@launch
             }
-            requestMicrophonePermissionOrListen()
+            startRealListening()
         }
     }
 
