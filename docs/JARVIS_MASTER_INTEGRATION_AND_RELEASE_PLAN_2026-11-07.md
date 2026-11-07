@@ -379,3 +379,13 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Run #233 (`42388091023`) is the current exact-head pipeline. Secret scanning has passed; CodeQL is still provisioning the Android SDK. It includes: cancellation checks after blocking reads and immediately before atomic install; final-file absence assertion after cancellation; unknown-length streaming size-cap test; per-file-cap-plus-margin storage preflight test; all-int8 upstream model manifest; and optional-model attribution in NOTICE.
 - Previous run #214 (43 tests, one cancellation race failure) is historical and must not be used as the final verdict. The next successful exact-head run must show the full unit test count and finish all build/security gates.
 - PR #95 run #191 and PR #104 run #195 have Secret scanning and CodeQL/APK build passed, but their emulator smoke jobs remain in progress at this snapshot.
+
+
+## 33. Russian TTS lifecycle work isolated into PR #106 (2026-11-07)
+
+- Source review of PR #101 confirmed a useful isolated improvement: Android `TextToSpeech` initializes asynchronously, so speech requested before `onInit` must be queued; the TTS engine also needs deterministic shutdown.
+- Did not transplant PR #101 wholesale: its `JarvisRuntimeController.prepare()` auto-downloads ASR and would regress the explicit consent gate; it also includes an unrelated Qwen self-diagnostic change.
+- Created PR #106 stacked on PR #105. It transplants only the TTS lifecycle behavior and strengthens it with an injectable `SpeechEngineFactory`, handling for callbacks that fire before factory return, explicit failure when Russian voice data is unavailable, latest-utterance queue semantics, and idempotent shutdown.
+- Added JVM tests for queued-message replacement, early/synchronous initialization callback, unsupported Russian locale, initialization failure and close/late-callback behavior.
+- PR #106 exact head: `c39d3d4b7134019aa82884be8b99109529065075`; run #236 (`42388241382`) is queued. No CI verification yet. Physical Russian speech output on OPPO remains a separate gate.
+- PR #101 remains open for its Qwen self-diagnostic slice; the TTS portion is now represented by #106 and must not be cherry-picked twice.
