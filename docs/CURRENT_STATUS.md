@@ -74,3 +74,22 @@ Do not provide an APK to the user as “ready” unless:
 A dedicated integration branch `integration/jarvis-safe-agent-runtime-2026-11-06` starts from PR #62, restores the three truncated handoff documents from current main, and adds a vertical slice from Russian ASR through a provider interface, strict typed proposal validation and the Android tool gateway. Dialer actions now require a visible user approval and still use ACTION_DIAL only. Tests were added for the deterministic local provider and malformed proposals.
 
 Important limitation: `LocalOnlyJarvisModelProvider` is a deterministic parser adapter, not a neural LLM or autonomous reasoning engine. This work establishes the safe execution boundary; a real on-device model remains future work. See [the implementation report](engineering/2026-11-06-safe-agent-runtime-integration.md). CI has not yet verified this integration branch. Product remains **NOT RELEASE READY**.
+
+## 2026-11-07 — emulator test reliability checkpoint
+
+- PR #92 (JNI runtime), #93 (emulator diagnostics), #94 (Unicode JNI + cancellable model installer), #95 (conversation transcript display), and #96 (installer cancellation-hook tests) remain separate open/draft changes; none is merged. APK builds and CodeQL/secret scans have passed on several exact heads, but the emulator smoke-test jobs for #93–#95 and #96 were still reported in progress at this checkpoint. This is not evidence of successful emulator execution.
+- PR #97 adds a deterministic microphone-permission UI test that deliberately denies RECORD_AUDIO. It does not download ASR assets and does not claim live microphone/ASR operation. It also corrects the settings test to use the actual Compose accessibility label, `Модель и настройки`.
+- PR #97 branch: `test/jarvis-permission-ui-no-network-2026-11-07`; latest recorded head at this checkpoint: `138940d9fa0edc8d28e4dd90284487c07278b1e2`. Workflow run #165 (42341080195) was still running at an older branch head; the newer run #166 (42341238471) was pending after the follow-up test-label correction.
+- The earlier emulator jobs are abnormally long-running at the step `Run Android emulator smoke tests`; job logs could not be retrieved through the connected GitHub log endpoint (Azure BlobNotFound). Do not label them passed or failed until GitHub reports a terminal result. PR #93 includes failure-only diagnostics, which should be inspected if that job terminates unsuccessfully.
+- Test strategy going forward: keep emulator UI/permission smoke tests deterministic and offline; test ASR/model download/inference separately with explicit network/model prerequisites; validate Qwen on the physical OPPO Find X6 Pro before claiming on-device or offline generation.
+- Product remains **NOT RELEASE READY**. No merge, release, or physical OPPO verification is claimed.
+
+
+## 2026-11-07 — bounded emulator diagnostics follow-up
+
+- PR #97 latest head: `484a33dc327640d75b0d96428f0dc901e04a7b4b`; run #168: https://github.com/sokfrut-tech/Gemeni/actions/runs/42342370703.
+- On the earlier PR #93 diagnostics branch, the emulator smoke step did fail, but the subsequent diagnostic shell step itself remained in progress and no diagnostic artifact was produced. This shows the original diagnostic commands can also hang when ADB/emulator communication is unhealthy; it does not identify the underlying test failure.
+- PR #97 workflow now runs each ADB diagnostic command under a short timeout and uploads emulator logs plus connected-test reports/results on failure. This is a diagnostics reliability improvement, not a test pass.
+- At the time of this update, run #168 had completed secret scanning successfully; CodeQL was still running and the emulator job had not yet started. Do not infer a result for either pending job.
+- Older PR #95 emulator run #164 (42340498895) ended in failure after the permission-test revision was not yet present. PR #97 is the intended deterministic test path. Previous run #167 was cancelled by the newer workflow commit.
+- APK builds from previous exact heads are successful, but instrumentation still needs a fresh terminal result. Product remains **NOT RELEASE READY**; no merge/release and no physical OPPO test claimed.

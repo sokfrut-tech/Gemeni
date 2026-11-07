@@ -213,3 +213,36 @@ Before implementing neural inference, read `docs/agents/BRIEF_LOCAL_REASONING_RU
 - MLC is a later GPU acceleration experiment; its Android guide requires model-specific packaging and a physical device for meaningful GPU tests. Base ONNX Runtime Android availability does not prove an LLM generation stack.
 - Replaced `LocalLlmEngine`'s prompt-echo placeholder with an explicit “model not connected” response and added a regression test. Do not present this as neural inference.
 - Added `LocalLlmEngineTest` to guard against echoing user prompts as model completions. New exact-head CI must run against the latest PR #78 head.
+
+## 2026-11-07 — emulator CI follow-up and current PR chain
+
+Read this section before further test-workflow changes.
+
+- PR #92: JNI/llama.cpp runtime implementation; open/draft. Exact prior CI evidence includes successful Kotlin compile, APK build/upload, CodeQL and secret scanning, but emulator runtime remains unverified.
+- PR #93: failure-only emulator diagnostics; open/draft. Its emulator job has remained in progress at the instrumentation step; if it fails, inspect the uploaded `jarvis-emulator-diagnostics-<sha>` artifact before changing tests.
+- PR #94: standard UTF-8 conversion at JNI boundary plus cancellation-safe model download; open/draft. It includes HTTPS host/redirect bounds, pinned digest/size and partial-file cleanup. Cancellation-hook tests are in PR #96.
+- PR #95: separate transcript from status and display recognized utterance plus final assistant response; open/draft. Build/security checks passed on its exact head; emulator check was not terminal at last observation.
+- PR #96: unit tests for disconnect-on-cancel and no-disconnect-on-normal-completion; open/draft. These test the cancellation callback contract, not a real stalled HTTP socket.
+- PR #97: deterministic Android microphone permission UI smoke test; open/draft. Branch `test/jarvis-permission-ui-no-network-2026-11-07`, latest head `138940d9fa0edc8d28e4dd90284487c07278b1e2`. It revokes RECORD_AUDIO, taps the mic, verifies the Android permission prompt, denies permission, then checks that Jarvis returns to the main screen. It intentionally does not grant permission or trigger first-run ASR downloads. The settings test selector was corrected to match the actual accessibility label `Модель и настройки`.
+
+CI note: old emulator jobs #160/#161 and PR #95/#96 follow-ups were still reported in progress at the 2026-11-07 checkpoint. Their active step is `Run Android emulator smoke tests`; the connected GitHub log retrieval returned Azure BlobNotFound. PR #97 workflow run #166 (42341238471) was pending at the latest test-label commit. Poll exact run and job statuses before drawing conclusions. A job remaining in progress is neither pass nor fail.
+
+Keep these validation gates distinct:
+1. JVM/unit tests and Kotlin compile.
+2. APK assembly + native ABI packaging + security scans.
+3. Deterministic emulator UI/permission smoke tests.
+4. Model download/hash verification and cancellation under network conditions.
+5. Actual Qwen inference, Russian output, cancellation and offline inference on emulator/device.
+6. Full voice/ASR/TTS/tool execution and visible renderer validation on physical OPPO Find X6 Pro.
+
+Do not merge the PR chain blindly. Preserve the exact dependency bases, inspect full diffs and CI evidence first. Product remains NOT RELEASE READY; no physical OPPO test or successful Qwen generation is claimed.
+
+
+## 15. 2026-11-07 — emulator diagnostics follow-up
+
+- Current permission-test PR: #97, branch `test/jarvis-permission-ui-no-network-2026-11-07`, latest head `484a33dc327640d75b0d96428f0dc901e04a7b4b`.
+- Latest workflow run #168: https://github.com/sokfrut-tech/Gemeni/actions/runs/42342370703. At handoff, secret scan succeeded, CodeQL was running, and emulator tests were pending.
+- The previous PR #93 diagnostic step got stuck after the emulator test failed; its original ADB diagnostic shell commands had no per-command timeout. The run did not produce a diagnostics artifact. Do not guess the test failure reason.
+- PR #97 workflow was amended to put explicit timeouts around ADB diagnostics and upload logcat, device properties, package/process dumps and connected test reports/results after a failure. This is intended to prevent diagnostics from blocking indefinitely.
+- Once run #168 finishes, inspect its job conclusion and, if failed, download `jarvis-emulator-diagnostics-<exact-head-sha>` and inspect XML/logcat before changing tests. Do not weaken tests based only on timeout symptoms.
+- Previous exact-head CI evidence: CodeQL and secret scanning passed and APK artifact uploaded; the emulator job remains the outstanding gate. No merge, release, Qwen inference or OPPO runtime success claimed.
