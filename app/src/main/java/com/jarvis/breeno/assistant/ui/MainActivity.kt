@@ -70,7 +70,11 @@ class MainActivity : ComponentActivity() {
     private var modelDownloadBusySink: ((Boolean) -> Unit)? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && pendingListen) startRealListening()
+        if (granted && pendingListen) {
+            startRealListening()
+        } else if (!granted && pendingListen) {
+            statusSink?.invoke("Доступ к микрофону не предоставлен. Разрешите его в настройках приложения, чтобы пользоваться голосом.")
+        }
         pendingListen = false
     }
 
