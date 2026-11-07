@@ -129,8 +129,33 @@ jobs:
           disable-animations: false
           script: |
             set +e
-            # The emulator-runner action has already booted the AVD and waited for ADB.
-            # Clear old logs, then capture the live emulator before action cleanup.
+            # ADB transport readiness is not sufficient: system_server may still be
+            # restarting, or the emulator can briefly go offline after boot. Wait until
+            # both PackageManager and ActivityManager answer before installing APKs.
+            mkdir -p emulator-diagnostics
+            ready=0
+            for attempt in $(seq 1 90); do
+              if adb get-state >/dev/null 2>&1 \\
+                && [ "$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ] \\
+                && timeout 5s adb shell cmd package list packages >/dev/null 2>&1 \\
+                && timeout 5s adb shell cmd activity get-current-user >/dev/null 2>&1; then
+                ready=1
+                echo "Android emulator services are ready (attempt $attempt)."
+                break
+              fi
+              adb reconnect offline >/dev/null 2>&1 || true
+              sleep 2
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "ERROR: emulator did not expose PackageManager and ActivityManager within 180 seconds."
+              adb devices -l > emulator-diagnostics/devices.txt 2>&1 || true
+              timeout 12s adb shell getprop > emulator-diagnostics/getprop.txt 2>&1 || true
+              timeout 12s adb shell dumpsys package > emulator-diagnostics/package-service.txt 2>&1 || true
+              timeout 12s adb shell dumpsys activity > emulator-diagnostics/activity-service.txt 2>&1 || true
+              timeout 20s adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1 || true
+              exit 1
+            fi
+            # Clear old logs only after the Android framework is responsive.
             adb logcat -c >/dev/null 2>&1 || true
             gradle --no-daemon :app:connectedDebugAndroidTest
             test_status=$?
