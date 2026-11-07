@@ -235,3 +235,22 @@ Current verified state: Android 10+ only is declared by Gradle; Android 7+ compa
 - PR #95 exact head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`.
 - Factory Security Baseline run #191 (42386652892): Secret scanning passed; CodeQL static analysis passed; Kotlin compile passed; full debug APK assembly passed; APK existence/hash check passed; SARIF analysis and archive passed.
 - Android emulator smoke job is still running. Therefore PR #95 is **not** fully verified and remains Draft. Await emulator terminal result and ensure its test report shows a non-zero test count before treating this as a successful end-to-end check.
+
+
+## 16. ASR downloader hardening implementation details (2026-11-07)
+
+PR #105 now contains the first implementation and regression suite:
+- `ModelDownloadManager` is injectable for deterministic tests (file directory, connection factory, file manifest, base URL, free-space provider).
+- Redirects are disabled at the HTTP layer; the downloader permits the pinned Hugging Face origin and validates each HTTPS redirect hop against an explicit allowlist, with a maximum of five redirects.
+- Each file has a streaming byte cap; declared Content-Length is checked before reading and against actual bytes; known SHA-256 hashes are calculated while streaming; unknown-length responses still have a hard cap.
+- The destination is committed only after successful verification via same-directory atomic move; temporary files are removed on all thrown failures.
+- Active HTTP connection is registered for cancellation-time disconnect; tests include a blocking stream fixture to exercise that path.
+- Tests cover valid installation, untrusted and approved redirects, redirect loops, oversized/truncated bodies, digest mismatch, low storage and cancellation cleanup.
+
+Review caveats before accepting #105:
+1. `tokens.txt` currently has no pinned SHA-256 in the upstream file manifest; it is only size/non-empty checked. Obtain and pin its digest from a trusted immutable source before claiming every model file is cryptographically pinned.
+2. Verify the exact Hugging Face redirect host set against real model delivery responses; do not broaden it to arbitrary domains.
+3. Confirm coroutine cancellation test actually observes disconnect and terminates quickly under CI.
+4. Check API/minSdk implications of `java.nio.file.Files.move` (the app currently declares API 29, so this is available at the declared minimum).
+
+PR #105 exact head: `977d0fabc725b1af394439f949560c1f113a8c91`; run #195 (42387110040) has secret scanning passed and CodeQL/build still running. Do not claim the hardening is verified until the exact-head run completes.
