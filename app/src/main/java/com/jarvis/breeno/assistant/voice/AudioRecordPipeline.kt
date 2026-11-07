@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 class AudioRecordPipeline(private val context: Context) {
@@ -44,9 +45,16 @@ class AudioRecordPipeline(private val context: Context) {
         try {
             recorder.startRecording()
             while (currentCoroutineContext().isActive) {
-                val read = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                // Non-blocking reads keep coroutine cancellation and VAD deadlines responsive.
+                val read = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
                 when {
                     read > 0 -> emit(buffer.copyOf(read))
+                    read == 0 -> {
+                        // Empty heartbeat lets the caller enforce no-speech/hard limits even
+                        // if the audio HAL temporarily produces no samples.
+                        delay(20)
+                        emit(ShortArray(0))
+                    }
                     read == AudioRecord.ERROR_DEAD_OBJECT -> break
                     read < 0 -> throw IllegalStateException("AudioRecord.read failed: $read")
                 }
