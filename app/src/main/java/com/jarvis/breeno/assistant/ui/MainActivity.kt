@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requestAndListen() {
         lifecycleScope.launch {
-            val modelReady = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+            val modelReady = withContext(Dispatchers.IO) { runtime.areVoiceModelsReady() }
             if (!modelReady) {
                 modelDownloadConsentSink?.invoke(true)
                 return@launch
@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    runtime.downloadRussianAsrAfterConsent(userConsent = true) { value ->
+                    runtime.downloadVoiceModelsAfterConsent(userConsent = true) { value ->
                         runOnUiThread { statusSink?.invoke(value) }
                     }
                 }
@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
     private fun startRealListening() {
         lifecycleScope.launch {
             runCatching {
-                statusSink?.invoke("Подготавливаю локальный русский ASR…")
+                statusSink?.invoke("Подготавливаю локальные ASR и VAD…")
                 withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
                 withContext(Dispatchers.IO) {
@@ -190,14 +190,16 @@ class MainActivity : ComponentActivity() {
                         status = "Загрузка модели отменена. Сетевых запросов не выполнялось."
                     }
                 },
-                title = { Text("Загрузить русскую модель?") },
+                title = { Text("Загрузить голосовые модели?") },
                 text = {
                     Text(
-                        "Для распознавания речи нужна локальная русская streaming-модель Vosk от Alpha Cephei " +
-                            "(лицензия Apache-2.0, загрузка около 29 МБ). После разрешения файлы будут сохранены " +
-                            "в закрытую память приложения; три файла проверяются по SHA-256. Сервер увидит " +
-                            "IP-адрес и технические данные соединения. Голос и записи речи не отправляются. " +
-                            "Проверьте свободное место. До нажатия «Разрешить загрузку» сетевой запрос за моделью не выполняется."
+                        "Для локального распознавания и определения конца речи нужны две модели. " +
+                            "1) Русская streaming ASR-модель Alpha Cephei/Vosk (Apache-2.0, около 29 МБ). " +
+                            "2) Silero VAD для определения начала и окончания речи (MIT, около 629 КБ). " +
+                            "Файлы сохраняются только в закрытой памяти приложения и проверяются по контрольным суммам. " +
+                            "Серверы загрузки увидят IP-адрес и технические данные соединения. " +
+                            "Микрофон, голос и расшифровка никуда не отправляются. " +
+                            "Загрузка обеих моделей начнётся только после нажатия «Разрешить загрузку»."
                     )
                 },
                 confirmButton = {
