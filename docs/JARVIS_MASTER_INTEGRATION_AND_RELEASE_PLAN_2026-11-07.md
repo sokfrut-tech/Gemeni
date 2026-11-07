@@ -581,3 +581,12 @@ For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42
 - Fresh run 42391861171 is for the current exact head 97010e0ae1c3e77befdead8d844fd0b79e0ed401. Secret scanning SUCCESS; CodeQL job is in progress (Android build components installation at latest poll). Emulator job is gated behind CodeQL and has not started yet.
 - The prior 69/69 JVM result and APK belong to parent head 603ff6894d60dc7cba7a4f6b9b691315f15717ed. They remain useful historical evidence for that parent only and must not be attributed to the new head until its fresh run completes.
 - PR #108 remains draft. Release gates still include fresh exact-head JVM/CodeQL/APK, non-zero emulator instrumentation evidence, Android API compatibility decision, and physical OPPO Find X6 Pro voice-path validation.
+
+
+## 55. Microphone permission denial UX and emulator coverage (2026-11-07)
+
+- Static UI review found that the Android runtime permission callback silently discarded a denied microphone request. The UI now reports that microphone access was denied and gives the user a recovery path through app settings; no capture is started after denial.
+- Added an emulator instrumentation test that revokes RECORD_AUDIO, opens Jarvis, requests microphone access, selects the Android permission dialog's deny action, checks the user-facing denial message, and verifies the permission remains denied.
+- Commits on PR #108: `e2f01847c174ceec672ddfaf648cb3b726e94c39` (permission UX), `46a9289da768885c30b63f0d281085455ac07050` (instrumentation), `432964ed8d5c4bf7e03b8d5ec953346eec7829da` (correct Package Manager permission query argument order).
+- This is a permission-denial UI test only. It does not prove permission grant, AudioRecord/HAL capture, VAD endpointing with microphone samples, ASR transcription, TTS playback, or OPPO behavior.
+- These commits supersede run `42391861171` for current-head evidence. Its 69/69 JVM result belongs to parent `97010e0ae1c3e77befdead8d844fd0b79e0ed401`; do not attribute it to the new head until fresh CI completes.
