@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
                 onDismissRequest = {
                     if (!modelDownloadInProgress) {
                         showModelDownloadConsent = false
-                        status = "Загрузка модели отменена. Сетевых запросов не выполнялось."
+                        status = "Загрузка голосовых моделей отменена. Сетевых запросов не выполнялось."
                     }
                 },
                 title = { Text("Загрузить голосовые модели?") },
@@ -213,7 +213,7 @@ class MainActivity : ComponentActivity() {
                         enabled = !modelDownloadInProgress,
                         onClick = {
                             showModelDownloadConsent = false
-                            status = "Загрузка модели отменена. Сетевых запросов не выполнялось."
+                            status = "Загрузка голосовых моделей отменена. Сетевых запросов не выполнялось."
                         }
                     ) { Text("Не сейчас") }
                 }
