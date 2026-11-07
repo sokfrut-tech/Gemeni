@@ -122,9 +122,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          arch: x86
-          target: aosp_atd
-          channel: canary
+          arch: x86_64
+          target: default
           emulator-boot-timeout: 900
           emulator-options: -no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -wipe-data
           disable-animations: false
