@@ -431,3 +431,11 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - Tightened the downloader's maximum permitted body from 32 MiB to 4 MiB, leaving headroom above the documented asset size without a needlessly wide limit.
 - Added a truncated-response test that asserts neither the final model nor the .part file is left behind. PR #107 now has 10 deterministic JVM regression cases.
 - Latest PR #107 head: `1627987fe43897ed6d33dc43122a1f8ee563bddb`; run #247 (`42388826653`) is pending. Previous run #244 was superseded by these changes and is not an exact-head result.
+
+
+## 39. PR #106 exact-head verification completed (2026-11-07)
+
+- PR #106 exact head `2a9a0aef3c887433a46cfe9660ecacca18372e6f`, run #238 (`42388285102`): inspected the uploaded JUnit XML artifact directly. **50 tests, 0 failures, 0 errors, 0 skipped** across 10 suites. The five `JarvisSpeakerTest` lifecycle cases all passed.
+- The same exact-head CodeQL job completed successfully after Kotlin source build, JVM unit tests, full `assembleDebug` and CodeQL analysis. Secret scanning passed. A debug APK artifact was uploaded.
+- The separate Android emulator smoke job has started but has not produced a terminal result/test count. PR #106 remains Draft; no physical OPPO test has occurred.
+- PR #105 has the same gates completed (45/45 JVM tests, APK build, CodeQL, secret scan), but its emulator smoke job is also still running.
