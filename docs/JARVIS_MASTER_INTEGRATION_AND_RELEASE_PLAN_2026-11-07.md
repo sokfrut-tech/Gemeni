@@ -637,3 +637,14 @@ The terminal result of exact-head run `42395610346` (head `78c0c98ececc9fd4d843e
 ## 59. ATD system-image compatibility correction (2026-11-07)
 
 Checked the current `reactivecircus/android-emulator-runner` configuration documentation before the next run. Its README lists `aosp_atd` / `google_atd` as requiring API 30+, `arch: x86` or `arm64-v8`, and `channel: canary`. Therefore the first infrastructure commit's inherited `x86_64` / stable settings would not be a valid ATD configuration. Corrected PR #108 workflow to use API 35, `aosp_atd`, `arch: x86`, and `channel: canary`. Keep this as an isolated CI experiment; exact-head run must confirm SDK image availability and boot before judging test outcomes. Reference: https://github.com/ReactiveCircus/android-emulator-runner/blob/main/README.md#configurations.
+
+
+## 60. Select the compatible lightweight emulator image (2026-11-07)
+
+A final ABI compatibility check changed the initial ATD experiment before it could be treated as a valid run configuration:
+
+- The app's `defaultConfig.ndk.abiFilters` currently includes only `arm64-v8a` and `x86_64`.
+- The current `reactivecircus/android-emulator-runner` README documents `aosp_atd` as requiring `arch: x86` or `arm64-v8` and `channel: canary`; its documented ATD configuration does not match the app's available `x86_64` ABI.
+- To avoid turning an emulator startup experiment into an APK ABI/install failure, the workflow now selects the lightweight `default` API 35 image with `arch: x86_64` on `ubuntu-22.04`. This removes the Google APIs image while retaining an ABI supported by the app. The app's native ABI configuration is not changed.
+- A future ATD migration would require deliberate addition and verification of the x86 native ABI (or an appropriate arm64 emulator strategy); it is not silently assumed here.
+- The workflow also runs the checked-in Bash harness as one command, restarts ADB, performs a cold boot with wiped data/no snapshot save, and requires a non-zero instrumentation XML count. Fresh exact-head CI is the acceptance evidence.
