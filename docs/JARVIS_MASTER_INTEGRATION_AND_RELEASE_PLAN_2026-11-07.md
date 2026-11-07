@@ -316,3 +316,9 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - PR #104 run #193 (42386882534): Secret scanning and CodeQL/Kotlin compile/full Debug APK/SARIF passed. Android emulator smoke is still in progress. This branch includes the deterministic consent-decline/no-download tests and a hard non-zero instrumentation-test-count check with evidence artifacts.
 - PR #105 current exact head: `d359e817f91fe5aa82bf992f20f773f19aadd1a8`; run #214 (42387501472) has secret scanning passed; CodeQL job is still setting up Gradle before Kotlin compile, JVM unit tests, APK build and analysis. The run was restarted after the full revision SHA and test changes.
 - No emulator run has yet reached a terminal state; no merge or release is authorized.
+
+
+## 24. Superseded consent PR closed (2026-11-07)
+
+- PR #85 contained only the two ASR consent implementation files; those changes are now integrated in PR #95, with stronger runtime consent enforcement and tests in PR #104/#105.
+- Closed PR #85 with a comment linking to the active integrated stack. Its branch remains available for history; no code was lost.
