@@ -236,3 +236,13 @@ Keep these validation gates distinct:
 6. Full voice/ASR/TTS/tool execution and visible renderer validation on physical OPPO Find X6 Pro.
 
 Do not merge the PR chain blindly. Preserve the exact dependency bases, inspect full diffs and CI evidence first. Product remains NOT RELEASE READY; no physical OPPO test or successful Qwen generation is claimed.
+
+
+## 15. 2026-11-07 — emulator diagnostics follow-up
+
+- Current permission-test PR: #97, branch `test/jarvis-permission-ui-no-network-2026-11-07`, latest head `484a33dc327640d75b0d96428f0dc901e04a7b4b`.
+- Latest workflow run #168: https://github.com/sokfrut-tech/Gemeni/actions/runs/42342370703. At handoff, secret scan succeeded, CodeQL was running, and emulator tests were pending.
+- The previous PR #93 diagnostic step got stuck after the emulator test failed; its original ADB diagnostic shell commands had no per-command timeout. The run did not produce a diagnostics artifact. Do not guess the test failure reason.
+- PR #97 workflow was amended to put explicit timeouts around ADB diagnostics and upload logcat, device properties, package/process dumps and connected test reports/results after a failure. This is intended to prevent diagnostics from blocking indefinitely.
+- Once run #168 finishes, inspect its job conclusion and, if failed, download `jarvis-emulator-diagnostics-<exact-head-sha>` and inspect XML/logcat before changing tests. Do not weaken tests based only on timeout symptoms.
+- Previous exact-head CI evidence: CodeQL and secret scanning passed and APK artifact uploaded; the emulator job remains the outstanding gate. No merge, release, Qwen inference or OPPO runtime success claimed.
