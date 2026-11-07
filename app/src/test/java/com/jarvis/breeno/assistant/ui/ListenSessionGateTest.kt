@@ -121,4 +121,5 @@ class ListenSessionGateTest {
 
         assertTrue(gate.tryEnter())
         gate.leave()
-    }}
+    }
+}
