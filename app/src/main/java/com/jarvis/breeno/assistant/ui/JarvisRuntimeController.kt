@@ -184,5 +184,10 @@ class JarvisRuntimeController(context: Context) {
         return response
     }
 
-    fun close() { pendingConfirmationJson = null; qwenRuntime.close(); asr.close() }
+    fun close() {
+        pendingConfirmationJson = null
+        speaker.close()
+        qwenRuntime.close()
+        asr.close()
+    }
 }
