@@ -69,9 +69,12 @@ class JarvisRuntimeController(context: Context) {
             val elapsedMs = (System.nanoTime() - started) / 1_000_000L
             if (output.isBlank()) {
                 "Диагностика НЕ ПРОЙДЕНА: движок не вернул текст. llama.cpp: $version; время: ${elapsedMs} мс."
+            } else if (!output.contains("JARVIS_OK", ignoreCase = true)) {
+                val preview = output.replace(Regex("\\s+"), " ").take(180)
+                "Диагностика НЕ ПРОЙДЕНА: ответ не совпал с контрольной фразой. Время: ${elapsedMs} мс; ответ: $preview"
             } else {
                 val preview = output.replace(Regex("\\s+"), " ").take(180)
-                "Диагностика пройдена: локальный inference ответил за ${elapsedMs} мс. llama.cpp: $version. Ответ: $preview"
+                "Диагностика пройдена: контрольная фраза получена за ${elapsedMs} мс. llama.cpp: $version. Ответ: $preview"
             }
         } catch (failure: Throwable) {
             "Диагностика НЕ ПРОЙДЕНА: ${failure.message ?: failure.javaClass.simpleName}"
