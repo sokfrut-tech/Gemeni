@@ -48,7 +48,7 @@ class ModelDownloadManager internal constructor(
         const val RUSSIAN_MODEL = "vosk-model-small-streaming-ru"
         // Official Alpha Cephei repository declares Apache-2.0. Pin the model revision,
         // and fetch only the quantized streaming files required by Sherpa-ONNX.
-        private const val MODEL_REVISION = "5fbd908"
+        private const val MODEL_REVISION = "5fbd908cb21cbd585fa21461f463ba41fbcbcb68"
         private const val BASE_URL = "https://huggingface.co/alphacep/$RUSSIAN_MODEL/resolve/$MODEL_REVISION/"
         private const val CONNECT_TIMEOUT_MS = 20_000
         private const val READ_TIMEOUT_MS = 30_000
