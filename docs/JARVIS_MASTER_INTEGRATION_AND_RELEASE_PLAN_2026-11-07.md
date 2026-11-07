@@ -687,3 +687,12 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - PR #110 run #299 and PR #111 run #300 have both passed CodeQL and secret scanning, but their Android emulator smoke jobs are still running. No terminal instrumentation result or non-zero test count has been established.
 - Source inspection reconfirmed that AudioRecord uses non-blocking reads, emits empty heartbeat frames for silence deadlines, and releases the recorder in `finally`; VAD operations are synchronized and the voice-session gate prevents two calls from entering the shared capture/ASR pipeline concurrently.
 - Open lifecycle review item: Activity/controller shutdown while a voice coroutine is active must be validated separately. The gate protects concurrent entry but does not itself cancel an in-flight coroutine; cancellation is expected from the owning lifecycle and must be proven by instrumentation/device evidence before always-on or background listening is considered.
+
+### PR #112 expanded guard scope after UI call-path review (2026-11-07)
+
+- A follow-up trace of `MainActivity.startRealListening()` found that it called `runtime.prepare()` **before** calling the guarded `runtime.listenOnce()`. Thus the first guard prevented concurrent recording sessions but did not prevent rapid taps from concurrently reloading the shared ASR/VAD native engines during preparation.
+- Corrected the boundary: `listenOnce()` now acquires the session gate first, runs `prepare(onProgress)` while holding it, then runs the complete VAD → ASR → reasoning/tool policy → TTS lifecycle, and releases in `finally`. `MainActivity` no longer prepares outside that guarded path.
+- This makes the gate cover the full microphone request rather than only the capture stage. A second tap is rejected before model preparation begins.
+- The unit suite now includes a 16-thread contention test that asserts exactly one successful gate acquisition, captures worker exceptions explicitly, and verifies reacquisition after release.
+- PR #112 updated scope/body; latest head after these changes is `b19cca46ecc081c9571df503abf59b191ea4fad5`. Fresh exact-head CI must be observed; older run #303 was superseded and cancelled and is not qualifying evidence.
+- Separate lifecycle concern remains: `MainActivity.onDestroy()` calls `runtime.close()`; confirm lifecycle-scope cancellation closes an active AudioRecord flow before/while native ASR/VAD resources are released. Do not claim this lifecycle race is solved by the session gate.
