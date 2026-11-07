@@ -182,3 +182,18 @@ Required resolution before #95 can be considered for merge:
 5. Add tests that assert no network request occurs before explicit model-download approval. Keep instrumentation deterministic and avoid granting microphone permission in a way that triggers downloads.
 
 Updated safe order: integrate #85's consent gate into the #92→#94→#95 runtime chain before approving #95 or subsequent #97/#98/#100/#101 children. The branch graph must be reconciled explicitly; do not assume sibling PRs are included because they share a parent.
+
+
+## 11. PR #95 explicit model-download consent integration (2026-11-07)
+
+The previously identified sibling-branch privacy blocker has now been addressed directly on the PR #95 branch (without merging):
+- `JarvisRuntimeController.isRussianAsrReady()` performs a local file/hash readiness check.
+- `MainActivity.requestAndListen()` checks readiness first. If absent, it opens a dedicated consent dialog and does not request microphone permission or call the downloader yet.
+- The explicit “Разрешить загрузку” button calls `downloadRussianAsrAfterConsent()`; the downloader verifies model files before the runtime can proceed.
+- `prepare()` now rejects an absent/unverified model instead of silently downloading it.
+- “Не сейчас” closes the dialog and makes no downloader call. The consent text identifies Hugging Face, app-private storage, checksum validation, IP/connection metadata and states that voice recordings are not uploaded.
+- Android instrumentation tests were added/updated to cover decline behavior, the prepare-without-consent guard (no model files created), and the approved download → microphone permission flow.
+
+Exact PR #95 head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`. Its Factory Security Baseline run #191 (42386652892) started; secret scanning passed and CodeQL/Gradle was still running at the time of this update. The code is not yet verified by terminal CI and must remain Draft.
+
+Remaining validation: ensure UI cancellation test passes, verify exact instrumentation test count is non-zero, inspect emulator diagnostics if it fails, and verify already-installed verified models bypass the consent dialog. Physical OPPO validation remains required.
