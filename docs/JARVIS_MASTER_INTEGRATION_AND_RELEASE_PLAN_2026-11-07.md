@@ -565,3 +565,11 @@ For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42
 - Debug APK artifact `13581088149`, 86,961,134 bytes (~82.9 MiB), uploaded successfully.
 - Android emulator smoke job `128459323496` was still `in_progress` at the latest poll. No instrumentation XML/count has yet been verified, so emulator acceptance remains pending. PR #108 remains draft; no physical OPPO Find X6 Pro test has been performed.
 - The compatibility issue in section 50 remains open: `minSdk = 29` conflicts with the original API 24+ goal. Do not lower/raise the minimum or claim Android 7+ support without a dependency/API/ABI audit and explicit product decision.
+
+
+## 53. AudioRecord native-resource failure-path fix (2026-11-07)
+
+- Static review of the integrated VAD branch found that AudioRecordPipeline.frames() checked recorder.state before entering its try/finally. If the native recorder object was created but reported an uninitialized state, the check threw before release(), leaking the native resource on that failure path.
+- Moved the Kotlin sample-buffer allocation before native recorder creation and moved the initialization-state check inside the release-protected try/finally. All operations after AudioRecord object creation are now covered by cleanup.
+- Commit: 97010e0ae1c3e77befdead8d844fd0b79e0ed401, on PR #108. Fresh exact-head CI run 42391861171 was queued at the time of recording. Do not reuse run #42390830165 as exact-head evidence for this newer commit.
+- This is a resource-lifecycle hardening change only; it does not establish microphone/HAL behavior on OPPO hardware. Keep PR #108 draft pending fresh CI, emulator evidence, and physical-device validation.
