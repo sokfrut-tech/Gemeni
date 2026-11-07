@@ -308,3 +308,11 @@ PR #105 now requires `userConsent: Boolean` on `downloadRussianAsrAfterConsent()
 ## 22. Full immutable ASR source revision pinned (2026-11-07)
 
 The official Alpha Cephei model commit prefix `5fbd908` was resolved to full immutable commit `5fbd908cb21cbd585fa21461f463ba41fbcbcb68`. PR #105's downloader and `docs/MODEL_PROVENANCE_RUSSIAN_ASR.md` now use the full SHA rather than a moving branch or short prefix. The remaining model provenance gap is the SHA-256 of `lang/tokens.txt`.
+
+
+## 23. Latest CI snapshot (2026-11-07)
+
+- PR #95 run #191 (42386652892): Secret scanning passed; CodeQL/Kotlin compile/full Debug APK/SARIF all passed. Android emulator smoke is still in progress.
+- PR #104 run #193 (42386882534): Secret scanning and CodeQL/Kotlin compile/full Debug APK/SARIF passed. Android emulator smoke is still in progress. This branch includes the deterministic consent-decline/no-download tests and a hard non-zero instrumentation-test-count check with evidence artifacts.
+- PR #105 current exact head: `d359e817f91fe5aa82bf992f20f773f19aadd1a8`; run #200 (42387501472) has secret scanning passed; CodeQL job is still setting up Gradle before Kotlin compile, JVM unit tests, APK build and analysis. The run was restarted after the full revision SHA and test changes.
+- No emulator run has yet reached a terminal state; no merge or release is authorized.
