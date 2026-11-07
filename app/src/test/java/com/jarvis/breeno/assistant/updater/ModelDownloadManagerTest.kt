@@ -105,6 +105,26 @@ class ModelDownloadManagerTest {
     }
 
     @Test
+    fun enforcesStreamingByteLimitWhenContentLengthIsUnknown() {
+        val root = tempDirectory()
+        try {
+            val manager = manager(root, maxBytes = 8L) { url ->
+                FakeConnection(url, 200, payload, contentLength = -1L)
+            }
+            val failure = runCatching { runBlocking { manager.ensureRussianAsr() } }.exceptionOrNull()
+            assertNotNullFailure(failure)
+            assertTrue(
+                "Unknown-length body must be rejected by the streaming byte cap",
+                failure!!.message.orEmpty().contains("exceeded its size limit")
+            )
+            assertFalse(File(root, "fixture.onnx.part").exists())
+            assertFalse(File(root, "fixture.onnx").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsTruncatedResponseAndCleansTemporaryFile() {
         val root = tempDirectory()
         try {
