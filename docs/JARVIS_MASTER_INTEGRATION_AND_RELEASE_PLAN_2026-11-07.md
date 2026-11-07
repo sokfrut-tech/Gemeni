@@ -449,3 +449,11 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 
 
 PR #107 hardening follow-up: added constructor validation for the injected size cap and SHA-256 manifest, and delete a stale/corrupt final target before beginning a fresh consented download. Commit `735196a692f8755a26f6e2327119008772ea2b5d`; the previous CI run must be superseded and a new exact-head run inspected.
+
+
+## 41. Silero VAD third-party attribution and manifest regression tests (2026-11-07)
+
+- Verified the exact upstream asset identity/checksum against an immutable model mirror: `silero_vad.onnx`, 643,854 bytes, SHA-256 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`; the upstream VAD model is MIT licensed. Official sherpa-onnx docs identify the download URL. See upstream references: https://github.com/k2-fsa/sherpa-onnx/blob/master/docs/source/onnx/pretrained_models/index.rst and https://huggingface.co/akm9191/silero-vad-onnx.
+- Updated repository `NOTICE` with the model's source, license, size and checksum, clarifying it is optional, consent-gated, stored app-privately and not bundled/relicensed.
+- Added tests rejecting malformed SHA-256 and a configured cap above the production cap, and replacing a stale/corrupt existing final model with a verified download. The Silero downloader suite now contains 12 cases.
+- Latest PR #107 head `54a69a4c2f1dbf139007453a2fa7253c423e434f`; prior run #252 is stale (it predates the notice and tests). Fresh exact-head CI must finish before claiming any test/build success for this state.
