@@ -20,10 +20,10 @@ class SileroVadEngine {
                 sileroVadModelConfig = SileroVadModelConfig(
                     model = modelFile.absolutePath,
                     threshold = 0.5f,
-                    minSilenceDuration = 0.25f,
+                    minSilenceDuration = 0.55f,
                     minSpeechDuration = 0.20f,
                     windowSize = 512,
-                    maxSpeechDuration = 15.0f,
+                    maxSpeechDuration = 25.0f,
                 ),
                 sampleRate = SAMPLE_RATE,
                 numThreads = 1,
@@ -49,6 +49,10 @@ class SileroVadEngine {
         engine.pop()
         return segment.samples
     }
+
+    /** Flushes buffered trailing speech at the app's hard capture deadline. */
+    @Synchronized
+    fun flush() { vad?.flush() }
 
     @Synchronized
     fun reset() { vad?.reset() }
