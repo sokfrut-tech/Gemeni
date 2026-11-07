@@ -389,3 +389,6 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Added JVM tests for queued-message replacement, early/synchronous initialization callback, unsupported Russian locale, initialization failure and close/late-callback behavior.
 - PR #106 exact head: `c39d3d4b7134019aa82884be8b99109529065075`; run #236 (`42388241382`) is queued. No CI verification yet. Physical Russian speech output on OPPO remains a separate gate.
 - PR #101 remains open for its Qwen self-diagnostic slice; the TTS portion is now represented by #106 and must not be cherry-picked twice.
+
+
+PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is now passed as an explicit SAM lambda rather than a Kotlin function-type variable. Commit `2a9a0aef3c887433a46cfe9660ecacca18372e6f`; a new exact-head CI run is required.
