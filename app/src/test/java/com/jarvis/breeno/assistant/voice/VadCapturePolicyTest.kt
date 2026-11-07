@@ -45,6 +45,16 @@ class VadCapturePolicyTest {
     }
 
     @Test
+    fun sherpaTwentyFiveSecondDetectorSettingIsNotTheAppCaptureDeadline() {
+        val policy = VadCapturePolicy()
+        policy.onFrame(1_000, speechDetected = true, completedSegmentAvailable = false)
+        assertEquals(
+            VadCapturePolicy.Decision.CONTINUE,
+            policy.onFrame(25_000, speechDetected = true, completedSegmentAvailable = false)
+        )
+    }
+
+    @Test
     fun enforcesHardThirtySecondLimitForLongSpeech() {
         val policy = VadCapturePolicy()
         policy.onFrame(1_000, speechDetected = true, completedSegmentAvailable = false)
