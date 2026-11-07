@@ -696,3 +696,11 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - The unit suite now includes a 16-thread contention test that asserts exactly one successful gate acquisition, captures worker exceptions explicitly, and verifies reacquisition after release.
 - PR #112 updated scope/body; latest head after these changes is `b19cca46ecc081c9571df503abf59b191ea4fad5`. Fresh exact-head CI must be observed; older run #303 was superseded and cancelled and is not qualifying evidence.
 - Separate lifecycle concern remains: `MainActivity.onDestroy()` calls `runtime.close()`; confirm lifecycle-scope cancellation closes an active AudioRecord flow before/while native ASR/VAD resources are released. Do not claim this lifecycle race is solved by the session gate.
+
+### PR #112 shutdown-order hardening (2026-11-07)
+
+- Further lifecycle review confirmed `MainActivity.onDestroy()` calls `runtime.close()` before `super.onDestroy()`; the Activity's `lifecycleScope` is cancelled as lifecycle destruction is dispatched, so an active IO voice coroutine may still be unwinding when native engines are closed.
+- Extended `ListenSessionGate` with a closing state and one-shot deferred cleanup. Shutdown rejects new microphone sessions immediately. If a session is active, speaker/Qwen/ASR/VAD resources are released only when the active session exits its `finally` block; if idle, cleanup runs immediately.
+- Added JVM coverage for deferred cleanup, immediate cleanup, idempotent close requests, and rejection of new sessions after shutdown, in addition to the 16-contender concurrency test.
+- Latest PR #112 source commit: `62f02df2493c7e4fd749cc9ecc27d6a1213761ef` (test addition; PR head should be read from GitHub before attributing CI). This change is not yet qualified until exact-head checks finish.
+- This is shutdown-order hardening, not proof that Android lifecycle cancellation or AudioRecord HAL release works on every OPPO/ColorOS build. The physical-device lifecycle test remains open.
