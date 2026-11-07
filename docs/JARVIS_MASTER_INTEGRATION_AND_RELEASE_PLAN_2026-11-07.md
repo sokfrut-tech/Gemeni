@@ -358,3 +358,9 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Extended the cancellation hardening beyond the blocking-read race: after stream completion, fsync and checksum verification, the downloader now calls `ensureActive()` immediately before the atomic move.
 - Extended the cancellation regression test to assert that neither a partial file nor a final installed model file remains after cancellation.
 - Commits: `aa508b43cb707895522b341b9d81a52a757e5384` and `8ce186437ac134a9b4292f2c05688c20f61e6581`. Both require exact-head CI verification.
+
+
+## 30. Third-party attribution added for optional ASR model (2026-11-07)
+
+- Added an explicit entry to the repository `NOTICE` for the optional user-downloaded Alpha Cephei Russian streaming ASR model, with full immutable revision, source link and Apache-2.0 license link.
+- Clarifies the model is not bundled in the APK, is downloaded only after explicit consent, and retains its third-party licensing rather than being relicensed by Gemeni.
