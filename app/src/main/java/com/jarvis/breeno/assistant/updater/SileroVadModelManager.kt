@@ -36,6 +36,13 @@ class SileroVadModelManager internal constructor(
         { url -> url.openConnection() as HttpURLConnection }
     )
 
+    init {
+        require(maxBytes in 1..MAX_BYTES) { "Invalid Silero VAD model size cap" }
+        require(expectedSha256.matches(Regex("[0-9a-fA-F]{64}"))) {
+            "Silero VAD model SHA-256 must be a 64-character hex digest"
+        }
+    }
+
     companion object {
         const val FILE_NAME = "silero_vad.onnx"
         private const val MODEL_URL =
@@ -81,6 +88,8 @@ class SileroVadModelManager internal constructor(
         }
 
         val destination = modelFile()
+        // A stale or tampered final file must not be mistaken for an installed model.
+        destination.delete()
         val parent = destination.parentFile
             ?: throw IOException("Silero VAD model directory is unavailable")
         check(parent.exists() || parent.mkdirs()) {
