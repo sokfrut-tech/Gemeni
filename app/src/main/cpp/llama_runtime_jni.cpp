@@ -46,6 +46,44 @@ jstring toJavaString(JNIEnv* env, const std::string& value) {
     return env->NewString(utf16.data(), static_cast<jsize>(utf16.size()));
 }
 
+
+static std::string fromJavaString(JNIEnv* env, jstring value) {
+    if (value == nullptr) return {};
+    const jsize length = env->GetStringLength(value);
+    const jchar* chars = env->GetStringChars(value, nullptr);
+    if (chars == nullptr) return {};
+    std::string out;
+    out.reserve(static_cast<size_t>(length) * 3);
+    for (jsize i = 0; i < length; ++i) {
+        uint32_t cp = chars[i];
+        if (cp >= 0xd800 && cp <= 0xdbff) {
+            if (i + 1 < length && chars[i + 1] >= 0xdc00 && chars[i + 1] <= 0xdfff) {
+                cp = 0x10000 + ((cp - 0xd800) << 10) + (chars[++i] - 0xdc00);
+            } else {
+                cp = 0xfffd;
+            }
+        } else if (cp >= 0xdc00 && cp <= 0xdfff) {
+            cp = 0xfffd;
+        }
+        if (cp <= 0x7f) out.push_back(static_cast<char>(cp));
+        else if (cp <= 0x7ff) {
+            out.push_back(static_cast<char>(0xc0 | (cp >> 6)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3f)));
+        } else if (cp <= 0xffff) {
+            out.push_back(static_cast<char>(0xe0 | (cp >> 12)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3f)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3f)));
+        } else {
+            out.push_back(static_cast<char>(0xf0 | (cp >> 18)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3f)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3f)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3f)));
+        }
+    }
+    env->ReleaseStringChars(value, chars);
+    return out;
+}
+
 namespace {
 constexpr const char* TAG = "JarvisLlama";
 std::mutex g_mutex;
@@ -127,11 +165,8 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeLoadModel(
         JNIEnv* env, jobject, jstring modelPath, jint contextTokens, jint threadCount) {
     if (modelPath == nullptr) return 0;
-    const char* path = env->GetStringUTFChars(modelPath, nullptr);
-    if (path == nullptr) return 0;
-    const std::string pathValue(path);
-    env->ReleaseStringUTFChars(modelPath, path);
-    if (pathValue.empty()) return 0;
+    const std::string pathValue = fromJavaString(env, modelPath);
+    if (env->ExceptionCheck() || pathValue.empty()) return 0;
 
     g_cancelled.store(true);
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -173,11 +208,10 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_jarvis_breeno_assistant_core_LlamaCppRuntime_nativeGenerate(
         JNIEnv* env, jobject, jstring prompt, jint maxTokens, jobject listener) {
     if (prompt == nullptr) return env->NewStringUTF("");
-    const char* promptChars = env->GetStringUTFChars(prompt, nullptr);
-    if (promptChars == nullptr) return env->NewStringUTF("");
-    const std::string userText(promptChars);
-    env->ReleaseStringUTFChars(prompt, promptChars);
-    if (userText.empty() || userText.size() > 12000) return env->NewStringUTF("");
+    const std::string userText = fromJavaString(env, prompt);
+    if (env->ExceptionCheck() || userText.empty() || userText.size() > 12000) {
+        return env->NewStringUTF("");
+    }
 
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_model == nullptr || g_context == nullptr) return env->NewStringUTF("");
