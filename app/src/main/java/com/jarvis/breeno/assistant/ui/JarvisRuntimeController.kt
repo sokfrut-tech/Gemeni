@@ -66,16 +66,31 @@ class JarvisRuntimeController(context: Context) {
         }
     }
 
+    suspend fun isRussianAsrReady(): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        models.isRussianAsrReady()
+    }
+
+    /** Network access is reachable only from the explicit consent button in MainActivity. */
+    suspend fun downloadRussianAsrAfterConsent(onProgress: (String) -> Unit) {
+        onProgress("Загружаю файлы русской модели из Hugging Face…")
+        models.ensureRussianAsr { percent -> onProgress("Загрузка модели: $percent%") }
+        check(models.isRussianAsrReady()) { "Проверка целостности русской модели не пройдена" }
+        onProgress("Модель загружена и проверена")
+    }
+
     suspend fun prepare(onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
-        val dir = models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
-        asr.load(dir)
+        check(models.isRussianAsrReady()) {
+            "Русская модель не установлена. Сначала отдельно подтвердите её загрузку."
+        }
+        asr.load(models.modelDir())
         onProgress("Русский ASR готов")
     }
 
     suspend fun listenOnce(
         onProgress: (String) -> Unit,
-        onState: (AssistantState) -> Unit = {}
+        onState: (AssistantState) -> Unit = {},
+        onConversation: (userText: String, assistantText: String) -> Unit = { _, _ -> }
     ): String {
         val samples = ArrayList<ShortArray>()
         val started = System.nanoTime()
@@ -122,6 +137,7 @@ class JarvisRuntimeController(context: Context) {
 
         onState(if (pendingConfirmationJson != null) AssistantState.WAITING_FOR_APPROVAL else AssistantState.SPEAKING)
         speaker.speak(response)
+        onConversation(text, response)
         onProgress(response)
         if (pendingConfirmationJson == null) onState(AssistantState.IDLE)
         return text

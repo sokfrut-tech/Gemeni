@@ -6,6 +6,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import com.jarvis.breeno.assistant.ui.JarvisRuntimeController
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -39,20 +41,63 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
+    fun decliningModelDownloadConsentDoesNotStartDownload() {
+        launchJarvis()
+        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
+        assertNotNull("Microphone button is missing", mic)
+        mic!!.click()
+
+        val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
+        assertNotNull("Explicit model-download consent dialog is missing", consent)
+        device.wait(Until.findObject(By.text("Не сейчас")), 5_000)!!.click()
+
+        assertTrue(
+            "Consent dialog should close without starting a model download",
+            device.wait(Until.gone(By.text("Загрузить русскую модель?")), 5_000)
+        )
+        assertTrue(
+            "Declining consent should show a no-download status",
+            device.wait(Until.hasObject(By.textContains("Сетевых запросов не выполнялось")), 5_000)
+        )
+    }
+
+    @Test
+    fun runtimePrepareNeverDownloadsModelWithoutPriorConsent() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val runtime = JarvisRuntimeController(context)
+        try {
+            val failure = runCatching { runtime.prepare {} }.exceptionOrNull()
+            assertNotNull("Runtime must reject preparation when ASR is not installed", failure)
+            assertTrue(
+                "Runtime must explain that separate model-download consent is required",
+                failure!!.message.orEmpty().contains("отдельно подтвердите")
+            )
+            val modelFiles = File(context.filesDir, "models").walkTopDown().filter { it.isFile }.toList()
+            assertTrue("No model files may be created by prepare() without consent", modelFiles.isEmpty())
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
     fun microphoneRequestsPermissionAndEntersRuntimeState() {
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
-        // On the emulator this may first show the Android permission dialog.
-        val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
+
+        val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
+        assertNotNull("Model download must require explicit consent before microphone permission", consent)
+        device.wait(Until.findObject(By.text("Разрешить загрузку")), 5_000)!!.click()
+
+        // Android microphone permission is requested only after the model has been
+        // explicitly approved and successfully installed.
+        val allow = device.wait(Until.findObject(By.textContains("Allow")), 180_000)
             ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
             ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
         if (allow != null) allow.click()
-        // A loading message or runtime error is not a successful microphone test.
-        // The app reaches this state only after permission is granted and the ASR
-        // model is prepared; allow time for first-run model downloads.
+
         val listening = device.wait(
             Until.hasObject(By.textContains("Микрофон активен")),
             180_000

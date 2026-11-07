@@ -64,7 +64,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var runtime: JarvisRuntimeController
     private var pendingListen = false
     private var statusSink: ((String) -> Unit)? = null
+    private var transcriptSink: ((String) -> Unit)? = null
     private var stateSink: ((AssistantState) -> Unit)? = null
+    private var modelDownloadConsentSink: ((Boolean) -> Unit)? = null
+    private var modelDownloadBusySink: ((Boolean) -> Unit)? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && pendingListen) startRealListening()
@@ -78,11 +81,42 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
+        lifecycleScope.launch {
+            val modelReady = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+            if (!modelReady) {
+                modelDownloadConsentSink?.invoke(true)
+                return@launch
+            }
+            requestMicrophonePermissionOrListen()
+        }
+    }
+
+    private fun requestMicrophonePermissionOrListen() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             startRealListening()
         } else {
             pendingListen = true
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun downloadModelAfterUserConsent() {
+        modelDownloadBusySink?.invoke(true)
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    runtime.downloadRussianAsrAfterConsent { value ->
+                        runOnUiThread { statusSink?.invoke(value) }
+                    }
+                }
+            }.onSuccess {
+                statusSink?.invoke("Модель установлена локально. Готов к работе.")
+                modelDownloadConsentSink?.invoke(false)
+                requestAndListen()
+            }.onFailure { error ->
+                statusSink?.invoke("Загрузка не выполнена: ${error.message ?: error.javaClass.simpleName}")
+            }
+            modelDownloadBusySink?.invoke(false)
         }
     }
 
@@ -92,13 +126,17 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
                 withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
-                val text = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     runtime.listenOnce(
                         onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
-                        onState = { state -> runOnUiThread { stateSink?.invoke(state) } }
+                        onState = { state -> runOnUiThread { stateSink?.invoke(state) } },
+                        onConversation = { userText, assistantText ->
+                            runOnUiThread {
+                                transcriptSink?.invoke("Вы: $userText\nДжарвис: $assistantText")
+                            }
+                        }
                     )
                 }
-                if (text.isNotBlank()) statusSink?.invoke("Распознано: $text")
             }.onFailure { error ->
                 stateSink?.invoke(AssistantState.ERROR)
                 statusSink?.invoke("Ошибка runtime: ${error.message ?: error.javaClass.simpleName}")
@@ -112,6 +150,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         statusSink = null
+        transcriptSink = null
         stateSink = null
         runtime.close()
         super.onDestroy()
@@ -125,11 +164,59 @@ class MainActivity : ComponentActivity() {
         var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
         var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
         var showQwenPanel by remember { mutableStateOf(false) }
+        var showModelDownloadConsent by remember { mutableStateOf(false) }
+        var modelDownloadInProgress by remember { mutableStateOf(false) }
 
         DisposableEffect(Unit) {
-            statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
+            statusSink = { value -> status = value }
+            transcriptSink = { value -> transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
-            onDispose { statusSink = null; stateSink = null }
+            modelDownloadConsentSink = { showModelDownloadConsent = it }
+            modelDownloadBusySink = { modelDownloadInProgress = it }
+            onDispose {
+                statusSink = null
+                transcriptSink = null
+                stateSink = null
+                modelDownloadConsentSink = null
+                modelDownloadBusySink = null
+            }
+        }
+
+        if (showModelDownloadConsent) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!modelDownloadInProgress) {
+                        showModelDownloadConsent = false
+                        status = "Загрузка модели отменена. Сетевых запросов не выполнялось."
+                    }
+                },
+                title = { Text("Загрузить русскую модель?") },
+                text = {
+                    Text(
+                        "Для распознавания речи нужна локальная модель из Hugging Face. " +
+                            "После разрешения будут загружены файлы модели в закрытую память приложения; " +
+                            "перед загрузкой проверяются контрольные суммы. Сервер увидит IP-адрес и " +
+                            "технические данные соединения. Голос и записи речи не отправляются. " +
+                            "Проверьте, что на устройстве достаточно свободного места. " +
+                            "До нажатия «Разрешить загрузку» сетевой запрос за моделью не выполняется."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !modelDownloadInProgress,
+                        onClick = { downloadModelAfterUserConsent() }
+                    ) { Text(if (modelDownloadInProgress) "Загрузка…" else "Разрешить загрузку") }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !modelDownloadInProgress,
+                        onClick = {
+                            showModelDownloadConsent = false
+                            status = "Загрузка модели отменена. Сетевых запросов не выполнялось."
+                        }
+                    ) { Text("Не сейчас") }
+                }
+            )
         }
 
         if (showQwenPanel) {
