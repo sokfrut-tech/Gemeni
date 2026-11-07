@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var runtime: JarvisRuntimeController
     private var pendingListen = false
     private var statusSink: ((String) -> Unit)? = null
+    private var transcriptSink: ((String) -> Unit)? = null
     private var stateSink: ((AssistantState) -> Unit)? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -92,13 +93,17 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
                 withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
-                val text = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     runtime.listenOnce(
                         onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
-                        onState = { state -> runOnUiThread { stateSink?.invoke(state) } }
+                        onState = { state -> runOnUiThread { stateSink?.invoke(state) } },
+                        onConversation = { userText, assistantText ->
+                            runOnUiThread {
+                                transcriptSink?.invoke("Вы: $userText\nДжарвис: $assistantText")
+                            }
+                        }
                     )
                 }
-                if (text.isNotBlank()) statusSink?.invoke("Распознано: $text")
             }.onFailure { error ->
                 stateSink?.invoke(AssistantState.ERROR)
                 statusSink?.invoke("Ошибка runtime: ${error.message ?: error.javaClass.simpleName}")
@@ -112,6 +117,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         statusSink = null
+        transcriptSink = null
         stateSink = null
         runtime.close()
         super.onDestroy()
@@ -127,9 +133,10 @@ class MainActivity : ComponentActivity() {
         var showQwenPanel by remember { mutableStateOf(false) }
 
         DisposableEffect(Unit) {
-            statusSink = { value -> status = value; if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Строю маршрут") || value.startsWith("Сейчас ")) transcript = value }
+            statusSink = { value -> status = value }
+            transcriptSink = { value -> transcript = value }
             stateSink = { value -> assistantState = value; listening = value == AssistantState.LISTENING }
-            onDispose { statusSink = null; stateSink = null }
+            onDispose { statusSink = null; transcriptSink = null; stateSink = null }
         }
 
         if (showQwenPanel) {

@@ -75,7 +75,8 @@ class JarvisRuntimeController(context: Context) {
 
     suspend fun listenOnce(
         onProgress: (String) -> Unit,
-        onState: (AssistantState) -> Unit = {}
+        onState: (AssistantState) -> Unit = {},
+        onConversation: (userText: String, assistantText: String) -> Unit = { _, _ -> }
     ): String {
         val samples = ArrayList<ShortArray>()
         val started = System.nanoTime()
@@ -122,6 +123,7 @@ class JarvisRuntimeController(context: Context) {
 
         onState(if (pendingConfirmationJson != null) AssistantState.WAITING_FOR_APPROVAL else AssistantState.SPEAKING)
         speaker.speak(response)
+        onConversation(text, response)
         onProgress(response)
         if (pendingConfirmationJson == null) onState(AssistantState.IDLE)
         return text
