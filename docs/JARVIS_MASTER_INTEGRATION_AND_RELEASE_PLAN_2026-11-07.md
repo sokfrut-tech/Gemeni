@@ -336,3 +336,11 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Static review found the original oversized-response test only exercised the declared Content-Length pre-check; it did not prove the streaming byte cap for chunked/unknown-length responses.
 - Added `enforcesStreamingByteLimitWhenContentLengthIsUnknown`, which serves a body larger than the per-file cap while reporting unknown length and asserts rejection plus cleanup of both partial and final files.
 - This is an additional regression test; exact-head run must execute it along with cancellation and the rest of the JVM suite.
+
+
+## 27. Current PR #105 verification rerun (2026-11-07)
+
+- PR #105 exact head: `e27b7c263f36f4401c3910e9d04db355f663119c`.
+- Run #221 (`42387826682`) has Secret scanning passed; CodeQL job is setting up Gradle. It includes the cancellation race fix and unknown-length body-cap regression test.
+- Prior run #214 failed the JVM suite with 42/43 tests passing; the failure was the cancellation/EOF race. Run #219 was superseded when the additional unknown-length regression test was added. No current exact-head pass is available yet.
+- PR #95 and #104 emulator smoke jobs remain in progress; neither has a terminal result or a verified non-zero instrumentation count at this snapshot.
