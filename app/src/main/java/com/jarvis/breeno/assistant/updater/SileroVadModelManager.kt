@@ -194,12 +194,12 @@ class SileroVadModelManager internal constructor(
             if (status == HttpURLConnection.HTTP_OK) return connection
 
             if (status in REDIRECT_CODES) {
+                val location = connection.getHeaderField("Location")
                 activeConnection.compareAndSet(connection, null)
                 connection.disconnect()
                 if (redirectCount >= MAX_REDIRECTS) {
                     throw IOException("Too many redirects while downloading Silero VAD")
                 }
-                val location = connection.getHeaderField("Location")
                 if (location.isNullOrBlank()) {
                     throw IOException("Silero VAD redirect has no Location header")
                 }
