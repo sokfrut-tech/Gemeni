@@ -475,3 +475,6 @@ PR #107 hardening follow-up: added constructor validation for the injected size 
 - VAD model lifecycle is closed with the runtime. Existing guarded tool confirmation flow is unchanged.
 - PR #108 exact head `a54382e7f5802a376d3c30d728cd5549787f53c2`; run #259 (`42389442448`) is active. Secret scanning passed; CodeQL job is still running. No JVM/ APK / emulator result claimed yet; no OPPO hardware test has been performed.
 - PR #107 exact head `54a69a4c2f1dbf139007453a2fa7253c423e434f`; run #255 (`42389152047`) is active. Secret scanning passed; CodeQL job is still building the full Debug APK. The previous run #252 predates latest notice/tests and is not accepted as exact-head evidence.
+
+
+PR #108 static review follow-up: `SileroVadEngine.load()` now clears the reference to the released native VAD object before attempting to construct a replacement. This prevents a failed native reinitialization from leaving a stale released pointer that a later `close()` could release again. Latest PR #108 head `e8da5277b68d17f760368e850beabf5bcdbb84a4`; exact-head run #261 is pending. PR #107 latest run #255 has secret scanning passed; CodeQL is still at full Debug APK build. PR #105/#106 emulator jobs remain active without a terminal instrumentation count.
