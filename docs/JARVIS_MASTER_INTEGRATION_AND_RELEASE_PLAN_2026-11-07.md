@@ -660,3 +660,10 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - Fresh workflow run #300 (`42407613350`) is for PR #111 exact head. At this update, secret scanning is SUCCESS; Android build component installation is in progress. No test or APK result is yet established.
 - Do not merge either PR or claim voice-loop acceptance until the current exact-head pipeline completes, emulator instrumentation reports a non-zero executed test count, and physical OPPO Find X6 Pro validation is performed.
 - Next: inspect terminal results for runs #299 and #300; if API 34 instrumentation still fails, use the newly uploaded in-action diagnostics to classify boot/framework/test-runner/app failure before changing production code. After CI, verify the real microphone -> VAD endpoint -> ASR transcript -> guarded tool result -> Russian TTS cycle on the physical OPPO. Keep wake-word/always-on capture out of scope until a separate consent, battery, privacy and lifecycle design is approved.
+
+## 62. PR #110 exact-head JVM suite parsed from CI artifact (2026-11-07)
+
+- Workflow run #299 / `42407501467` is the Factory Security Baseline associated with PR #110's API 34 emulator stabilization change. GitHub uploaded JUnit artifact `13588072200` (`jarvis-unit-test-results-8f6463a4b2982f62675eb9891fc31b45a60a0d4d`).
+- Downloaded and parsed every XML file in that artifact: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. Includes `JarvisSpeakerTest` 5/5 and `VadCapturePolicyTest` 7/7.
+- Secret scanning is SUCCESS; Kotlin source compilation is SUCCESS; JVM unit tests are SUCCESS with the parsed count above. At the latest poll, full Debug APK build was still in progress. CodeQL analysis and emulator instrumentation had not reached terminal results.
+- This evidence is for the workflow's PR merge ref (artifact name contains merge SHA `8f6463a4b2982f62675eb9891fc31b45a60a0d4d`), not a standalone physical-device test. Do not claim API 34 emulator stability until the emulator job terminates with a non-zero instrumentation test count.
