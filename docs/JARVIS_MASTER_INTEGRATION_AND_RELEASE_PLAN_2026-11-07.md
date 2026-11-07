@@ -573,3 +573,11 @@ For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42
 - Moved the Kotlin sample-buffer allocation before native recorder creation and moved the initialization-state check inside the release-protected try/finally. All operations after AudioRecord object creation are now covered by cleanup.
 - Commit: 97010e0ae1c3e77befdead8d844fd0b79e0ed401, on PR #108. Fresh exact-head CI run 42391861171 was queued at the time of recording. Do not reuse run #42390830165 as exact-head evidence for this newer commit.
 - This is a resource-lifecycle hardening change only; it does not establish microphone/HAL behavior on OPPO hardware. Keep PR #108 draft pending fresh CI, emulator evidence, and physical-device validation.
+
+
+## 54. Superseded emulator run and fresh exact-head validation (2026-11-07)
+
+- When commit 97010e0ae1c3e77befdead8d844fd0b79e0ed401 triggered the new PR run, workflow concurrency cancelled the previous run 42390830165 while its Android emulator smoke job was still running. That job ended with conclusion CANCELLED, not SUCCESS; no emulator pass or instrumentation count may be inferred from it.
+- Fresh run 42391861171 is for the current exact head 97010e0ae1c3e77befdead8d844fd0b79e0ed401. Secret scanning SUCCESS; CodeQL job is in progress (Android build components installation at latest poll). Emulator job is gated behind CodeQL and has not started yet.
+- The prior 69/69 JVM result and APK belong to parent head 603ff6894d60dc7cba7a4f6b9b691315f15717ed. They remain useful historical evidence for that parent only and must not be attributed to the new head until its fresh run completes.
+- PR #108 remains draft. Release gates still include fresh exact-head JVM/CodeQL/APK, non-zero emulator instrumentation evidence, Android API compatibility decision, and physical OPPO Find X6 Pro voice-path validation.
