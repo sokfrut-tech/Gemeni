@@ -75,6 +75,7 @@ class ListenSessionGateTest {
         val contenders = 16
         val ready = CountDownLatch(contenders)
         val start = CountDownLatch(1)
+        val attempted = CountDownLatch(contenders)
         val releaseWinner = CountDownLatch(1)
         val finished = CountDownLatch(contenders)
         val successfulEntries = AtomicInteger(0)
@@ -87,10 +88,12 @@ class ListenSessionGateTest {
                     ready.countDown()
                     try {
                         assertTrue(start.await(5, TimeUnit.SECONDS))
-                        if (gate.tryEnter()) {
+                        val acquired = gate.tryEnter()
+                        attempted.countDown()
+                        if (acquired) {
                             successfulEntries.incrementAndGet()
                             try {
-                                assertTrue(releaseWinner.await(5, TimeUnit.SECONDS))
+                                assertTrue(releaseWinner.await(10, TimeUnit.SECONDS))
                             } finally {
                                 gate.leave()
                             }
@@ -105,8 +108,10 @@ class ListenSessionGateTest {
 
             assertTrue("Workers did not become ready", ready.await(5, TimeUnit.SECONDS))
             start.countDown()
-            assertTrue("Workers did not finish their acquisition attempt", finished.await(5, TimeUnit.SECONDS))
+            assertTrue("Workers did not attempt acquisition", attempted.await(5, TimeUnit.SECONDS))
             assertEquals(1, successfulEntries.get())
+            releaseWinner.countDown()
+            assertTrue("Workers did not finish", finished.await(5, TimeUnit.SECONDS))
             assertNull("Worker failed: ${workerFailure.get()}", workerFailure.get())
         } finally {
             releaseWinner.countDown()
@@ -116,5 +121,4 @@ class ListenSessionGateTest {
 
         assertTrue(gate.tryEnter())
         gate.leave()
-    }
-}
+    }}
