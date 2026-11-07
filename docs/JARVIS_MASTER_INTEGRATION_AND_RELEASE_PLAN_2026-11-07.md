@@ -298,3 +298,8 @@ Next voice acceptance work after downloader/security gates:
 3. Add explicit capture cancellation and recorder lifecycle tests for permission revocation, app backgrounding and interruption.
 4. Add wake-word/background listening only behind user opt-in, Android foreground-service requirements, privacy indicators and battery tests.
 5. Verify Russian end-to-end: recognized transcript, model answer, audible Russian response, no network, and honest error state.
+
+
+## 21. Consent enforced at downloader boundary (2026-11-07)
+
+PR #105 now requires `userConsent: Boolean` on `downloadRussianAsrAfterConsent()` and rejects `false` before any call into the model downloader. The UI passes `true` only from the explicit consent button. The deterministic instrumentation test now verifies the runtime rejects a false consent flag and creates no model files; `prepare()` also rejects a missing model without downloading. This is stronger than relying on the UI flow alone.
