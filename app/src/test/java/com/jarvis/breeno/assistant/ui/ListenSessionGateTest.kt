@@ -39,6 +39,37 @@ class ListenSessionGateTest {
     }
 
     @Test
+    fun defersResourceCleanupUntilActiveSessionLeaves() {
+        val gate = ListenSessionGate()
+        val cleanupCalls = AtomicInteger(0)
+
+        assertTrue(gate.tryEnter())
+        gate.closeWhenIdle { cleanupCalls.incrementAndGet() }
+
+        assertTrue(gate.isClosing)
+        assertFalse(gate.tryEnter())
+        assertEquals(0, cleanupCalls.get())
+
+        gate.leave()
+
+        assertEquals(1, cleanupCalls.get())
+        gate.closeWhenIdle { cleanupCalls.incrementAndGet() }
+        assertEquals(1, cleanupCalls.get())
+    }
+
+    @Test
+    fun closesResourcesImmediatelyWhenNoSessionIsActive() {
+        val gate = ListenSessionGate()
+        val cleanupCalls = AtomicInteger(0)
+
+        gate.closeWhenIdle { cleanupCalls.incrementAndGet() }
+
+        assertEquals(1, cleanupCalls.get())
+        assertTrue(gate.isClosing)
+        assertFalse(gate.tryEnter())
+    }
+
+    @Test
     fun concurrentCallersCanAcquireOnlyOneSession() {
         val gate = ListenSessionGate()
         val contenders = 16
