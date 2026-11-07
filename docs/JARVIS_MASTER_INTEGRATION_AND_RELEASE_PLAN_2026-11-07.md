@@ -550,9 +550,18 @@ Implemented directly on PR #108 branch `feat/jarvis-vad-endpointed-push-to-talk-
 ## 50. Android compatibility and instrumentation scope audit
 
 - Current PR #108 `app/build.gradle.kts` declares `minSdk = 29` (Android 10). This conflicts with the original product requirement recorded for Jarvis: Android 7+ compatibility (API 24+). Treat this as an unresolved product compatibility blocker; do not claim Android 7+ support. Audit dependencies/native ABI/API calls and either restore API 24 compatibility with tests or explicitly document and approve a revised minimum supported Android version.
-- Current checked-in `app/src/androidTest` contains only one UI Automator smoke test, `JarvisLaunchSmokeTest.mainScreenLaunchesAndShowsReadyState`. It verifies launch and ready text only. It does not yet exercise model-consent rejection/acceptance, microphone permission, live AudioRecord, VAD endpointing, ASR, TTS playback, or guarded tool confirmation. The emulator workflow requires at least one instrumentation test, not full voice-flow coverage. Expand instrumentation in subsequent work; do not overstate the present smoke test.
+- The current checked-in `app/src/androidTest` now contains two UI Automator test classes: `JarvisLaunchSmokeTest.mainScreenLaunchesAndShowsReadyState` and `JarvisRuntimeSmokeTest` (four tests). The runtime tests check key UI controls, rejection of model-download consent without network setup, runtime preparation failing closed when the ASR model is absent/consent is denied, and opening the local model/settings panel. This is broader than a launch-only smoke test, but it still does not validate consent acceptance/download, runtime microphone permission grant, live AudioRecord capture, actual Silero endpointing against audio, ASR transcription, audible TTS playback, or guarded tool confirmation. The emulator workflow requires a non-zero instrumentation count; passing these UI/runtime checks is not full voice-flow or physical-device acceptance.
 
 
 ## 51. Integrated PR #108 exact-head JVM evidence (2026-11-07)
 
 For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42390830165` uploaded JUnit artifact `13581915627`. The archive was downloaded and all XML suites parsed: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. This includes `JarvisSpeakerTest` 5/5 and `VadCapturePolicyTest` 7/7. Evidence comment posted on PR #108 (comment ID `6709784485`). At the time of recording, the workflow had advanced to full Debug APK build; APK verification/upload, CodeQL analysis and emulator instrumentation remained pending. Do not treat the JVM pass as full CI or release approval.
+
+
+## 52. Integrated PR #108 build and static-analysis evidence (2026-11-07)
+
+- Exact integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42390830165`: Secret scanning SUCCESS; CodeQL static analysis SUCCESS; Kotlin source compile SUCCESS; JVM unit tests SUCCESS; full Debug APK build SUCCESS; APK verification/hash SUCCESS; APK upload SUCCESS; CodeQL analyze/SARIF archive SUCCESS.
+- Exact-head JUnit artifact `13581915627`: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. Includes `JarvisSpeakerTest` 5/5 and `VadCapturePolicyTest` 7/7.
+- Debug APK artifact `13581088149`, 86,961,134 bytes (~82.9 MiB), uploaded successfully.
+- Android emulator smoke job `128459323496` was still `in_progress` at the latest poll. No instrumentation XML/count has yet been verified, so emulator acceptance remains pending. PR #108 remains draft; no physical OPPO Find X6 Pro test has been performed.
+- The compatibility issue in section 50 remains open: `minSdk = 29` conflicts with the original API 24+ goal. Do not lower/raise the minimum or claim Android 7+ support without a dependency/API/ABI audit and explicit product decision.
