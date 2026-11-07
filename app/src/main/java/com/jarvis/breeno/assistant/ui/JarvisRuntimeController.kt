@@ -18,7 +18,6 @@ import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
-
 /** The self-test is intentionally strict: extra or negating text must not count as success. */
 internal fun isQwenSelfTestResponseValid(output: String): Boolean =
     output.trim().equals("JARVIS_OK", ignoreCase = true)
@@ -198,5 +197,10 @@ class JarvisRuntimeController(context: Context) {
         return response
     }
 
-    fun close() { pendingConfirmationJson = null; qwenRuntime.close(); asr.close() }
+    fun close() {
+        pendingConfirmationJson = null
+        speaker.close()
+        qwenRuntime.close()
+        asr.close()
+    }
 }
