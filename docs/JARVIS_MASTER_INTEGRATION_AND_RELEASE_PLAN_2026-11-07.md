@@ -481,3 +481,11 @@ PR #108 static review follow-up: `SileroVadEngine.load()` now clears the referen
 
 
 PR #108 responsiveness hardening: changed `AudioRecordPipeline` from blocking reads to `READ_NON_BLOCKING`. When the HAL returns no samples, the flow emits an empty heartbeat every 20 ms after a short delay. This allows the existing 8 s no-speech and 30 s hard-capture policy to advance even during temporary silent/stalled input, and keeps coroutine cancellation responsive instead of waiting on a blocking native read. `SileroVadEngine.accept()` treats empty arrays as a no-op. Commit `1011ec4248277a08a8c9193c506e09bf59a1ea6e`; this supersedes PR #108's earlier exact-head CI run and requires a fresh run.
+
+
+## 44. Sherpa API pin and audio-HAL stall handling (2026-11-07)
+
+- Verified against the exact dependency tag used by the app, Sherpa-ONNX `v1.13.8`: `Vad.kt` exposes `SpeechSegment.samples`, `acceptWaveform`, `empty/front/pop`, `isSpeechDetected`, `reset`, `flush`, and `release`. The current `SileroVadEngine` calls APIs present in that pinned source. Source: https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/sherpa-onnx/kotlin-api/Vad.kt.
+- Exact v1.13.8 native config docs describe `maxSpeechDuration` as raising the detector threshold to 0.9 after the configured duration; it is not the app's hard capture timer. Kotlin independently enforces 30 s and flushes/drains at that deadline. Source: https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/sherpa-onnx/csrc/silero-vad-model-config.cc.
+- Replaced blocking `AudioRecord.READ_BLOCKING` with `READ_NON_BLOCKING`; a zero-sample read yields a 20 ms empty heartbeat so the policy can still enforce 8 s/30 s deadlines when the audio HAL temporarily stalls. Cancellation no longer waits for a blocking native read to return.
+- PR #108 latest head `1011ec4248277a08a8c9193c506e09bf59a1ea6e`; exact-head run #263 (`42389745430`) is pending. Prior run #261 is stale. PR #107 run #255 now has secret scanning and CodeQL passed; Android emulator smoke is still running, with no terminal test count yet.
