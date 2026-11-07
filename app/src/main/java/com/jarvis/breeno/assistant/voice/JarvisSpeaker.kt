@@ -5,19 +5,21 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 /**
- * Small lifecycle-safe Russian TTS adapter.
+ * Lifecycle-safe Russian TTS adapter.
  *
- * TextToSpeech initializes asynchronously. Calls made before onInit are queued
- * instead of being silently sent to an uninitialized engine.
+ * Android initializes TextToSpeech asynchronously. Calls made before onInit
+ * are queued instead of being sent to an uninitialized engine.
  */
 class JarvisSpeaker(context: Context) {
     private val lock = Any()
     private var initialized = false
     private var initializationFailed = false
+    private var closed = false
     private var pendingText: String? = null
 
     private val tts = TextToSpeech(context.applicationContext) { status ->
         synchronized(lock) {
+            if (closed) return@synchronized
             if (status != TextToSpeech.SUCCESS) {
                 initializationFailed = true
                 pendingText = null
@@ -28,9 +30,7 @@ class JarvisSpeaker(context: Context) {
             initialized = languageStatus != TextToSpeech.LANG_MISSING_DATA &&
                 languageStatus != TextToSpeech.LANG_NOT_SUPPORTED
 
-            if (initialized) {
-                pendingText?.let(::speakNow)
-            }
+            if (initialized) pendingText?.let(::speakNow)
             pendingText = null
         }
     }
@@ -38,7 +38,7 @@ class JarvisSpeaker(context: Context) {
     fun speak(text: String) {
         if (text.isBlank()) return
         synchronized(lock) {
-            if (initializationFailed) return
+            if (closed || initializationFailed) return
             if (!initialized) {
                 // Keep only the newest response; stale queued speech is confusing.
                 pendingText = text
@@ -54,6 +54,8 @@ class JarvisSpeaker(context: Context) {
 
     fun close() {
         synchronized(lock) {
+            if (closed) return
+            closed = true
             pendingText = null
             initialized = false
             tts.stop()
