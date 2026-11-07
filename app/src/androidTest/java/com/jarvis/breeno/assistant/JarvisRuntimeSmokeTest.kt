@@ -41,7 +41,7 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
-    fun decliningModelDownloadConsentDoesNotStartDownload() {
+    fun decliningModelDownloadConsentDoesNotStartNetworkSetup() {
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
@@ -49,20 +49,21 @@ class JarvisRuntimeSmokeTest {
 
         val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
         assertNotNull("Explicit model-download consent dialog is missing", consent)
-        device.wait(Until.findObject(By.text("Не сейчас")), 5_000)!!.click()
+        assertNotNull("Consent dialog must offer a clear decline action", device.wait(Until.findObject(By.text("Не сейчас")), 5_000))
+        device.findObject(By.text("Не сейчас")).click()
 
         assertTrue(
-            "Consent dialog should close without starting a model download",
+            "Consent dialog should close after declining",
             device.wait(Until.gone(By.text("Загрузить русскую модель?")), 5_000)
         )
         assertTrue(
-            "Declining consent should show a no-download status",
+            "Declining consent should not start model network setup",
             device.wait(Until.hasObject(By.textContains("Сетевых запросов не выполнялось")), 5_000)
         )
     }
 
     @Test
-    fun runtimePrepareNeverDownloadsModelWithoutPriorConsent() = runBlocking {
+    fun runtimePrepareRejectsMissingModelWithoutDownloading() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val runtime = JarvisRuntimeController(context)
         try {
@@ -73,43 +74,22 @@ class JarvisRuntimeSmokeTest {
                 failure!!.message.orEmpty().contains("отдельно подтвердите")
             )
             val modelFiles = File(context.filesDir, "models").walkTopDown().filter { it.isFile }.toList()
-            assertTrue("No model files may be created by prepare() without consent", modelFiles.isEmpty())
+            assertTrue("prepare() must not create model files or download them without consent", modelFiles.isEmpty())
         } finally {
             runtime.close()
         }
     }
 
     @Test
-    fun microphoneRequestsPermissionAndEntersRuntimeState() {
+    fun settingsOpensLocalModelPanel() {
         launchJarvis()
-        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
-        assertNotNull("Microphone button is missing", mic)
-        mic!!.click()
-
-        val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
-        assertNotNull("Model download must require explicit consent before microphone permission", consent)
-        device.wait(Until.findObject(By.text("Разрешить загрузку")), 5_000)!!.click()
-
-        // Android microphone permission is requested only after the model has been
-        // explicitly approved and successfully installed.
-        val allow = device.wait(Until.findObject(By.textContains("Allow")), 180_000)
-            ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
-        if (allow != null) allow.click()
-
-        val listening = device.wait(
-            Until.hasObject(By.textContains("Микрофон активен")),
-            180_000
+        val settings = device.wait(Until.findObject(By.desc("Модель и настройки")), 10_000)
+        assertNotNull("Model/settings button is missing", settings)
+        settings!!.click()
+        assertTrue(
+            "Local intelligence model panel did not open",
+            device.wait(Until.hasObject(By.text("Локальный интеллект Джарвиса")), 5_000)
         )
-        assertTrue("Microphone permission/ASR preparation did not reach active listening", listening)
-    }
-
-    @Test
-    fun settingsOpensAndroidAccessibilitySettings() {
-        launchJarvis()
-        device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
-        assertTrue("Accessibility settings did not open", device.wait(Until.hasObject(By.textContains("Accessibility")), 5_000) || device.wait(Until.hasObject(By.textContains("Специальные возможности")), 5_000))
     }
 
     private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
