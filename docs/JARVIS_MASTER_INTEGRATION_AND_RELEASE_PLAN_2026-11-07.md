@@ -678,3 +678,12 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - PR #112 exact-head CI has not yet been observed in the available workflow results. Do not claim this guard is tested until its own fresh JVM/CodeQL/APK/emulator pipeline completes.
 - The exact-head workflow runs #299 (PR #110) and #300 (PR #111) remain non-terminal at the latest poll: secret scanning passed in both; #299 is in CodeQL analysis after APK build, #300 is in APK build. Emulator instrumentation has not produced a terminal non-zero test count yet.
 - Next: inspect terminal results for #299/#300; then inspect #112's exact-head CI. If it passes, continue with lifecycle tests for Activity recreation/backgrounding and actual microphone/VAD/ASR/TTS behavior on OPPO Find X6 Pro. Keep every stacked PR Draft until all applicable gates pass.
+
+### PR #112 follow-up verification hardening (2026-11-07)
+
+- Expanded `ListenSessionGateTest` from sequential-only checks to a concurrent contention test with 16 simultaneous callers. The test holds the winning lease until every contender has attempted entry, then asserts exactly one successful acquisition and verifies the gate can be acquired again after release.
+- Worker-thread failures are captured and asserted on the test thread so executor exceptions cannot be silently swallowed by the test harness.
+- Latest PR #112 head: `82bf95685279d95d0cd2dece2e928aa48af81e01`. Fresh Factory Security Baseline run #306 / `42408375739` is queued; secret scan and CodeQL have started. The previous run #303 was superseded/cancelled by this additional test commit and is not evidence for the current head.
+- PR #110 run #299 and PR #111 run #300 have both passed CodeQL and secret scanning, but their Android emulator smoke jobs are still running. No terminal instrumentation result or non-zero test count has been established.
+- Source inspection reconfirmed that AudioRecord uses non-blocking reads, emits empty heartbeat frames for silence deadlines, and releases the recorder in `finally`; VAD operations are synchronized and the voice-session gate prevents two calls from entering the shared capture/ASR pipeline concurrently.
+- Open lifecycle review item: Activity/controller shutdown while a voice coroutine is active must be validated separately. The gate protects concurrent entry but does not itself cancel an in-flight coroutine; cancellation is expected from the owning lifecycle and must be proven by instrumentation/device evidence before always-on or background listening is considered.
