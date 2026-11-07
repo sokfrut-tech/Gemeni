@@ -521,3 +521,17 @@ PR #108 exact-head run #266 (`42389826211`) for `82eab794842be36942fa8cc934001a8
 - At the latest poll, emulator smoke jobs are all actively running (not queued) for PR #105 run #233 (job `128451096498`), PR #106 run #238 (job `128451735829`), PR #107 run #255 (job `128454449250`), and PR #108 run #266 (job `128456229885`).
 - Their current workflow step is `Run Android emulator smoke tests`; diagnostics and evidence-upload steps have not started. No instrumentation XML or non-zero test count has been published yet. This remains pending, not passed.
 - PR #108 exact-head CodeQL job and secret scan are both SUCCESS; APK build, verify/hash and upload are successful. Its Android emulator job has moved from queued to in progress.
+
+
+## 48. Stacked-branch integration hazard: TTS lifecycle vs VAD (2026-11-07)
+
+Read-only source comparison of PR #106 branch `fix/jarvis-tts-lifecycle-queue-2026-11-07` against PR #108 branch `feat/jarvis-vad-endpointed-push-to-talk-2026-11-07` found a real integration gap:
+
+- PR #106 contains the lifecycle-safe `JarvisSpeaker` adapter with asynchronous initialization handling, Russian locale validation, newest-utterance queue, failure handling, and idempotent `close()`.
+- PR #106's `JarvisRuntimeController.close()` calls `speaker.close()`, but its branch does not include the new VAD controller work.
+- PR #108 contains VAD lifecycle cleanup (`vad.close()`) and the new endpointing pipeline, but its branch still has the old fire-and-forget `JarvisSpeaker` implementation and its controller `close()` does **not** call `speaker.close()`.
+- This is expected from the current DAG: PR #106 is stacked on PR #105, while PR #107 is also stacked on PR #105 and PR #108 is stacked on PR #107. Therefore PR #108 does not inherit PR #106 automatically.
+
+**Integration requirement:** before marking TTS+VAD integrated, carry PR #106's lifecycle-safe `JarvisSpeaker` and tests into the VAD integration branch (or rebase/stack in an equivalent dependency-safe order), and preserve both `speaker.close()` and `vad.close()` in the final controller cleanup. Run the full JVM + instrumentation suite on the combined exact head. Do not merge PR #106 and #108 as if one already contains the other.
+
+No source files were changed in this review step; this is a verified integration finding and release-plan update.
