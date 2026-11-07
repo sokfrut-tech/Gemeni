@@ -43,11 +43,27 @@ class JarvisRuntimeController(context: Context) {
         userConsent: Boolean,
         onProgress: (QwenModelInstaller.Progress) -> Unit
     ): String {
-        val installed = qwenInstaller.install(userConsent, onProgress)
-        return activateQwenFile(installed.file)
+        if (!listenSessionGate.tryEnter()) {
+            return "Голосовой runtime занят. Дождитесь завершения команды перед изменением модели."
+        }
+        return try {
+            val installed = qwenInstaller.install(userConsent, onProgress)
+            activateQwenFile(installed.file)
+        } finally {
+            listenSessionGate.leave()
+        }
     }
 
-    fun activateInstalledQwen(): String = activateQwenFile(qwenInstaller.installedModelFile())
+    fun activateInstalledQwen(): String {
+        if (!listenSessionGate.tryEnter()) {
+            return "Голосовой runtime занят. Дождитесь завершения команды перед изменением модели."
+        }
+        return try {
+            activateQwenFile(qwenInstaller.installedModelFile())
+        } finally {
+            listenSessionGate.leave()
+        }
+    }
 
     private fun activateQwenFile(file: java.io.File): String {
         return when (val result = qwenRuntime.loadVerifiedModel(
@@ -63,12 +79,19 @@ class JarvisRuntimeController(context: Context) {
     }
 
     suspend fun removeQwenModel(): String {
-        reasoning = LocalOnlyJarvisModelProvider()
-        qwenRuntime.close()
-        return if (qwenInstaller.removeInstalledModel()) {
-            "Файл Qwen удалён. Остались офлайн-команды."
-        } else {
-            "Не удалось полностью удалить файл модели."
+        if (!listenSessionGate.tryEnter()) {
+            return "Голосовой runtime занят. Дождитесь завершения команды перед удалением модели."
+        }
+        return try {
+            reasoning = LocalOnlyJarvisModelProvider()
+            qwenRuntime.close()
+            if (qwenInstaller.removeInstalledModel()) {
+                "Файл Qwen удалён. Остались офлайн-команды."
+            } else {
+                "Не удалось полностью удалить файл модели."
+            }
+        } finally {
+            listenSessionGate.leave()
         }
     }
 
