@@ -23,3 +23,16 @@ third-party materials and are not relicensed by this repository.
 
 Source: https://huggingface.co/alphacep/vosk-model-small-streaming-ru/tree/5fbd908cb21cbd585fa21461f463ba41fbcbcb68
 License: https://www.apache.org/licenses/LICENSE-2.0
+
+Optional user-downloaded model (not bundled in the APK):
+
+Silero VAD model: `silero_vad.onnx`, distributed by the sherpa-onnx project at
+`https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx`.
+The upstream Silero VAD model is MIT-licensed. The pinned file is 643,854 bytes
+with SHA-256 `9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6`.
+Jarvis downloads it only after explicit user consent into app-private storage;
+it is not bundled in the APK and is not relicensed by this repository.
+
+Upstream model reference and checksum:
+https://huggingface.co/akm9191/silero-vad-onnx
+License: https://opensource.org/license/mit
