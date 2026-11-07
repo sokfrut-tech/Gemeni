@@ -551,3 +551,8 @@ Implemented directly on PR #108 branch `feat/jarvis-vad-endpointed-push-to-talk-
 
 - Current PR #108 `app/build.gradle.kts` declares `minSdk = 29` (Android 10). This conflicts with the original product requirement recorded for Jarvis: Android 7+ compatibility (API 24+). Treat this as an unresolved product compatibility blocker; do not claim Android 7+ support. Audit dependencies/native ABI/API calls and either restore API 24 compatibility with tests or explicitly document and approve a revised minimum supported Android version.
 - Current checked-in `app/src/androidTest` contains only one UI Automator smoke test, `JarvisLaunchSmokeTest.mainScreenLaunchesAndShowsReadyState`. It verifies launch and ready text only. It does not yet exercise model-consent rejection/acceptance, microphone permission, live AudioRecord, VAD endpointing, ASR, TTS playback, or guarded tool confirmation. The emulator workflow requires at least one instrumentation test, not full voice-flow coverage. Expand instrumentation in subsequent work; do not overstate the present smoke test.
+
+
+## 51. Integrated PR #108 exact-head JVM evidence (2026-11-07)
+
+For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42390830165` uploaded JUnit artifact `13581915627`. The archive was downloaded and all XML suites parsed: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. This includes `JarvisSpeakerTest` 5/5 and `VadCapturePolicyTest` 7/7. Evidence comment posted on PR #108 (comment ID `6709784485`). At the time of recording, the workflow had advanced to full Debug APK build; APK verification/upload, CodeQL analysis and emulator instrumentation remained pending. Do not treat the JVM pass as full CI or release approval.
