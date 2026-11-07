@@ -535,3 +535,19 @@ Read-only source comparison of PR #106 branch `fix/jarvis-tts-lifecycle-queue-20
 **Integration requirement:** before marking TTS+VAD integrated, carry PR #106's lifecycle-safe `JarvisSpeaker` and tests into the VAD integration branch (or rebase/stack in an equivalent dependency-safe order), and preserve both `speaker.close()` and `vad.close()` in the final controller cleanup. Run the full JVM + instrumentation suite on the combined exact head. Do not merge PR #106 and #108 as if one already contains the other.
 
 No source files were changed in this review step; this is a verified integration finding and release-plan update.
+
+
+## 49. Carry TTS lifecycle into the VAD integration branch (2026-11-07)
+
+Implemented directly on PR #108 branch `feat/jarvis-vad-endpointed-push-to-talk-2026-11-07` to close the sibling-branch integration gap identified in section 48:
+
+- Copied the complete lifecycle-safe `JarvisSpeaker.kt` implementation from PR #106 into the VAD branch (commit `bbbd1d37856053f2d33132d243891825bac126fb`).
+- Added all five `JarvisSpeakerTest` lifecycle tests from PR #106 (commit `952349f409d6215a910b325a783f299ff0e981e8`).
+- Updated `JarvisRuntimeController.close()` to clear pending confirmation and close the speaker, Qwen runtime, ASR and VAD (commit `603ff6894d60dc7cba7a4f6b9b691315f15717ed`).
+- Verified the resulting branch file content: all five lifecycle test methods are present and final controller cleanup calls both `speaker.close()` and `vad.close()`.
+- This changes PR #108 head and triggers a new exact-head CI run. Previous 64/64 result belongs to the previous head and must not be reused as evidence for the new head.
+
+## 50. Android compatibility and instrumentation scope audit
+
+- Current PR #108 `app/build.gradle.kts` declares `minSdk = 29` (Android 10). This conflicts with the original product requirement recorded for Jarvis: Android 7+ compatibility (API 24+). Treat this as an unresolved product compatibility blocker; do not claim Android 7+ support. Audit dependencies/native ABI/API calls and either restore API 24 compatibility with tests or explicitly document and approve a revised minimum supported Android version.
+- Current checked-in `app/src/androidTest` contains only one UI Automator smoke test, `JarvisLaunchSmokeTest.mainScreenLaunchesAndShowsReadyState`. It verifies launch and ready text only. It does not yet exercise model-consent rejection/acceptance, microphone permission, live AudioRecord, VAD endpointing, ASR, TTS playback, or guarded tool confirmation. The emulator workflow requires at least one instrumentation test, not full voice-flow coverage. Expand instrumentation in subsequent work; do not overstate the present smoke test.
