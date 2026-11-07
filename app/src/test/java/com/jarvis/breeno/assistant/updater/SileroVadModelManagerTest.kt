@@ -22,6 +22,52 @@ class SileroVadModelManagerTest {
     private val hash = sha256(payload)
 
     @Test
+    fun rejectsInvalidManifestAtConstruction() {
+        val root = tempDirectory()
+        try {
+            val invalidHash = runCatching {
+                SileroVadModelManager(
+                    target = File(root, "vad/silero_vad.onnx"),
+                    connectionFactory = { url -> FakeConnection(url, 200, payload) },
+                    expectedSha256 = "not-a-sha256",
+                    maxBytes = 1024L
+                )
+            }.exceptionOrNull()
+            val excessiveCap = runCatching {
+                SileroVadModelManager(
+                    target = File(root, "vad/silero_vad.onnx"),
+                    connectionFactory = { url -> FakeConnection(url, 200, payload) },
+                    expectedSha256 = hash,
+                    maxBytes = 5L * 1024L * 1024L
+                )
+            }.exceptionOrNull()
+
+            assertTrue(invalidHash is IllegalArgumentException)
+            assertTrue(excessiveCap is IllegalArgumentException)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun replacesStaleCorruptFinalFileWithVerifiedDownload() {
+        val root = tempDirectory()
+        try {
+            val target = File(root, "vad/silero_vad.onnx")
+            target.parentFile?.mkdirs()
+            target.writeText("stale-corrupt-model")
+            val manager = manager(root) { url -> FakeConnection(url, 200, payload) }
+
+            val installed = runBlocking { manager.ensure(userConsent = true) }
+
+            assertEquals(payload.toList(), installed.readBytes().toList())
+            assertTrue(manager.isReady())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun requiresExplicitConsentBeforeAnyNetworkRequest() {
         val root = tempDirectory()
         var connections = 0
