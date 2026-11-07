@@ -70,8 +70,12 @@ class JarvisRuntimeController(context: Context) {
         models.isRussianAsrReady()
     }
 
-    /** Network access is reachable only from the explicit consent button in MainActivity. */
-    suspend fun downloadRussianAsrAfterConsent(onProgress: (String) -> Unit) {
+    /** Requires an explicit caller consent token before any model network access. */
+    suspend fun downloadRussianAsrAfterConsent(
+        userConsent: Boolean,
+        onProgress: (String) -> Unit
+    ) {
+        require(userConsent) { "Для загрузки русской ASR-модели требуется явное согласие пользователя" }
         onProgress("Загружаю файлы русской модели из Hugging Face…")
         models.ensureRussianAsr { percent -> onProgress("Загрузка модели: $percent%") }
         check(models.isRussianAsrReady()) { "Проверка целостности русской модели не пройдена" }
