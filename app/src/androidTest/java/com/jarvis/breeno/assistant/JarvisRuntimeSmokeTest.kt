@@ -39,25 +39,27 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
-    fun microphoneRequestsPermissionAndEntersRuntimeState() {
+    fun microphoneRequestsPermissionWithoutStartingNetworkModelSetup() {
         launchJarvis()
+        device.executeShellCommand("pm revoke $packageName android.permission.RECORD_AUDIO")
+
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
-        // On the emulator this may first show the Android permission dialog.
-        val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
-        if (allow != null) allow.click()
-        // A loading message or runtime error is not a successful microphone test.
-        // The app reaches this state only after permission is granted and the ASR
-        // model is prepared; allow time for first-run model downloads.
-        val listening = device.wait(
-            Until.hasObject(By.textContains("Микрофон активен")),
-            180_000
+
+        // This is a deterministic permission-flow smoke test. Granting permission
+        // here would start first-run ASR downloads and make emulator CI network-dependent.
+        val deny = device.wait(Until.findObject(By.textContains("Don't allow")), 5_000)
+            ?: device.wait(Until.findObject(By.textContains("Не разрешать")), 5_000)
+            ?: device.wait(Until.findObject(By.textContains("Deny")), 3_000)
+            ?: device.wait(Until.findObject(By.textContains("Запретить")), 3_000)
+        assertNotNull("Android microphone permission dialog did not appear", deny)
+        deny!!.click()
+
+        assertTrue(
+            "Jarvis did not return to its main screen after microphone permission was denied",
+            device.wait(Until.hasObject(By.text("ДЖАРВИС")), 5_000)
         )
-        assertTrue("Microphone permission/ASR preparation did not reach active listening", listening)
     }
 
     @Test
