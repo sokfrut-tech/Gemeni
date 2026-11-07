@@ -135,7 +135,7 @@ private class AndroidSpeechEngine(
     context: Context,
     onInit: (Int) -> Unit
 ) : SpeechEngine {
-    private val tts = TextToSpeech(context, onInit)
+    private val tts = TextToSpeech(context) { status -> onInit(status) }
 
     override fun setLanguage(locale: Locale): Int = tts.setLanguage(locale)
 
