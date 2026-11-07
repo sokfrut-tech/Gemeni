@@ -492,3 +492,12 @@ PR #108 responsiveness hardening: changed `AudioRecordPipeline` from blocking re
 
 
 PR #108 test refinement: added a seventh deterministic policy test proving that reaching Sherpa's 25 s `maxSpeechDuration` tuning point does not terminate capture; only the app's own 30 s deadline does so (unless a VAD endpoint arrives first). Latest PR #108 head `82eab794842be36942fa8cc934001a86516db7f4`; exact-head run #266 (`42389826211`) is pending. Run #263 is stale.
+
+
+## 45. PR #107 exact-head CI evidence (2026-11-07)
+
+- PR #107 head `54a69a4c2f1dbf139007453a2fa7253c423e434f`, run #255 (`42389152047`): Secret scanning SUCCESS; CodeQL static analysis SUCCESS; Kotlin compile SUCCESS; JVM unit tests SUCCESS; full Debug APK build SUCCESS; APK verification/hash SUCCESS; CodeQL analyze/SARIF SUCCESS.
+- Downloaded and parsed JUnit XML artifact `13580692876`: **57 tests, 0 failures, 0 errors, 0 skipped**, across 10 suites. The Silero VAD downloader suite specifically reports 12/12 passing.
+- Debug APK artifact `13580633488`, 86,954,012 bytes (~82.9 MiB), uploaded successfully.
+- Android emulator smoke job `128454449250` remains in progress; no instrumentation result/count is yet available. This does not satisfy emulator release gate. PR #107 remains draft; physical OPPO testing is not performed.
+- Evidence comment posted to PR #107. Run #255 is exact-head for PR #107 and remains valid; emulator status is still pending.
