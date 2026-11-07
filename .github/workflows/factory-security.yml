@@ -61,6 +61,8 @@ jobs:
           build-mode: manual
       - name: Build Kotlin sources for CodeQL
         run: gradle --no-daemon :app:compileDebugKotlin
+      - name: Run JVM unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build full debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify and hash debug APK
@@ -111,9 +113,6 @@ jobs:
         timeout-minutes: 32
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # API 35 repeatedly stalled on hosted Linux (12-minute boot, then ADB
-          # Broken pipe before the test script ran). Keep compileSdk 35, but use
-          # API 34 for deterministic instrumentation coverage.
           api-level: 34
           arch: x86_64
           target: google_apis
