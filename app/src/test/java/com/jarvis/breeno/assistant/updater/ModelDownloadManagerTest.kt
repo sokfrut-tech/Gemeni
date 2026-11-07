@@ -229,6 +229,7 @@ class ModelDownloadManagerTest {
             job.cancelAndJoin()
             assertTrue("Cancellation did not disconnect the active HTTP connection", disconnected.await(5, TimeUnit.SECONDS))
             assertFalse(File(root, "fixture.onnx.part").exists())
+            assertFalse("Cancelled download must never install a final model file", File(root, "fixture.onnx").exists())
         } finally {
             root.deleteRecursively()
         }
