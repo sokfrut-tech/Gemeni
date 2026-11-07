@@ -392,3 +392,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 
 
 PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is now passed as an explicit SAM lambda rather than a Kotlin function-type variable. Commit `2a9a0aef3c887433a46cfe9660ecacca18372e6f`; a new exact-head CI run is required.
+
+
+## 34. PR #105 JVM test report verified directly (2026-11-07)
+
+- Run #233 (`42388091023`) exact head `46013ce1ddd09dd6281ef72248a6288a478c12e2` completed the JVM unit-test step successfully.
+- Downloaded and inspected the JUnit XML artifact `jarvis-unit-test-results-14c82f7f439e511f016c08a5f70b9211e2aaf56a`: **45 tests, 0 failures, 0 errors, 0 skipped** across 9 test suites. The downloader suite contributed 11 passing tests, including cancellation cleanup, unknown-length byte cap and storage preflight.
+- Secret scanning also passed. At this snapshot the full Debug APK build was still running; CodeQL analysis and emulator smoke had not yet reached terminal state. Therefore this is a verified JVM-suite pass, not a full CI/release pass.
