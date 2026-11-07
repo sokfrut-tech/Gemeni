@@ -155,3 +155,13 @@ Next diagnostic slice:
 5. Re-run the exact resulting PR head; only a terminal green emulator job with executed tests closes P0.
 
 The artifact is from PR #97, not PR #92. PR #92's own run 42336140479 also reported instrumentation process crash, but no equivalent artifact was established in this review. The shared symptom does not prove a shared root cause.
+
+
+## 9. CI instrumentation diagnostic capture improvement (2026-11-07)
+
+- PR #97 now captures emulator diagnostics **inside** the `reactivecircus/android-emulator-runner` script, immediately after a failed `connectedDebugAndroidTest` and before the action's AVD cleanup. The prior workflow attempted ADB diagnostics in a later GitHub step, after the emulator-runner action had already returned; the ADB snapshot could therefore show an offline emulator and empty logcat even if the runner cleanup—not the app—had disconnected it.
+- The separate failure diagnostics step remains as a bounded fallback for failures occurring before the emulator script starts. The app tests and assertions were not weakened.
+- Commits: `5813c29ffff82eb6b9c6babcb6d1393dbbe36f1e` (move primary capture into action) and `0aeec94f9606bb8c50e3d043d92f63d86372409e` (remove an unnecessary unbounded ADB wait; emulator-runner already performs boot/readiness handling).
+- Exact current PR #97 head: `0aeec94f9606bb8c50e3d043d92f63d86372409e`. Workflow run #186 (42386335558) has started; at this update CodeQL is in progress and secret scanning is queued. Emulator instrumentation has not yet started, so this is not a test result.
+- Run #185 (42386317407) on the preceding workflow commit was superseded/cancelled after the next commit. Do not use it as evidence for the current head.
+- Next action: inspect run #186 after it reaches a terminal state. If emulator smoke fails, inspect the new artifact's XML and logcat captured before AVD cleanup. If it passes, confirm that the XML reports a non-zero test count.
