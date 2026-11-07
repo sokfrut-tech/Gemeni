@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                         onState = { state -> runOnUiThread { stateSink?.invoke(state) } },
                         onConversation = { userText, assistantText ->
                             runOnUiThread {
-                                transcriptSink?.invoke("Вы: $userText\\nДжарвис: $assistantText")
+                                transcriptSink?.invoke("Вы: $userText\nДжарвис: $assistantText")
                             }
                         }
                     )
