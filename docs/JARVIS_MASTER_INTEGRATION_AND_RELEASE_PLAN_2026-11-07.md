@@ -439,3 +439,10 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - The same exact-head CodeQL job completed successfully after Kotlin source build, JVM unit tests, full `assembleDebug` and CodeQL analysis. Secret scanning passed. A debug APK artifact was uploaded.
 - The separate Android emulator smoke job has started but has not produced a terminal result/test count. PR #106 remains Draft; no physical OPPO test has occurred.
 - PR #105 has the same gates completed (45/45 JVM tests, APK build, CodeQL, secret scan), but its emulator smoke job is also still running.
+
+
+## 40. VAD voice-loop implementation brief saved
+
+- Added `docs/JARVIS_VAD_VOICE_LOOP_INTEGRATION_BRIEF_2026-11-07.md` with the current fixed-window limitation, two-model consent flow, privacy disclosure, proposed local endpointing targets, cancellation/resource lifecycle, test matrix and OPPO device acceptance scenarios.
+- The brief explicitly defers VAD runtime wiring until PR #107's secure downloader passes exact-head CI. It keeps always-on hotword out of this slice and preserves the existing guarded tool-confirmation policy.
+- Initial tuning targets: 0.55 s trailing silence, 8 s no-speech timeout, 25 s max segment and 30 s hard capture ceiling. These are starting values, not validated device measurements; adjust only from repeatable fixtures and OPPO testing.
