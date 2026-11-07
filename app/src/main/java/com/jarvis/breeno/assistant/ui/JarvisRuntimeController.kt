@@ -18,6 +18,11 @@ import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
+
+/** The self-test is intentionally strict: extra or negating text must not count as success. */
+internal fun isQwenSelfTestResponseValid(output: String): Boolean =
+    output.trim().equals("JARVIS_OK", ignoreCase = true)
+
 /** Microphone -> local Russian ASR -> guarded Android tool registry -> speech. */
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
@@ -53,6 +58,33 @@ class JarvisRuntimeController(context: Context) {
                 "Qwen загружена и подключена. Запросы обрабатываются локально."
             }
             is LlamaCppRuntime.LoadResult.Rejected -> result.reason
+        }
+    }
+
+    /** Three sequential local inference probes; call only from a worker thread. Never executes tools or downloads weights. */
+    fun runQwenSelfTest(): String {
+        if (!qwenRuntime.isModelLoaded) return "Диагностика: модель Qwen не активирована."
+        return try {
+            val version = qwenRuntime.runtimeVersion()
+            val durations = mutableListOf<Long>()
+            repeat(3) { index ->
+                val started = System.nanoTime()
+                val output = qwenRuntime.generate(
+                    prompt = "You are running a local runtime self-test. Reply with exactly: JARVIS_OK",
+                    maxTokens = 48
+                ).trim()
+                val elapsedMs = (System.nanoTime() - started) / 1_000_000L
+                durations += elapsedMs
+                if (!isQwenSelfTestResponseValid(output)) {
+                    val preview = output.replace(Regex("\\s+"), " ").take(180)
+                    return "Диагностика НЕ ПРОЙДЕНА: запрос ${index + 1}/3 вернул неверный ответ. Время: ${elapsedMs} мс; ответ: $preview"
+                }
+            }
+            val averageMs = durations.average().toLong()
+            val maxMs = durations.maxOrNull() ?: 0L
+            "Диагностика пройдена: 3/3 последовательных запроса. Среднее: ${averageMs} мс; максимум: ${maxMs} мс. llama.cpp: $version."
+        } catch (failure: Throwable) {
+            "Диагностика НЕ ПРОЙДЕНА: ${failure.message ?: failure.javaClass.simpleName}"
         }
     }
 
