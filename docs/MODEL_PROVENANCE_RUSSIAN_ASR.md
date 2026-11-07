@@ -14,11 +14,11 @@ Only the following files are downloaded into the app-private model directory:
 | Local file | Upstream path | Approx. size | SHA-256 |
 |---|---|---:|---|
 | `encoder.int8.onnx` | `am-onnx/encoder.int8.onnx` | 26.2 MB | `e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d` |
-| `decoder.onnx` | `am-onnx/decoder.onnx` | 2.09 MB | `89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0` |
+| `decoder.onnx` (local name) | `am-onnx/decoder.int8.onnx` | 1.33 MB | `2b0df458692e1d090075c8249001136ef05240dd0d726a6b56552fd46c538b2d` |
 | `joiner.int8.onnx` | `am-onnx/joiner.int8.onnx` | 259 kB | `b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5` |
 | `tokens.txt` | `lang/tokens.txt` | 6.39 kB | Not yet pinned |
 
-The three ONNX SHA-256 values are published by the official upstream file metadata. The token file is fetched from the pinned upstream revision and bounded by a 4 MiB limit, but its SHA-256 has not yet been established. **This is an open integrity item and must be closed before a production release.** Do not invent a digest or treat the token file as cryptographically verified.
+The three ONNX SHA-256 values are published by the official upstream file metadata. All three model components use the upstream int8 quantized variants, matching Alpha Cephei's `decode8.py` reference configuration. The token file is fetched from the pinned upstream revision and bounded by a 4 MiB limit, but its SHA-256 has not yet been established. **This is an open integrity item and must be closed before a production release.** Do not invent a digest or treat the token file as cryptographically verified.
 
 ## License and attribution
 
