@@ -57,7 +57,7 @@ class JarvisRuntimeSmokeTest {
 
         assertTrue(
             "Consent dialog should close after declining",
-            device.wait(Until.gone(By.text("Загрузить русскую модель?")), 5_000)
+            device.wait(Until.gone(By.text("Загрузить голосовые модели?")), 5_000)
         )
         assertTrue(
             "Declining consent should not start model network setup",
