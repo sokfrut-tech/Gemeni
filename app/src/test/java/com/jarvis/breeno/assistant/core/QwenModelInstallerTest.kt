@@ -1,6 +1,7 @@
 package com.jarvis.breeno.assistant.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import java.net.HttpURLConnection
 import java.net.URL
@@ -21,6 +22,21 @@ class QwenModelInstallerTest {
         assertTrue("Cancellation must disconnect the active HTTP request", connection.disconnected)
         assertEquals(null, activeConnection.get())
         handle?.dispose()
+    }
+
+    @Test
+    fun successfulDownloadCompletionDoesNotDisconnectConnection() {
+        val job = Job()
+        val connection = DisconnectTrackingConnection()
+        val activeConnection = AtomicReference<HttpURLConnection?>(connection)
+        val handle = disconnectActiveConnectionOnCancellation(job, activeConnection)
+
+        assertTrue(job.complete())
+
+        assertFalse("A normally completed download must not be treated as cancelled", connection.disconnected)
+        assertEquals(connection, activeConnection.get())
+        handle?.dispose()
+        connection.disconnect()
     }
 
     private class DisconnectTrackingConnection : HttpURLConnection(URL("https://localhost/test")) {
