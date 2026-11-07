@@ -54,7 +54,6 @@ class ModelDownloadManager internal constructor(
         private const val READ_TIMEOUT_MS = 30_000
         private const val MAX_REDIRECTS = 5
         private const val MIN_FREE_MARGIN_BYTES = 16L * 1024L * 1024L
-        private const val MIN_FREE_SPACE_FOR_UNKNOWN_LENGTH = 256L * 1024L * 1024L
         private const val BUFFER_SIZE = 64 * 1024
         private const val USER_AGENT = "Jarvis-Android-ASR/1.0"
         private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
@@ -147,7 +146,7 @@ class ModelDownloadManager internal constructor(
             val requiredSpace = if (declaredLength > 0L) {
                 declaredLength + MIN_FREE_MARGIN_BYTES
             } else {
-                MIN_FREE_SPACE_FOR_UNKNOWN_LENGTH
+                item.maxBytes + MIN_FREE_MARGIN_BYTES
             }
             require(availableBytes(destination.parentFile!!) >= requiredSpace) {
                 "Not enough free storage for ASR file ${item.name}"
