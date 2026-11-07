@@ -20,7 +20,8 @@ import kotlinx.coroutines.withContext
 internal data class AsrModelFile(
     val name: String,
     val sha256: String?,
-    val maxBytes: Long = 256L * 1024L * 1024L
+    val maxBytes: Long = 256L * 1024L * 1024L,
+    val remotePath: String = name
 )
 
 /**
@@ -44,10 +45,11 @@ class ModelDownloadManager internal constructor(
     )
 
     companion object {
-        const val RUSSIAN_MODEL = "sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16"
-        // Immutable Hugging Face revision; do not follow a moving main branch for model artifacts.
-        private const val MODEL_REVISION = "31fa603e4f31279c6e1f7600fed13dc4312663ab"
-        private const val BASE_URL = "https://huggingface.co/csukuangfj/$RUSSIAN_MODEL/resolve/$MODEL_REVISION/"
+        const val RUSSIAN_MODEL = "vosk-model-small-streaming-ru"
+        // Official Alpha Cephei repository declares Apache-2.0. Pin the model revision,
+        // and fetch only the quantized streaming files required by Sherpa-ONNX.
+        private const val MODEL_REVISION = "5fbd908"
+        private const val BASE_URL = "https://huggingface.co/alphacep/$RUSSIAN_MODEL/resolve/$MODEL_REVISION/"
         private const val CONNECT_TIMEOUT_MS = 20_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val MAX_REDIRECTS = 5
@@ -64,10 +66,10 @@ class ModelDownloadManager internal constructor(
             "us.aws.cdn.hf.co"
         )
         private val DEFAULT_FILES = listOf(
-            AsrModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d"),
-            AsrModelFile("decoder.onnx", "89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
-            AsrModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5"),
-            AsrModelFile("tokens.txt", null, maxBytes = 4L * 1024L * 1024L)
+            AsrModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d", remotePath = "am-onnx/encoder.int8.onnx"),
+            AsrModelFile("decoder.onnx", "89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0", remotePath = "am-onnx/decoder.onnx"),
+            AsrModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5", remotePath = "am-onnx/joiner.int8.onnx"),
+            AsrModelFile("tokens.txt", null, maxBytes = 4L * 1024L * 1024L, remotePath = "lang/tokens.txt")
         )
     }
 
@@ -137,7 +139,7 @@ class ModelDownloadManager internal constructor(
         temporary.delete()
         var connection: HttpURLConnection? = null
         try {
-            connection = openTrustedResponse(URL(baseUrl + item.name), activeConnection)
+            connection = openTrustedResponse(URL(baseUrl + item.remotePath), activeConnection)
             val declaredLength = connection.contentLengthLong
             require(declaredLength == -1L || declaredLength in 1..item.maxBytes) {
                 "Unexpected size for ASR file ${item.name}"
