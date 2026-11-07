@@ -399,3 +399,18 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - Run #233 (`42388091023`) exact head `46013ce1ddd09dd6281ef72248a6288a478c12e2` completed the JVM unit-test step successfully.
 - Downloaded and inspected the JUnit XML artifact `jarvis-unit-test-results-14c82f7f439e511f016c08a5f70b9211e2aaf56a`: **45 tests, 0 failures, 0 errors, 0 skipped** across 9 test suites. The downloader suite contributed 11 passing tests, including cancellation cleanup, unknown-length byte cap and storage preflight.
 - Secret scanning also passed. At this snapshot the full Debug APK build was still running; CodeQL analysis and emulator smoke had not yet reached terminal state. Therefore this is a verified JVM-suite pass, not a full CI/release pass.
+
+
+## 35. PR #107 — secure optional Silero VAD model delivery (2026-11-07)
+
+- Static review confirmed the repository already contains `SileroVadEngine` and a basic `SileroVadModelManager`, but the manager used automatic redirects, had no streaming byte cap, wrote a temporary file without atomic install, and did not require an explicit consent argument. The runtime still uses a fixed 4.5-second capture window; the VAD path is not yet wired into the active voice loop.
+- Created PR #107, stacked on PR #105, to harden this prerequisite before voice-loop integration. It requires `userConsent=true` before any request; pins SHA-256; caps the file at 32 MiB; validates HTTPS and every redirect hop; limits redirects; preflights free space; writes/fsyncs a .part file; atomically installs only after digest verification; disconnects blocking reads on cancellation; and checks cancellation before interpreting EOF or committing the file.
+- Added six JVM tests covering no-consent/no-network, successful verified install, untrusted redirect, unknown-length streaming cap, checksum mismatch cleanup, and cancellation cleanup.
+- PR #107 exact head: `fdc736481f59da9c5439698caf13c2a63657a1aa`; run #244 (`42388625778`) is queued/running. PR #107 remains Draft; no test/build pass claimed yet.
+- Integration remains a separate follow-up: disclose the optional Silero model and its network/storage implications in the consent UI, then load it and feed audio frames through VAD to detect endpoint silence. Do not silently add this second download to the existing ASR consent flow.
+
+## 36. Latest CI snapshot (2026-11-07)
+
+- PR #105 exact head `46013ce1ddd09dd6281ef72248a6288a478c12e2`: CodeQL job completed successfully, including Kotlin compilation, 45/45 JVM tests and full debug APK build. Secret scanning passed. The separate Android emulator smoke job was still running; therefore full CI is not yet green.
+- PR #106 exact head `2a9a0aef3c887433a46cfe9660ecacca18372e6f`: Secret scanning passed; CodeQL job was still building the full debug APK. No emulator or full CI pass yet.
+- Older emulator smoke runs #191 and #195 were still active without terminal test counts at this snapshot. Do not treat an active job as success; inspect timeout/runner behavior before release.
