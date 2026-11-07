@@ -115,6 +115,22 @@ fun QwenModelPanel(
                         }
                     ) { Text("Проверить и активировать файл") }
 
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                busy = true
+                                message = "Проверяю нативный движок и выполняю безопасный пробный запрос…"
+                                try {
+                                    message = withContext(Dispatchers.IO) { controller.runQwenSelfTest() }
+                                    onMessage(message)
+                                } catch (failure: Throwable) {
+                                    message = "Диагностика не пройдена: ${failure.message ?: failure.javaClass.simpleName}"
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        }
+                    ) { Text("Самодиагностика Qwen") }
                     TextButton(
                         onClick = {
                             scope.launch {
