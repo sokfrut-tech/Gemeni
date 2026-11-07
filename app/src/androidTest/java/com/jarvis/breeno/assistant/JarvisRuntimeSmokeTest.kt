@@ -147,5 +147,6 @@ class JarvisRuntimeSmokeTest {
         device.executeShellCommand("mkdir -p ${dir.absolutePath}")
         dir.mkdirs()
         device.takeScreenshot(File(dir, "$name.png"))
+        device.dumpWindowHierarchy(File(dir, "$name.xml"))
     }
 }
