@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }.onSuccess {
-                statusSink?.invoke("Модель установлена локально. Готов к работе.")
+                statusSink?.invoke("Голосовые модели установлены и проверены локально. Готов к работе.")
                 modelDownloadConsentSink?.invoke(false)
                 requestAndListen()
             }.onFailure { error ->
