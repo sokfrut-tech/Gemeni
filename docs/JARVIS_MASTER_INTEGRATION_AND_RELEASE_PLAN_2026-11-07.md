@@ -165,3 +165,20 @@ The artifact is from PR #97, not PR #92. PR #92's own run 42336140479 also repor
 - Exact current PR #97 head: `0aeec94f9606bb8c50e3d043d92f63d86372409e`. Workflow run #186 (42386335558) has started; at this update CodeQL is in progress and secret scanning is queued. Emulator instrumentation has not yet started, so this is not a test result.
 - Run #185 (42386317407) on the preceding workflow commit was superseded/cancelled after the next commit. Do not use it as evidence for the current head.
 - Next action: inspect run #186 after it reaches a terminal state. If emulator smoke fails, inspect the new artifact's XML and logcat captured before AVD cleanup. If it passes, confirm that the XML reports a non-zero test count.
+
+
+## 10. Consent-path dependency review (2026-11-07)
+
+A source-level review found a merge-order issue that must be resolved before the voice runtime can be considered safe:
+- PR #85 (`fix/jarvis-explicit-model-download-consent-2026-11-06`) implements `isRussianAsrReady()`, an explicit dialog explaining the Hugging Face model download and its network metadata, and a separate `downloadRussianAsrAfterConsent()` path. Its `prepare()` refuses to proceed if the model is not already installed.
+- PR #95 (`fix/jarvis-response-display-2026-11-07`) is based on PR #94, whose parent chain starts from the safe-agent integration branch; PR #85 is a **sibling** branch off that same integration branch, not an ancestor of #95. Therefore the explicit ASR download-consent behavior from #85 is not present in #95's current branch.
+- PR #95's current `MainActivity.requestAndListen()` calls `runtime.prepare()` directly, while its corresponding `prepare()` calls `models.ensureRussianAsr()`. This means tapping the microphone can initiate a model download without the explicit consent dialog in PR #85. This is a concrete privacy/UX blocker, not a theoretical concern.
+
+Required resolution before #95 can be considered for merge:
+1. Rebase/cherry-pick or otherwise integrate the consent implementation from #85 into the #95 stack without dropping transcript/state/agent changes.
+2. Preserve separate microphone permission and model-download consent: permission to use the microphone is not consent to download a multi-file model.
+3. Verify the dialog clearly explains the model source, approximate download size, local storage destination, IP/connection metadata disclosure, and that voice/audio are not uploaded.
+4. Verify “Not now” performs no network request and returns to the idle UI; explicit approval starts the download; cancellation/failure leaves a recoverable state; already-installed verified model does not prompt again.
+5. Add tests that assert no network request occurs before explicit model-download approval. Keep instrumentation deterministic and avoid granting microphone permission in a way that triggers downloads.
+
+Updated safe order: integrate #85's consent gate into the #92→#94→#95 runtime chain before approving #95 or subsequent #97/#98/#100/#101 children. The branch graph must be reconciled explicitly; do not assume sibling PRs are included because they share a parent.
