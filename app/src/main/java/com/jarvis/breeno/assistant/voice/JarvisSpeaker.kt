@@ -1,5 +1,68 @@
 package com.jarvis.breeno.assistant.voice
-import android.speech.tts.TextToSpeech
+
 import android.content.Context
+import android.speech.tts.TextToSpeech
 import java.util.Locale
-class JarvisSpeaker(context:Context){private val tts=TextToSpeech(context){ }; fun speak(text:String){tts.language=Locale("ru","RU");tts.speak(text,TextToSpeech.QUEUE_FLUSH,null,"jarvis")}}
+
+/**
+ * Lifecycle-safe Russian TTS adapter.
+ *
+ * Android initializes TextToSpeech asynchronously. Calls made before onInit
+ * are queued instead of being sent to an uninitialized engine.
+ */
+class JarvisSpeaker(context: Context) {
+    private val lock = Any()
+    private var initialized = false
+    private var initializationFailed = false
+    private var closed = false
+    private var pendingText: String? = null
+    private lateinit var tts: TextToSpeech
+
+    init {
+        tts = TextToSpeech(context.applicationContext) { status ->
+            synchronized(lock) {
+                if (closed) return@synchronized
+                if (status != TextToSpeech.SUCCESS) {
+                    initializationFailed = true
+                    pendingText = null
+                    return@synchronized
+                }
+
+                val languageStatus = tts.setLanguage(Locale("ru", "RU"))
+                initialized = languageStatus != TextToSpeech.LANG_MISSING_DATA &&
+                    languageStatus != TextToSpeech.LANG_NOT_SUPPORTED
+
+                if (initialized) pendingText?.let(::speakNow)
+                pendingText = null
+            }
+        }
+    }
+
+    fun speak(text: String) {
+        if (text.isBlank()) return
+        synchronized(lock) {
+            if (closed || initializationFailed) return
+            if (!initialized) {
+                // Keep only the newest response; stale queued speech is confusing.
+                pendingText = text
+                return
+            }
+            speakNow(text)
+        }
+    }
+
+    private fun speakNow(text: String) {
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis")
+    }
+
+    fun close() {
+        synchronized(lock) {
+            if (closed) return
+            closed = true
+            pendingText = null
+            initialized = false
+            tts.stop()
+            tts.shutdown()
+        }
+    }
+}
