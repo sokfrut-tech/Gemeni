@@ -4,7 +4,7 @@
 **Purpose:** local Russian speech recognition (ASR), not the conversational language model.  
 **Upstream:** Alpha Cephei, `alphacep/vosk-model-small-streaming-ru`  
 **Declared upstream license:** Apache License 2.0  
-**Pinned upstream revision prefix:** `5fbd908` (resolve and record the full immutable commit SHA before release)  
+**Pinned upstream revision prefix:** `5fbd908cb21cbd585fa21461f463ba41fbcbcb68`  
 **Download:** approximately 29 MB for the selected quantized streaming subset.
 
 ## Selected files
@@ -32,7 +32,7 @@ This model is not bundled in the APK. It is downloaded only after the user expli
 
 ## Release checklist
 
-- [ ] Resolve `5fbd908` to its full immutable upstream commit SHA and store that full SHA in the source manifest.
+- [x] Pin the full immutable upstream commit SHA in the source manifest.
 - [ ] Obtain and pin the SHA-256 of `lang/tokens.txt` from the same immutable revision.
 - [ ] Confirm all downloaded files are from the official Apache-2.0 upstream repository.
 - [ ] Verify real redirect hosts remain within the explicit allowlist.
