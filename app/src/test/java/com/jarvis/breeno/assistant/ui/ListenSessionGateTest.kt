@@ -4,8 +4,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,6 +47,7 @@ class ListenSessionGateTest {
         val releaseWinner = CountDownLatch(1)
         val finished = CountDownLatch(contenders)
         val successfulEntries = AtomicInteger(0)
+        val workerFailure = AtomicReference<Throwable?>(null)
         val executor = Executors.newFixedThreadPool(contenders)
 
         try {
@@ -61,9 +64,8 @@ class ListenSessionGateTest {
                                 gate.leave()
                             }
                         }
-                    } catch (interrupted: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        throw AssertionError("Concurrent gate test was interrupted", interrupted)
+                    } catch (failure: Throwable) {
+                        workerFailure.compareAndSet(null, failure)
                     } finally {
                         finished.countDown()
                     }
@@ -74,6 +76,7 @@ class ListenSessionGateTest {
             start.countDown()
             assertTrue("Workers did not finish their acquisition attempt", finished.await(5, TimeUnit.SECONDS))
             assertEquals(1, successfulEntries.get())
+            assertNull("Worker failed: ${workerFailure.get()}", workerFailure.get())
         } finally {
             releaseWinner.countDown()
             executor.shutdownNow()
