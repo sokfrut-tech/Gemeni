@@ -34,11 +34,11 @@ Scope: Replace the current fixed 4.5-second push-to-talk capture window with loc
 - Speech threshold: begin with Sherpa-ONNX default/current 0.5; tune only with recorded test fixtures and device measurements.
 - Minimum speech duration: 0.20 s.
 - Minimum trailing silence: start at 0.55 s (current 0.25 s may cut natural pauses too aggressively).
-- Maximum speech segment: 25 s.
+- Sherpa `maxSpeechDuration`: begin at 25 s as a detector sensitivity parameter. Upstream documents that after this duration the detector raises its threshold to 0.9; it is **not** a hard segment-duration cap.
 - No-speech timeout after microphone activation: 8 s.
-- Hard command capture ceiling: 30 s; this prevents a stuck microphone session.
+- Hard command capture ceiling: 30 s, enforced by the Kotlin capture state machine, not by Silero's `maxSpeechDuration`.
 - Stop capture after a completed endpoint segment; always close AudioRecord on success, timeout, cancellation and exception.
-- Avoid cutting long utterances: either set VAD max segment to the command ceiling or accumulate consecutive segments until endpoint/ceiling, then transcribe the combined utterance.
+- Preserve long utterances: collect completed VAD segments and concatenate them until the natural endpoint or the hard 30 s capture ceiling. At the ceiling, call Sherpa VAD `flush()` and drain the final queued segment before transcription.
 - Empty/no-speech result returns to IDLE with a clear prompt; it must not execute an empty command.
 
 ## Implementation sequence
