@@ -89,9 +89,9 @@ class ListenSessionGateTest {
                     try {
                         assertTrue(start.await(5, TimeUnit.SECONDS))
                         val acquired = gate.tryEnter()
+                        if (acquired) successfulEntries.incrementAndGet()
                         attempted.countDown()
                         if (acquired) {
-                            successfulEntries.incrementAndGet()
                             try {
                                 assertTrue(releaseWinner.await(10, TimeUnit.SECONDS))
                             } finally {
