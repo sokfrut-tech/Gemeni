@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "qwen3.5-0.8b-q4_0",
+  "display_name": "Qwen3.5 0.8B Q4_0",
+  "provider": "ggml-org",
+  "repository": "https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF",
+  "revision": "4c11520cef475dd40ed72ec4a1e68b26721bd769",
+  "filename": "Qwen3.5-0.8B-Q4_0.gguf",
+  "download_url": "https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF/resolve/4c11520cef475dd40ed72ec4a1e68b26721bd769/Qwen3.5-0.8B-Q4_0.gguf",
+  "size_bytes": 563036064,
+  "sha256": "57d1997790d1744fba5b40a7317df71ea5e2acee28c47e78f0cce39c0703f8cf",
+  "quantization": "Q4_0",
+  "license": "Apache-2.0",
+  "license_url": "https://huggingface.co/ggml-org/Qwen3.5-0.8B-GGUF/blob/4c11520cef475dd40ed72ec4a1e68b26721bd769/README.md",
+  "installation_policy": {
+    "requires_explicit_user_consent": true,
+    "network_only_during_user_initiated_download": true,
+    "verify_sha256_before_model_load": true,
+    "download_to_app_private_storage": true,
+    "use_temporary_file_then_atomic_rename": true,
+    "support_cancellation": true,
+    "support_user_initiated_removal": true,
+    "minimum_free_space_bytes": 650000000,
+    "never_upload_prompts_or_model_data": true
+  },
+  "qualification_status": "candidate-not-yet-device-qualified",
+  "notes": "Pinned metadata for the first local inference smoke candidate. This manifest does not enable automatic download or activate the model."
+}
