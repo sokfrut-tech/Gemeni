@@ -137,3 +137,21 @@ Release is blocked if any required gate is red, skipped without justification, r
 ## 7. Immediate next task
 
 **Investigate and repair the emulator instrumentation crash on the current JNI/runtime chain, starting with PR #92 diagnostics and then validate #97's deterministic smoke-test changes.** Do not begin a broad UI feature or merge stacked PRs until this CI blocker is understood.
+
+
+## 8. Emulator crash investigation — diagnostic evidence (2026-11-07)
+
+Downloaded and inspected the failure artifact from PR #97 workflow run 42342436315 (artifact 13563300338, exact head `6b283e4247693c81fa05fa2146b2e6b18a535baf`). Findings:
+- Instrumentation report: `INSTRUMENTATION_FAILED`, “Test run failed to complete. Instrumentation run failed due to Process crashed.” The generated XML reports **0 tests**, so this is not a failed assertion from the permission test.
+- The post-failure ADB snapshot lists `emulator-5554` as **offline**. `adb logcat -d` returned “waiting for device -”; package/process dumps are empty. The diagnostic artifact therefore cannot identify an application stack trace.
+- PR #97's deterministic permission test itself is narrow and avoids ASR downloads. Its diff also adds bounded diagnostic timeouts and artifact upload. Those changes improve diagnosability but the exact-head emulator run still failed.
+- Conclusion: the available evidence points to an emulator/ADB transport or process-lifecycle failure, but does **not** prove whether the emulator process, instrumentation runner, or app process caused the disconnect. Do not patch app behavior or weaken assertions based on this artifact alone.
+
+Next diagnostic slice:
+1. Inspect the emulator runner setup and full emulator boot log for the exact failing run; determine whether ADB became offline before instrumentation began or only after app/test launch.
+2. Add a bounded preflight that waits for `adb get-state=device`, `sys.boot_completed=1`, and package installation before starting instrumentation; fail early with the preflight log if readiness is not reached.
+3. Run instrumentation with one test class/method at a time (permission flow first, settings second) to isolate a crash trigger; keep non-zero executed test count as a hard acceptance condition.
+4. If the emulator disconnects before tests, repair runner/AVD configuration. If the app/test process crashes while ADB remains online, capture logcat immediately and fix the app/test root cause.
+5. Re-run the exact resulting PR head; only a terminal green emulator job with executed tests closes P0.
+
+The artifact is from PR #97, not PR #92. PR #92's own run 42336140479 also reported instrumentation process crash, but no equivalent artifact was established in this review. The shared symptom does not prove a shared root cause.
