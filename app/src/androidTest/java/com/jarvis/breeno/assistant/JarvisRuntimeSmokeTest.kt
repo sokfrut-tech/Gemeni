@@ -65,7 +65,9 @@ class JarvisRuntimeSmokeTest {
     @Test
     fun settingsOpensAndroidAccessibilitySettings() {
         launchJarvis()
-        device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
+        device.wait(Until.findObject(By.desc("Модель и настройки")), 10_000)
+            ?.click()
+            ?: throw AssertionError("Model/settings button is missing")
         assertTrue("Accessibility settings did not open", device.wait(Until.hasObject(By.textContains("Accessibility")), 5_000) || device.wait(Until.hasObject(By.textContains("Специальные возможности")), 5_000))
     }
 
