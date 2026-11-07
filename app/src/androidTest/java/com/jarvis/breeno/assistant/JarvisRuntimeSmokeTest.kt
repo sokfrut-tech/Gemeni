@@ -85,7 +85,7 @@ class JarvisRuntimeSmokeTest {
                 5_000
             )
         )
-        val permissionState = device.executeShellCommand("pm check-permission $packageName android.permission.RECORD_AUDIO")
+        val permissionState = device.executeShellCommand("pm check-permission android.permission.RECORD_AUDIO $packageName")
         assertTrue("Microphone permission must remain denied", permissionState.trim() == "denied")
     }
 
