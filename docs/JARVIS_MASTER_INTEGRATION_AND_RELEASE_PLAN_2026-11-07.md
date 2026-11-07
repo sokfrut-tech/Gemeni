@@ -303,3 +303,8 @@ Next voice acceptance work after downloader/security gates:
 ## 21. Consent enforced at downloader boundary (2026-11-07)
 
 PR #105 now requires `userConsent: Boolean` on `downloadRussianAsrAfterConsent()` and rejects `false` before any call into the model downloader. The UI passes `true` only from the explicit consent button. The deterministic instrumentation test now verifies the runtime rejects a false consent flag and creates no model files; `prepare()` also rejects a missing model without downloading. This is stronger than relying on the UI flow alone.
+
+
+## 22. Full immutable ASR source revision pinned (2026-11-07)
+
+The official Alpha Cephei model commit prefix `5fbd908` was resolved to full immutable commit `5fbd908cb21cbd585fa21461f463ba41fbcbcb68`. PR #105's downloader and `docs/MODEL_PROVENANCE_RUSSIAN_ASR.md` now use the full SHA rather than a moving branch or short prefix. The remaining model provenance gap is the SHA-256 of `lang/tokens.txt`.
