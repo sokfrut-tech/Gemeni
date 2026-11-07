@@ -489,3 +489,6 @@ PR #108 responsiveness hardening: changed `AudioRecordPipeline` from blocking re
 - Exact v1.13.8 native config docs describe `maxSpeechDuration` as raising the detector threshold to 0.9 after the configured duration; it is not the app's hard capture timer. Kotlin independently enforces 30 s and flushes/drains at that deadline. Source: https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.8/sherpa-onnx/csrc/silero-vad-model-config.cc.
 - Replaced blocking `AudioRecord.READ_BLOCKING` with `READ_NON_BLOCKING`; a zero-sample read yields a 20 ms empty heartbeat so the policy can still enforce 8 s/30 s deadlines when the audio HAL temporarily stalls. Cancellation no longer waits for a blocking native read to return.
 - PR #108 latest head `1011ec4248277a08a8c9193c506e09bf59a1ea6e`; exact-head run #263 (`42389745430`) is pending. Prior run #261 is stale. PR #107 run #255 now has secret scanning and CodeQL passed; Android emulator smoke is still running, with no terminal test count yet.
+
+
+PR #108 test refinement: added a seventh deterministic policy test proving that reaching Sherpa's 25 s `maxSpeechDuration` tuning point does not terminate capture; only the app's own 30 s deadline does so (unless a VAD endpoint arrives first). Latest PR #108 head `82eab794842be36942fa8cc934001a86516db7f4`; exact-head run #266 (`42389826211`) is pending. Run #263 is stale.
