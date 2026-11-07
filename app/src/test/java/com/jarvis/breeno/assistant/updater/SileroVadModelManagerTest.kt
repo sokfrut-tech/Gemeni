@@ -85,6 +85,78 @@ class SileroVadModelManagerTest {
     }
 
     @Test
+    fun followsApprovedGitHubReleaseAssetRedirect() {
+        val root = tempDirectory()
+        val visited = mutableListOf<String>()
+        try {
+            val manager = manager(root) { url ->
+                visited += url.host
+                when (url.host) {
+                    "github.com" -> FakeConnection(
+                        url, 302, byteArrayOf(),
+                        mapOf("Location" to "https://release-assets.githubusercontent.com/model.onnx")
+                    )
+                    "release-assets.githubusercontent.com" -> FakeConnection(url, 200, payload)
+                    else -> throw AssertionError("Unexpected host: ${url.host}")
+                }
+            }
+            runBlocking { manager.ensure(userConsent = true) }
+            assertEquals(listOf("github.com", "release-assets.githubusercontent.com"), visited)
+            assertTrue(manager.isReady())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsDeclaredOversizedResponseBeforeOpeningBody() {
+        val root = tempDirectory()
+        var bodyRequested = false
+        try {
+            val manager = manager(root, maxBytes = 8L) { url ->
+                FakeConnection(
+                    url, 200, payload,
+                    contentLength = payload.size.toLong(),
+                    onInputStream = { bodyRequested = true }
+                )
+            }
+            val failure = runCatching {
+                runBlocking { manager.ensure(userConsent = true) }
+            }.exceptionOrNull()
+            assertTrue(failure != null)
+            assertFalse(bodyRequested)
+            assertFalse(manager.modelFile().exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun rejectsInsufficientStorageBeforeOpeningBody() {
+        val root = tempDirectory()
+        var bodyRequested = false
+        try {
+            val manager = SileroVadModelManager(
+                target = File(root, "vad/silero_vad.onnx"),
+                connectionFactory = { url ->
+                    FakeConnection(url, 200, payload, onInputStream = { bodyRequested = true })
+                },
+                modelUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+                expectedSha256 = hash,
+                maxBytes = 1024L,
+                availableBytes = { 0L }
+            )
+            val failure = runCatching {
+                runBlocking { manager.ensure(userConsent = true) }
+            }.exceptionOrNull()
+            assertTrue(failure?.message.orEmpty().contains("free storage"))
+            assertFalse(bodyRequested)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun enforcesStreamingSizeLimitForUnknownLengthResponse() {
         val root = tempDirectory()
         try {
