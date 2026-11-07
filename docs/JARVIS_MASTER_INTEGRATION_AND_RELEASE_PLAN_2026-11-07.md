@@ -501,3 +501,6 @@ PR #108 test refinement: added a seventh deterministic policy test proving that 
 - Debug APK artifact `13580633488`, 86,954,012 bytes (~82.9 MiB), uploaded successfully.
 - Android emulator smoke job `128454449250` remains in progress; no instrumentation result/count is yet available. This does not satisfy emulator release gate. PR #107 remains draft; physical OPPO testing is not performed.
 - Evidence comment posted to PR #107. Run #255 is exact-head for PR #107 and remains valid; emulator status is still pending.
+
+
+PR #108 exact-head run #266 (`42389826211`) for `82eab794842be36942fa8cc934001a86516db7f4`: Secret scanning SUCCESS; Kotlin compile SUCCESS; JVM unit tests SUCCESS. Downloaded/parsed JUnit XML artifact `13580524835`: **64 tests, 0 failures, 0 errors, 0 skipped**, 11 suites; `VadCapturePolicyTest` 7/7. At this evidence update, full Debug APK build is in progress; APK verification and CodeQL analyze not yet complete. Emulator job has not yet started. PR #108 remains draft; run #266 is exact-head.
