@@ -2,12 +2,12 @@
 set -uo pipefail
 mkdir -p emulator-diagnostics
 capture_diagnostics() {
-  local suffix="\${1:-failure}"
-  adb devices -l > "emulator-diagnostics/devices-\${suffix}.txt" 2>&1 || true
-  timeout 12s adb shell getprop > "emulator-diagnostics/getprop-\${suffix}.txt" 2>&1 || true
-  timeout 12s adb shell dumpsys package > "emulator-diagnostics/package-service-\${suffix}.txt" 2>&1 || true
-  timeout 12s adb shell dumpsys activity > "emulator-diagnostics/activity-service-\${suffix}.txt" 2>&1 || true
-  timeout 20s adb logcat -d -v threadtime > "emulator-diagnostics/logcat-\${suffix}.txt" 2>&1 || true
+  local suffix="${1:-failure}"
+  adb devices -l > "emulator-diagnostics/devices-${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell getprop > "emulator-diagnostics/getprop-${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell dumpsys package > "emulator-diagnostics/package-service-${suffix}.txt" 2>&1 || true
+  timeout 12s adb shell dumpsys activity > "emulator-diagnostics/activity-service-${suffix}.txt" 2>&1 || true
+  timeout 20s adb logcat -d -v threadtime > "emulator-diagnostics/logcat-${suffix}.txt" 2>&1 || true
 }
 echo "Restarting host ADB server before emulator service checks."
 adb kill-server || true
