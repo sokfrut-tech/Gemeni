@@ -45,7 +45,9 @@ class ModelDownloadManager internal constructor(
 
     companion object {
         const val RUSSIAN_MODEL = "sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16"
-        private const val BASE_URL = "https://huggingface.co/csukuangfj/$RUSSIAN_MODEL/resolve/main/"
+        // Immutable Hugging Face revision; do not follow a moving main branch for model artifacts.
+        private const val MODEL_REVISION = "31fa603e4f31279c6e1f7600fed13dc4312663ab"
+        private const val BASE_URL = "https://huggingface.co/csukuangfj/$RUSSIAN_MODEL/resolve/$MODEL_REVISION/"
         private const val CONNECT_TIMEOUT_MS = 20_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val MAX_REDIRECTS = 5
