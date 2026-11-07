@@ -61,6 +61,8 @@ jobs:
           build-mode: manual
       - name: Build Kotlin sources for CodeQL
         run: gradle --no-daemon :app:compileDebugKotlin
+      - name: Run JVM unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build full debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify and hash debug APK
@@ -111,12 +113,13 @@ jobs:
         timeout-minutes: 32
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
           target: google_apis
           emulator-boot-timeout: 900
+          cores: 4
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
+          disable-animations: true
           script: gradle --no-daemon :app:connectedDebugAndroidTest
       - name: Capture bounded emulator diagnostics on failure
         if: failure()
