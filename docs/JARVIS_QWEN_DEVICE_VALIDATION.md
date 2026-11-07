@@ -41,6 +41,17 @@ Create a dated report under `docs/device-validation/` with:
 
 Never include personal data, phone numbers, account identifiers, or raw voice recordings in the report.
 
+## Self-diagnostic implementation update (2026-11-07)
+
+A separate draft PR adds a user-visible Qwen self-test:
+- Related PR: https://github.com/sokfrut-tech/Gemeni/pull/100
+- The probe runs direct local inference on a worker thread and reports llama.cpp version and elapsed time.
+- It does not download a model and does not call the Android tool registry.
+- The control response is accepted only when the trimmed output is exactly `JARVIS_OK` (case-insensitive); prose that merely contains the token is rejected.
+- JVM unit tests cover exact success, case/outer-whitespace handling, and false-positive responses.
+
+This improves the pre-device diagnostic gate but does not replace physical-device inference testing. The PR is still draft until its Android build, unit tests, and security checks pass.
+
 ## Engineering follow-up before claiming production readiness
 
 - Add a user-visible local model self-test/benchmark that runs on a worker thread and reports load/inference status and latency without silently downloading anything.
