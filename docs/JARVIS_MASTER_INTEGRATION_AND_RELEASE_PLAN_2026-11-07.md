@@ -514,3 +514,10 @@ PR #108 exact-head run #266 (`42389826211`) for `82eab794842be36942fa8cc934001a8
 - PR #108, head `82eab794842be36942fa8cc934001a86516db7f4`, run #266 (`42389826211`): **64/64** JVM tests; secret scan, Kotlin compile, full APK build/verification, CodeQL all SUCCESS. Emulator job `128456229885` is queued.
 - Emulator jobs for PR #105/#106/#107 are still in progress at latest check. No terminal instrumentation XML/count has been confirmed for any of these branches. Therefore emulator release gate remains open and PRs stay draft. Physical OPPO Find X6 Pro test remains outstanding.
 - Exact evidence comments posted on PRs #105, #106, #107 and #108. Do not interpret a successful JVM/APK/CodeQL run as emulator or device acceptance.
+
+
+## 47. Emulator queue update (2026-11-07)
+
+- At the latest poll, emulator smoke jobs are all actively running (not queued) for PR #105 run #233 (job `128451096498`), PR #106 run #238 (job `128451735829`), PR #107 run #255 (job `128454449250`), and PR #108 run #266 (job `128456229885`).
+- Their current workflow step is `Run Android emulator smoke tests`; diagnostics and evidence-upload steps have not started. No instrumentation XML or non-zero test count has been published yet. This remains pending, not passed.
+- PR #108 exact-head CodeQL job and secret scan are both SUCCESS; APK build, verify/hash and upload are successful. Its Android emulator job has moved from queued to in progress.
