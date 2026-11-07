@@ -414,3 +414,12 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - PR #105 exact head `46013ce1ddd09dd6281ef72248a6288a478c12e2`: CodeQL job completed successfully, including Kotlin compilation, 45/45 JVM tests and full debug APK build. Secret scanning passed. The separate Android emulator smoke job was still running; therefore full CI is not yet green.
 - PR #106 exact head `2a9a0aef3c887433a46cfe9660ecacca18372e6f`: Secret scanning passed; CodeQL job was still building the full debug APK. No emulator or full CI pass yet.
 - Older emulator smoke runs #191 and #195 were still active without terminal test counts at this snapshot. Do not treat an active job as success; inspect timeout/runner behavior before release.
+
+
+## 37. PR #107 regression suite expanded after review (2026-11-07)
+
+- Expanded the Silero downloader suite to 9 cases: added successful redirect to the approved GitHub release-asset host, declared oversized Content-Length rejection before opening the body, and insufficient-storage rejection before opening the body.
+- Added a body-open callback to the fake HTTP connection so tests can prove preflight happens before any body read.
+- Latest PR #107 exact head is `cb840f2b84382e92268c9b6c3eb0516a6212c910`. Run #241 was for the earlier head; run #243 was cancelled/superseded after the follow-up test commits. A fresh exact-head run is required before treating this slice as verified.
+- PR #105 CodeQL and full debug APK build have now completed successfully, along with secret scanning. Its emulator smoke job is still active and has not supplied a final instrumentation count.
+- PR #106 secret scanning is green; CodeQL is still in the full APK build step. No complete CI or release status is claimed for #106.
