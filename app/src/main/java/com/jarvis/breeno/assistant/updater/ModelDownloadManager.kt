@@ -161,6 +161,9 @@ class ModelDownloadManager internal constructor(
                     while (true) {
                         currentCoroutineContext().ensureActive()
                         val count = input.read(buffer)
+                        // A disconnect may unblock read() with EOF rather than an exception.
+                        // Re-check cancellation before interpreting that EOF as a complete body.
+                        currentCoroutineContext().ensureActive()
                         if (count < 0) break
                         downloaded += count
                         require(downloaded <= item.maxBytes) {
