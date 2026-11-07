@@ -457,3 +457,10 @@ PR #107 hardening follow-up: added constructor validation for the injected size 
 - Updated repository `NOTICE` with the model's source, license, size and checksum, clarifying it is optional, consent-gated, stored app-privately and not bundled/relicensed.
 - Added tests rejecting malformed SHA-256 and a configured cap above the production cap, and replacing a stale/corrupt existing final model with a verified download. The Silero downloader suite now contains 12 cases.
 - Latest PR #107 head `54a69a4c2f1dbf139007453a2fa7253c423e434f`; prior run #252 is stale (it predates the notice and tests). Fresh exact-head CI must finish before claiming any test/build success for this state.
+
+
+## 42. Correct Sherpa Silero maxSpeechDuration semantics
+
+- Reviewed the upstream Kotlin `Vad.kt` API and C++ configuration docs. `Vad.flush()` is available and must be used at the hard capture ceiling to emit buffered trailing speech before draining the queue.
+- Important correction to the initial VAD brief: Silero `maxSpeechDuration` is **not** a hard segment-length cap. Upstream describes it as raising the detector threshold to 0.9 after the configured duration. Therefore the proposed 25 s value is only a detector sensitivity parameter; enforce the 30 s command ceiling independently in Kotlin and concatenate VAD segments until endpoint/ceiling.
+- Updated `JARVIS_VAD_VOICE_LOOP_INTEGRATION_BRIEF_2026-11-07.md` accordingly. Reference: https://github.com/k2-fsa/sherpa-onnx/blob/master/kotlin-api/Vad.kt and https://github.com/k2-fsa/sherpa-onnx/blob/master/sherpa-onnx/csrc/silero-vad-model-config.cc.
