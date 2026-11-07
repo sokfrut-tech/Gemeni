@@ -119,8 +119,8 @@ jobs:
           disable-animations: false
           script: |
             set +e
-            # Capture the emulator state before the runner action tears the AVD down.
-            adb wait-for-device
+            # The emulator-runner action has already booted the AVD and waited for ADB.
+            # Clear old logs, then capture the live emulator before action cleanup.
             adb logcat -c >/dev/null 2>&1 || true
             gradle --no-daemon :app:connectedDebugAndroidTest
             test_status=$?
