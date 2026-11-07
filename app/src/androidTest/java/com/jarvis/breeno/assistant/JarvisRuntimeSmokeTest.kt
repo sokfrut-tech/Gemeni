@@ -67,6 +67,15 @@ class JarvisRuntimeSmokeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val runtime = JarvisRuntimeController(context)
         try {
+            val deniedDownload = runCatching {
+                runtime.downloadRussianAsrAfterConsent(userConsent = false) {}
+            }.exceptionOrNull()
+            assertNotNull("Downloader must reject a missing explicit consent flag", deniedDownload)
+            assertTrue(
+                "Downloader must explain that explicit user consent is required",
+                deniedDownload!!.message.orEmpty().contains("явное согласие")
+            )
+
             val failure = runCatching { runtime.prepare {} }.exceptionOrNull()
             assertNotNull("Runtime must reject preparation when ASR is not installed", failure)
             assertTrue(
@@ -74,7 +83,7 @@ class JarvisRuntimeSmokeTest {
                 failure!!.message.orEmpty().contains("отдельно подтвердите")
             )
             val modelFiles = File(context.filesDir, "models").walkTopDown().filter { it.isFile }.toList()
-            assertTrue("prepare() must not create model files or download them without consent", modelFiles.isEmpty())
+            assertTrue("prepare() and denied download must not create model files or access the network", modelFiles.isEmpty())
         } finally {
             runtime.close()
         }
