@@ -121,11 +121,11 @@ jobs:
         timeout-minutes: 32
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
           target: default
           emulator-boot-timeout: 900
-          emulator-options: -no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -wipe-data
+          emulator-options: -no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: false
           script: bash .github/scripts/run-android-emulator-smoke.sh
       - name: Capture bounded emulator diagnostics on failure
@@ -133,19 +133,15 @@ jobs:
         timeout-minutes: 4
         shell: bash
         run: |
-          # The primary diagnostics are captured inside the emulator-runner action,
-          # before its cleanup shuts down the AVD. This is only a bounded fallback
-          # for failures that occur before the script starts.
           if [ ! -d emulator-diagnostics ]; then
             mkdir -p emulator-diagnostics
             adb devices -l > emulator-diagnostics/devices.txt 2>&1 || true
             timeout 12s adb shell getprop > emulator-diagnostics/getprop.txt 2>&1 || true
-            timeout 12s adb shell dumpsys package com.jarvis.breeno.assistant > emulator-diagnostics/app-package.txt 2>&1 || true
-            timeout 12s adb shell dumpsys activity processes > emulator-diagnostics/activity-processes.txt 2>&1 || true
+            timeout 12s adb shell service check package > emulator-diagnostics/package-service.txt 2>&1 || true
+            timeout 12s adb shell service check activity > emulator-diagnostics/activity-service.txt 2>&1 || true
             timeout 20s adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1 || true
             if [ -d app/build/reports/androidTests/connected ]; then cp -R app/build/reports/androidTests/connected emulator-diagnostics/test-reports; fi
             if [ -d app/build/outputs/androidTest-results/connected ]; then cp -R app/build/outputs/androidTest-results/connected emulator-diagnostics/test-results; fi
-            if [ -d app/build/outputs/androidTest-results ]; then cp -R app/build/outputs/androidTest-results emulator-diagnostics/all-test-results; fi
           fi
       - name: Upload emulator test evidence
         if: always()
