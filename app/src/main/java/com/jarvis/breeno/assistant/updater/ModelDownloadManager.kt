@@ -189,6 +189,8 @@ class ModelDownloadManager internal constructor(
                     "SHA-256 verification failed for ${item.name}"
                 }
             }
+            // Do not atomically install a file if cancellation arrived during fsync/hash verification.
+            currentCoroutineContext().ensureActive()
             Files.move(
                 temporary.toPath(),
                 destination.toPath(),
