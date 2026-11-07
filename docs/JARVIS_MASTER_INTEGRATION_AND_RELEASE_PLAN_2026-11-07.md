@@ -716,3 +716,9 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - The Compose screen now derives a busy state across LISTENING, TRANSCRIBING, UNDERSTANDING, EXECUTING, SPEAKING and WAITING_FOR_APPROVAL. The microphone action is visually muted and ignores taps during these states or while voice models are downloading.
 - This is a usability layer only; `ListenSessionGate` remains the authoritative runtime guard against repeated calls and concurrent lifecycle races.
 - Change is in PR #112; current source head after the UI change: `d84de8e192a495a22283dbf46d66f75a85dd08a2`. A fresh exact-head CI run is required.
+
+### PR #112 contention-test synchronization correction (2026-11-07)
+
+- A final review of the new 16-thread test found a test-harness ordering flaw: the winning worker was waiting on a release latch while the main test thread waited for all workers to finish, so both could wait until timeout.
+- Corrected the test with a distinct `attempted` latch. Each worker records its acquisition result before decrementing that latch; the test thread waits until all attempts are complete, asserts exactly one winner, releases the winner, and only then waits for worker completion. Worker exceptions remain explicitly propagated.
+- Latest PR #112 head: `192c417632d08af4fd794f191385a0476e3ca0bf`. Fresh Factory Security Baseline run #319 / `42408671067` is pending. Earlier run #315 on the previous head was cancelled when the test synchronization fix was pushed; it is not qualifying evidence.
