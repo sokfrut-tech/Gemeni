@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    runtime.downloadRussianAsrAfterConsent { value ->
+                    runtime.downloadRussianAsrAfterConsent(userConsent = true) { value ->
                         runOnUiThread { statusSink?.invoke(value) }
                     }
                 }
