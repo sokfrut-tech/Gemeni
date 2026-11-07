@@ -32,6 +32,7 @@ class JarvisLaunchSmokeTest {
                 Until.hasObject(By.text("ДЖАРВИС")),
                 30_000L
             )
+            if (!headerVisible) saveFailureEvidence(device, "main-screen-missing")
             assertTrue("Jarvis main screen did not appear", headerVisible)
 
             val readyStateVisible = device.wait(
@@ -39,9 +40,7 @@ class JarvisLaunchSmokeTest {
                 15_000L
             )
             if (!readyStateVisible) {
-                val screenshotDir = File("/sdcard/Download/jarvis-test")
-                device.executeShellCommand("mkdir -p ${screenshotDir.absolutePath}")
-                device.takeScreenshot(File(screenshotDir, "launch-ready-state-missing.png"))
+                saveFailureEvidence(device, "launch-ready-state-missing")
             }
             assertTrue("Jarvis did not show its idle ready state", readyStateVisible)
         } finally {
@@ -49,5 +48,13 @@ class JarvisLaunchSmokeTest {
             device.pressBack()
             instrumentation.waitForIdleSync()
         }
+    }
+
+    private fun saveFailureEvidence(device: UiDevice, name: String) {
+        val dir = File("/sdcard/Download/jarvis-test")
+        device.executeShellCommand("mkdir -p ${dir.absolutePath}")
+        dir.mkdirs()
+        device.takeScreenshot(File(dir, "$name.png"))
+        device.dumpWindowHierarchy(File(dir, "$name.xml"))
     }
 }
