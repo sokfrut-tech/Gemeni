@@ -710,3 +710,9 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - Downloaded and parsed all JUnit XML files from PR #111 workflow run #300 / `42407613350`, artifact `13588465984` (merge-ref SHA `570d297737c4cbea2f5827a1ce292ed44014948f`).
 - Result: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. This independently confirms the same 69-test JVM baseline on PR #111's merge ref; it does not include Android instrumentation.
 - The run's secret scan and CodeQL completed successfully and its Debug APK artifact was uploaded. Android emulator smoke remains in progress; no non-zero instrumentation count is established yet.
+
+### PR #112 microphone busy-state UX (2026-11-07)
+
+- The Compose screen now derives a busy state across LISTENING, TRANSCRIBING, UNDERSTANDING, EXECUTING, SPEAKING and WAITING_FOR_APPROVAL. The microphone action is visually muted and ignores taps during these states or while voice models are downloading.
+- This is a usability layer only; `ListenSessionGate` remains the authoritative runtime guard against repeated calls and concurrent lifecycle races.
+- Change is in PR #112; current source head after the UI change: `d84de8e192a495a22283dbf46d66f75a85dd08a2`. A fresh exact-head CI run is required.
