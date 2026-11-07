@@ -269,3 +269,10 @@ The downloader in PR #105 has therefore been switched to the official upstream r
 The source tree shows the official license and files under the streaming model repository. References: Hugging Face model page `https://huggingface.co/alphacep/vosk-model-small-streaming-ru`; model card README `https://huggingface.co/alphacep/vosk-model-small-streaming-ru/blob/main/README.md`; selected file metadata for encoder/decoder/joiner is published by Hugging Face. The three ONNX hashes match the current pinned file manifest.
 
 The consent dialog now identifies Alpha Cephei, Apache-2.0 and an approximate 29 MB first download. The source revision prefix is pinned to `5fbd908`; verify the revision resolves and retain its full immutable commit SHA in the manifest before release. Do not ship if the source revision or license cannot be verified.
+
+
+## 18. Model provenance document added (2026-11-07)
+
+- Added `docs/MODEL_PROVENANCE_RUSSIAN_ASR.md` to PR #105. It records official Alpha Cephei source, declared Apache-2.0 license, selected files, three upstream SHA-256 values, the approximately 29 MB subset, and explicit release checklist.
+- The old unlicensed mirror is no longer the downloader source. The official upstream is used directly.
+- Open item remains: establish SHA-256 for `lang/tokens.txt` and replace short revision prefix `5fbd908` with the full immutable commit SHA before production release. The code currently limits token file size and pins its revision, but does not claim a cryptographic digest for that file.
