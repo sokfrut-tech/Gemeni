@@ -276,3 +276,10 @@ The consent dialog now identifies Alpha Cephei, Apache-2.0 and an approximate 29
 - Added `docs/MODEL_PROVENANCE_RUSSIAN_ASR.md` to PR #105. It records official Alpha Cephei source, declared Apache-2.0 license, selected files, three upstream SHA-256 values, the approximately 29 MB subset, and explicit release checklist.
 - The old unlicensed mirror is no longer the downloader source. The official upstream is used directly.
 - Open item remains: establish SHA-256 for `lang/tokens.txt` and replace short revision prefix `5fbd908` with the full immutable commit SHA before production release. The code currently limits token file size and pins its revision, but does not claim a cryptographic digest for that file.
+
+
+## 19. CI now executes JVM unit tests (2026-11-07)
+
+- The Factory Security Baseline previously compiled Kotlin and assembled the APK but did not execute `testDebugUnitTest`; this would have left the new downloader regression tests unexecuted.
+- Added a dedicated `Run JVM unit tests` step after Kotlin compilation and uploads JUnit XML reports as an artifact. The workflow now needs to pass compile, unit tests, APK build, CodeQL, secret scanning, and emulator instrumentation with a non-zero test count.
+- This workflow change is on the PR #105 stack and will be verified at its new exact head; prior CI results do not cover this added gate.
