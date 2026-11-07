@@ -18,6 +18,11 @@ import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
+
+/** The self-test is intentionally strict: extra or negating text must not count as success. */
+internal fun isQwenSelfTestResponseValid(output: String): Boolean =
+    output.trim().equals("JARVIS_OK", ignoreCase = true)
+
 /** Microphone -> local Russian ASR -> guarded Android tool registry -> speech. */
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
@@ -69,7 +74,7 @@ class JarvisRuntimeController(context: Context) {
             val elapsedMs = (System.nanoTime() - started) / 1_000_000L
             if (output.isBlank()) {
                 "Диагностика НЕ ПРОЙДЕНА: движок не вернул текст. llama.cpp: $version; время: ${elapsedMs} мс."
-            } else if (!output.contains("JARVIS_OK", ignoreCase = true)) {
+            } else if (!isQwenSelfTestResponseValid(output)) {
                 val preview = output.replace(Regex("\\s+"), " ").take(180)
                 "Диагностика НЕ ПРОЙДЕНА: ответ не совпал с контрольной фразой. Время: ${elapsedMs} мс; ответ: $preview"
             } else {
