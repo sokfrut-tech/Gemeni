@@ -11,10 +11,20 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+
+
+/** Disconnects the currently active HTTP request when its owning coroutine is cancelled. */
+internal fun disconnectActiveConnectionOnCancellation(
+    job: Job?,
+    activeConnection: AtomicReference<HttpURLConnection?>
+): DisposableHandle? = job?.invokeOnCompletion { cause ->
+    if (cause != null) activeConnection.getAndSet(null)?.disconnect()
+}
 
 /**
  * Consent-gated installer for the pinned first-run GGUF candidate.
@@ -99,9 +109,7 @@ class QwenModelInstaller(context: Context) {
         val job = currentCoroutineContext()[Job]
         // Disconnect the socket from the cancellation callback so cancellation
         // can interrupt responseCode/read(), not merely the next ensureActive().
-        val cancellationHandle = job?.invokeOnCompletion { cause ->
-            if (cause != null) activeConnection.getAndSet(null)?.disconnect()
-        }
+        val cancellationHandle = disconnectActiveConnectionOnCancellation(job, activeConnection)
         var redirects = 0
         try {
             while (true) {
