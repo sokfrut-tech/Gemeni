@@ -283,3 +283,18 @@ The consent dialog now identifies Alpha Cephei, Apache-2.0 and an approximate 29
 - The Factory Security Baseline previously compiled Kotlin and assembled the APK but did not execute `testDebugUnitTest`; this would have left the new downloader regression tests unexecuted.
 - Added a dedicated `Run JVM unit tests` step after Kotlin compilation and uploads JUnit XML reports as an artifact. The workflow now needs to pass compile, unit tests, APK build, CodeQL, secret scanning, and emulator instrumentation with a non-zero test count.
 - This workflow change is on the PR #105 stack and will be verified at its new exact head; prior CI results do not cover this added gate.
+
+
+## 20. Voice pipeline source review and remaining work (2026-11-07)
+
+Source review of the current #95 runtime found:
+- `AudioRecordPipeline` is a real mono 16 kHz PCM recorder, but the controller currently captures a fixed 4.5-second window. It is not yet a continuous conversation loop and has no integrated Silero VAD endpointing or wake-word trigger.
+- The current `JarvisSpeaker` on #95's branch calls Android `TextToSpeech.speak()` immediately without waiting for asynchronous TTS initialization and has no `shutdown()` lifecycle. This can lose early speech or leak the TTS engine.
+- PR #101 (`fix/jarvis-tts-init-queue-2026-11-07`) contains a lifecycle-safe queue that waits for TTS initialization, sets Russian locale, queues the newest utterance, and shuts down cleanly. It is stacked on the Qwen self-diagnostic branch, so do not cherry-pick blindly; integrate it after the #98/#100 ancestry is reconciled, or transplant the isolated class with tests and preserve exact dependency history.
+
+Next voice acceptance work after downloader/security gates:
+1. Integrate the TTS queue and test initialization success/failure, repeated speech, cancellation and shutdown.
+2. Add VAD-driven endpointing so speech can end naturally instead of being cut at 4.5 seconds; retain a bounded maximum duration.
+3. Add explicit capture cancellation and recorder lifecycle tests for permission revocation, app backgrounding and interruption.
+4. Add wake-word/background listening only behind user opt-in, Android foreground-service requirements, privacy indicators and battery tests.
+5. Verify Russian end-to-end: recognized transcript, model answer, audible Russian response, no network, and honest error state.
