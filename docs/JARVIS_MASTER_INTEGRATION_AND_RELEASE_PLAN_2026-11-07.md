@@ -329,3 +329,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - PR #105 run #214 (42387501472) executed the new JVM unit suite: **43 tests, 1 failure**. The failing case was `cancellationDisconnectsActiveConnectionAndCleansPartialFile`; the failure occurred at the post-stream completeness check because a socket disconnect can unblock a blocking `read()` by returning EOF instead of throwing.
 - Corrected the downloader loop to call `currentCoroutineContext().ensureActive()` immediately after each blocking `input.read(buffer)`, before interpreting EOF. Cancellation is now observed before a disconnect-induced EOF can be mistaken for a completed response.
 - Fix commit: `18ce5f8aceb80a3c7732df939a7a2f25cc3f80d1`. Exact-head CI rerun is required; no passing claim until the full unit suite completes.
+
+
+## 26. Unknown-length response size-cap test added (2026-11-07)
+
+- Static review found the original oversized-response test only exercised the declared Content-Length pre-check; it did not prove the streaming byte cap for chunked/unknown-length responses.
+- Added `enforcesStreamingByteLimitWhenContentLengthIsUnknown`, which serves a body larger than the per-file cap while reporting unknown length and asserts rejection plus cleanup of both partial and final files.
+- This is an additional regression test; exact-head run must execute it along with cancellation and the rest of the JVM suite.
