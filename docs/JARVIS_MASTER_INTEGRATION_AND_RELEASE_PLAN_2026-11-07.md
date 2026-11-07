@@ -254,3 +254,18 @@ Review caveats before accepting #105:
 4. Check API/minSdk implications of `java.nio.file.Files.move` (the app currently declares API 29, so this is available at the declared minimum).
 
 PR #105 exact head: `977d0fabc725b1af394439f949560c1f113a8c91`; run #195 (42387110040) has secret scanning passed and CodeQL/build still running. Do not claim the hardening is verified until the exact-head run completes.
+
+
+## 17. Russian ASR model provenance and licensing correction (2026-11-07)
+
+A license review found that the previously selected republished model repository `csukuangfj/sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16` has no license declared. It must not be treated as Apache-2.0 merely because its README says the weights originated from Alpha Cephei.
+
+The downloader in PR #105 has therefore been switched to the official upstream repository `alphacep/vosk-model-small-streaming-ru`, whose Hugging Face model card declares **Apache-2.0**. It downloads only the quantized streaming subset needed by Sherpa-ONNX:
+- `am-onnx/encoder.int8.onnx` (SHA-256 pinned)
+- `am-onnx/decoder.onnx` (SHA-256 pinned)
+- `am-onnx/joiner.int8.onnx` (SHA-256 pinned)
+- `lang/tokens.txt` (small text file, currently no SHA-256 pin; revision is pinned and this remaining integrity gap is documented)
+
+The source tree shows the official license and files under the streaming model repository. References: Hugging Face model page `https://huggingface.co/alphacep/vosk-model-small-streaming-ru`; model card README `https://huggingface.co/alphacep/vosk-model-small-streaming-ru/blob/main/README.md`; selected file metadata for encoder/decoder/joiner is published by Hugging Face. The three ONNX hashes match the current pinned file manifest.
+
+The consent dialog now identifies Alpha Cephei, Apache-2.0 and an approximate 29 MB first download. The source revision prefix is pinned to `5fbd908`; verify the revision resolves and retain its full immutable commit SHA in the manifest before release. Do not ship if the source revision or license cannot be verified.
