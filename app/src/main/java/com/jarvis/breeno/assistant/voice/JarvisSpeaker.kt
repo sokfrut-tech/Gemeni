@@ -16,22 +16,25 @@ class JarvisSpeaker(context: Context) {
     private var initializationFailed = false
     private var closed = false
     private var pendingText: String? = null
+    private lateinit var tts: TextToSpeech
 
-    private val tts = TextToSpeech(context.applicationContext) { status ->
-        synchronized(lock) {
-            if (closed) return@synchronized
-            if (status != TextToSpeech.SUCCESS) {
-                initializationFailed = true
+    init {
+        tts = TextToSpeech(context.applicationContext) { status ->
+            synchronized(lock) {
+                if (closed) return@synchronized
+                if (status != TextToSpeech.SUCCESS) {
+                    initializationFailed = true
+                    pendingText = null
+                    return@synchronized
+                }
+
+                val languageStatus = tts.setLanguage(Locale("ru", "RU"))
+                initialized = languageStatus != TextToSpeech.LANG_MISSING_DATA &&
+                    languageStatus != TextToSpeech.LANG_NOT_SUPPORTED
+
+                if (initialized) pendingText?.let(::speakNow)
                 pendingText = null
-                return@synchronized
             }
-
-            val languageStatus = tts.setLanguage(Locale("ru", "RU"))
-            initialized = languageStatus != TextToSpeech.LANG_MISSING_DATA &&
-                languageStatus != TextToSpeech.LANG_NOT_SUPPORTED
-
-            if (initialized) pendingText?.let(::speakNow)
-            pendingText = null
         }
     }
 
