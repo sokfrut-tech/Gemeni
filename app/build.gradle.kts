@@ -22,7 +22,15 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.31.6" } }
-    packaging { jniLibs { useLegacyPackaging = true } }
+    packaging {
+        resources {
+            // Sherpa's Android AAR also carries desktop-only JNI payloads as Java resources.
+            // Android loads its native runtimes from lib/<ABI>/, so these desktop binaries
+            // are not used by this APK and needlessly add more than 100 MiB.
+            excludes += "sherpa-onnx/native/**"
+        }
+        jniLibs { useLegacyPackaging = true }
+    }
 }
 
 protobuf {
