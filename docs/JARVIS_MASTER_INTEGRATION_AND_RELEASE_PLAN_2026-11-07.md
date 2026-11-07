@@ -464,3 +464,14 @@ PR #107 hardening follow-up: added constructor validation for the injected size 
 - Reviewed the upstream Kotlin `Vad.kt` API and C++ configuration docs. `Vad.flush()` is available and must be used at the hard capture ceiling to emit buffered trailing speech before draining the queue.
 - Important correction to the initial VAD brief: Silero `maxSpeechDuration` is **not** a hard segment-length cap. Upstream describes it as raising the detector threshold to 0.9 after the configured duration. Therefore the proposed 25 s value is only a detector sensitivity parameter; enforce the 30 s command ceiling independently in Kotlin and concatenate VAD segments until endpoint/ceiling.
 - Updated `JARVIS_VAD_VOICE_LOOP_INTEGRATION_BRIEF_2026-11-07.md` accordingly. Reference: https://github.com/k2-fsa/sherpa-onnx/blob/master/kotlin-api/Vad.kt and https://github.com/k2-fsa/sherpa-onnx/blob/master/sherpa-onnx/csrc/silero-vad-model-config.cc.
+
+
+## 43. PR #108 — local VAD endpointing implementation opened (2026-11-07)
+
+- Created draft PR #108, stacked on PR #107: https://github.com/sokfrut-tech/Gemeni/pull/108.
+- Replaced the active `JarvisRuntimeController.listenOnce()` fixed 4.5-second collector with local Silero VAD endpointing. It collects completed VAD segments, exits after endpoint, an 8 s no-speech timeout, or an independent 30 s hard capture ceiling. At the hard ceiling it calls Sherpa `flush()` and drains the final queued segment before local ASR.
+- Added a pure Kotlin `VadCapturePolicy` with six deterministic JVM tests. Configured 550 ms trailing silence, 200 ms minimum speech and 25 s Sherpa `maxSpeechDuration` (detector sensitivity parameter, not app hard limit).
+- Updated model readiness so microphone capture requires both verified ASR and VAD. Updated explicit consent dialog to disclose both downloads, their licenses/approximate sizes, private storage and connection metadata. Neither model is downloaded by startup or `prepare()`; both are downloaded only after the user approves the combined dialog.
+- VAD model lifecycle is closed with the runtime. Existing guarded tool confirmation flow is unchanged.
+- PR #108 exact head `a54382e7f5802a376d3c30d728cd5549787f53c2`; run #259 (`42389442448`) is active. Secret scanning passed; CodeQL job is still running. No JVM/ APK / emulator result claimed yet; no OPPO hardware test has been performed.
+- PR #107 exact head `54a69a4c2f1dbf139007453a2fa7253c423e434f`; run #255 (`42389152047`) is active. Secret scanning passed; CodeQL job is still building the full Debug APK. The previous run #252 predates latest notice/tests and is not accepted as exact-head evidence.
