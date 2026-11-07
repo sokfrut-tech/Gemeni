@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
                 withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
-                val text = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     runtime.listenOnce(
                         onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
                         onState = { state -> runOnUiThread { stateSink?.invoke(state) } },
