@@ -42,7 +42,9 @@ class SileroVadModelManager internal constructor(
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
         private const val SHA256 =
             "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
-        private const val MAX_BYTES = 32L * 1024L * 1024L
+        // Official sherpa-onnx documentation lists this model at about 629 KiB;
+        // 4 MiB leaves generous room for upstream packaging changes without an open-ended cap.
+        private const val MAX_BYTES = 4L * 1024L * 1024L
         private const val FREE_MARGIN_BYTES = 16L * 1024L * 1024L
         private const val BUFFER_SIZE = 64 * 1024
         private const val CONNECT_TIMEOUT_MS = 20_000
