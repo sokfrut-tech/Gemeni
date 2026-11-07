@@ -667,3 +667,14 @@ A final ABI compatibility check changed the initial ATD experiment before it cou
 - Downloaded and parsed every XML file in that artifact: **12 suites, 69 tests, 0 failures, 0 errors, 0 skipped**. Includes `JarvisSpeakerTest` 5/5 and `VadCapturePolicyTest` 7/7.
 - Secret scanning is SUCCESS; Kotlin source compilation is SUCCESS; JVM unit tests are SUCCESS with the parsed count above. At the latest poll, full Debug APK build was still in progress. CodeQL analysis and emulator instrumentation had not reached terminal results.
 - This evidence is for the workflow's PR merge ref (artifact name contains merge SHA `8f6463a4b2982f62675eb9891fc31b45a60a0d4d`), not a standalone physical-device test. Do not claim API 34 emulator stability until the emulator job terminates with a non-zero instrumentation test count.
+
+## 63. Prevent overlapping microphone sessions (2026-11-07)
+
+- Source review found that the microphone FAB remains available while Jarvis is transcribing, reasoning, executing a tool, or speaking. `JarvisRuntimeController` owns shared AudioRecord, Silero VAD, ASR and TTS instances; a second tap could therefore enter `listenOnce()` concurrently and race shared native/runtime state.
+- Added a non-blocking `ListenSessionGate` using `AtomicBoolean.compareAndSet`. Only one listen/voice-command lifecycle can enter at a time. A repeated tap is rejected immediately with a user-facing “already processing” status rather than queued behind the current session.
+- The gate is released in a `finally` block, including cancellation and runtime exceptions.
+- Added two pure JVM tests covering overlap rejection, release/reacquisition, and ensuring a failed second entry cannot release the first session.
+- Implementation is isolated in Draft PR #112, head `9fafca6f72492f1c507b8d08bb2a799c710b116a`, stacked on PR #111 → #110 → #109. It changes only the voice runtime guard and its tests; no always-on/background microphone, permission, network, or tool-policy changes.
+- PR #112 exact-head CI has not yet been observed in the available workflow results. Do not claim this guard is tested until its own fresh JVM/CodeQL/APK/emulator pipeline completes.
+- The exact-head workflow runs #299 (PR #110) and #300 (PR #111) remain non-terminal at the latest poll: secret scanning passed in both; #299 is in CodeQL analysis after APK build, #300 is in APK build. Emulator instrumentation has not produced a terminal non-zero test count yet.
+- Next: inspect terminal results for #299/#300; then inspect #112's exact-head CI. If it passes, continue with lifecycle tests for Activity recreation/backgrounding and actual microphone/VAD/ASR/TTS behavior on OPPO Find X6 Pro. Keep every stacked PR Draft until all applicable gates pass.
