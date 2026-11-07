@@ -67,7 +67,7 @@ class ModelDownloadManager internal constructor(
         )
         private val DEFAULT_FILES = listOf(
             AsrModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d", remotePath = "am-onnx/encoder.int8.onnx"),
-            AsrModelFile("decoder.onnx", "89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0", remotePath = "am-onnx/decoder.onnx"),
+            AsrModelFile("decoder.onnx", "2b0df458692e1d090075c8249001136ef05240dd0d726a6b56552fd46c538b2d", remotePath = "am-onnx/decoder.int8.onnx"),
             AsrModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5", remotePath = "am-onnx/joiner.int8.onnx"),
             AsrModelFile("tokens.txt", null, maxBytes = 4L * 1024L * 1024L, remotePath = "lang/tokens.txt")
         )
