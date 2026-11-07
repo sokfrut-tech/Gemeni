@@ -9,7 +9,9 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -93,6 +95,13 @@ class QwenModelInstaller(context: Context) {
     ) {
         var currentUrl = URL(DOWNLOAD_URL)
         var connection: HttpURLConnection? = null
+        val activeConnection = AtomicReference<HttpURLConnection?>(null)
+        val job = currentCoroutineContext()[Job]
+        // Disconnect the socket from the cancellation callback so cancellation
+        // can interrupt responseCode/read(), not merely the next ensureActive().
+        val cancellationHandle = job?.invokeOnCompletion { cause ->
+            if (cause != null) activeConnection.getAndSet(null)?.disconnect()
+        }
         var redirects = 0
         try {
             while (true) {
@@ -106,6 +115,10 @@ class QwenModelInstaller(context: Context) {
                     setRequestProperty("User-Agent", USER_AGENT)
                     setRequestProperty("Accept-Encoding", "identity")
                 }
+                activeConnection.set(connection)
+                // Closes the race where cancellation happens as the connection
+                // is being registered with the job's completion handler.
+                currentCoroutineContext().ensureActive()
                 val status = connection.responseCode
                 if (status in REDIRECT_CODES) {
                     if (redirects++ >= MAX_REDIRECTS) {
@@ -114,6 +127,7 @@ class QwenModelInstaller(context: Context) {
                     val location = connection.getHeaderField("Location")
                         ?: throw IOException("Сервер вернул перенаправление без адреса")
                     currentUrl = URL(currentUrl, location)
+                    activeConnection.compareAndSet(connection, null)
                     connection.disconnect()
                     connection = null
                     continue
@@ -156,6 +170,8 @@ class QwenModelInstaller(context: Context) {
                 return
             }
         } finally {
+            cancellationHandle?.dispose()
+            activeConnection.getAndSet(null)?.disconnect()
             connection?.disconnect()
         }
     }
