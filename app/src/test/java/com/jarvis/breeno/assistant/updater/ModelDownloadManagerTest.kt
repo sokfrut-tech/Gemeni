@@ -177,6 +177,30 @@ class ModelDownloadManagerTest {
     }
 
     @Test
+    fun reservesConfiguredFileCapAndMarginForUnknownLengthBeforeBody() {
+        val root = tempDirectory()
+        var bodyRequested = false
+        try {
+            val manager = ModelDownloadManager(
+                root,
+                { url -> FakeConnection(url, 200, payload, contentLength = -1L, onInputStream = { bodyRequested = true }) },
+                modelFiles = listOf(AsrModelFile("fixture.onnx", payloadHash, maxBytes = 8L)),
+                baseUrl = "https://huggingface.co/model/",
+                availableBytes = { 1024L }
+            )
+            val failure = runCatching { runBlocking { manager.ensureRussianAsr() } }.exceptionOrNull()
+            assertNotNullFailure(failure)
+            assertTrue(
+                "Insufficient space for the configured unknown-length file cap must be rejected",
+                failure!!.message.orEmpty().contains("Not enough free storage")
+            )
+            assertFalse("Storage preflight must happen before opening the body", bodyRequested)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rejectsRedirectLoopAtBoundedHopLimit() {
         val root = tempDirectory()
         val visited = mutableListOf<String>()
