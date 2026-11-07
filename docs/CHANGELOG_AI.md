@@ -40,3 +40,10 @@ Do not record secrets, API keys, tokens, private credentials, or personal data.
 - Corrected the settings smoke test selector to the real accessibility description `Модель и настройки` (previously it searched for `Настройки`, which did not match MainActivity).
 - Latest PR #97 head: `138940d9fa0edc8d28e4dd90284487c07278b1e2`; run #166 (42341238471) was pending at checkpoint. Earlier emulator jobs remained non-terminal at the instrumentation step, and log retrieval returned Azure BlobNotFound.
 - This change improves determinism but does not validate microphone capture, ASR, TTS, Qwen inference or OPPO device behavior. No merge/release claimed.
+
+
+## 2026-11-07 — bounded emulator failure diagnostics
+- Investigated a failed PR #93 emulator smoke step. Its follow-up diagnostics step remained in progress, and no artifact appeared; ADB diagnostic commands were unbounded, so the diagnostic step itself could stall when the emulator/ADB bridge was unhealthy.
+- Updated PR #97 workflow to wrap each ADB diagnostic command with a bounded timeout and upload logcat, device/process/package information, and connected instrumentation reports/results on failure.
+- Commit: `484a33dc327640d75b0d96428f0dc901e04a7b4b`. Run #168: https://github.com/sokfrut-tech/Gemeni/actions/runs/42342370703.
+- At update time, secret scanning passed; CodeQL was still running; emulator job had not started. No runtime success is claimed.
