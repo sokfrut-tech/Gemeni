@@ -56,6 +56,27 @@ class JarvisRuntimeController(context: Context) {
         }
     }
 
+    /** Safe direct inference probe; call only from a worker thread. It never executes tools or downloads weights. */
+    fun runQwenSelfTest(): String {
+        if (!qwenRuntime.isModelLoaded) return "Диагностика: модель Qwen не активирована."
+        return try {
+            val version = qwenRuntime.runtimeVersion()
+            val started = System.nanoTime()
+            val output = qwenRuntime.generate(
+                prompt = "You are running a local runtime self-test. Reply with exactly: JARVIS_OK",
+                maxTokens = 48
+            ).trim()
+            val elapsedMs = (System.nanoTime() - started) / 1_000_000L
+            if (output.isBlank()) {
+                "Диагностика НЕ ПРОЙДЕНА: движок не вернул текст. llama.cpp: $version; время: ${elapsedMs} мс."
+            } else {
+                val preview = output.replace(Regex("\\s+"), " ").take(180)
+                "Диагностика пройдена: локальный inference ответил за ${elapsedMs} мс. llama.cpp: $version. Ответ: $preview"
+            }
+        } catch (failure: Throwable) {
+            "Диагностика НЕ ПРОЙДЕНА: ${failure.message ?: failure.javaClass.simpleName}"
+        }
+    }
     suspend fun removeQwenModel(): String {
         reasoning = LocalOnlyJarvisModelProvider()
         qwenRuntime.close()
