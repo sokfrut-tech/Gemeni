@@ -351,3 +351,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Reviewed Alpha Cephei's official `decode8.py` for the pinned streaming model revision. It configures `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx` and `lang/tokens.txt` together.
 - Changed PR #105 to download the int8 decoder as well (local runtime filename remains `decoder.onnx` to match the Sherpa loader). Its pinned SHA-256 is `2b0df458692e1d090075c8249001136ef05240dd0d726a6b56552fd46c538b2d`.
 - The runtime now uses all three quantized ONNX components, avoiding an unnecessary mixed-precision model configuration and reducing download size. Provenance doc updated.
+
+
+## 29. Cancellation is checked before atomic installation (2026-11-07)
+
+- Extended the cancellation hardening beyond the blocking-read race: after stream completion, fsync and checksum verification, the downloader now calls `ensureActive()` immediately before the atomic move.
+- Extended the cancellation regression test to assert that neither a partial file nor a final installed model file remains after cancellation.
+- Commits: `aa508b43cb707895522b341b9d81a52a757e5384` and `8ce186437ac134a9b4292f2c05688c20f61e6581`. Both require exact-head CI verification.
