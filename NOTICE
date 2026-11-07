@@ -11,3 +11,15 @@ required notices, and redistribution conditions in the third-party inventory.
 
 OPPO, ColorOS, Breeno and other third-party trademarks and proprietary
 materials are not claimed by this project.
+
+Optional user-downloaded model (not bundled in the APK):
+
+Russian streaming ASR model: Alpha Cephei, `alphacep/vosk-model-small-streaming-ru`,
+revision `5fbd908cb21cbd585fa21461f463ba41fbcbcb68`.
+The upstream model card declares Apache License 2.0. Jarvis downloads only the
+selected quantized ONNX encoder/decoder/joiner files and `lang/tokens.txt`,
+after explicit user consent, into app-private storage. The model files remain
+third-party materials and are not relicensed by this repository.
+
+Source: https://huggingface.co/alphacep/vosk-model-small-streaming-ru/tree/5fbd908cb21cbd585fa21461f463ba41fbcbcb68
+License: https://www.apache.org/licenses/LICENSE-2.0
