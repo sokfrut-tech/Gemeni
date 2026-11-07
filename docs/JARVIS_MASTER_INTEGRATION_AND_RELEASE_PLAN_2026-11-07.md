@@ -344,3 +344,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 - Run #221 (`42387826682`) has Secret scanning passed; CodeQL job is setting up Gradle. It includes the cancellation race fix and unknown-length body-cap regression test.
 - Prior run #214 failed the JVM suite with 42/43 tests passing; the failure was the cancellation/EOF race. Run #219 was superseded when the additional unknown-length regression test was added. No current exact-head pass is available yet.
 - PR #95 and #104 emulator smoke jobs remain in progress; neither has a terminal result or a verified non-zero instrumentation count at this snapshot.
+
+
+## 28. ASR decoder aligned with upstream int8 reference (2026-11-07)
+
+- Reviewed Alpha Cephei's official `decode8.py` for the pinned streaming model revision. It configures `encoder.int8.onnx`, `decoder.int8.onnx`, `joiner.int8.onnx` and `lang/tokens.txt` together.
+- Changed PR #105 to download the int8 decoder as well (local runtime filename remains `decoder.onnx` to match the Sherpa loader). Its pinned SHA-256 is `2b0df458692e1d090075c8249001136ef05240dd0d726a6b56552fd46c538b2d`.
+- The runtime now uses all three quantized ONNX components, avoiding an unnecessary mixed-precision model configuration and reducing download size. Provenance doc updated.
