@@ -43,9 +43,9 @@ The emulator job logs show repeated adb exit code 1 while Android services are u
 ## Required next steps
 
 1. Inspect and retain the full emulator diagnostic artifacts for PR #112 and #113; identify whether package/activity services ever become available after boot.
-2. Add a bounded readiness check immediately before APK installation / connected tests, verifying `service check package` and `service check activity` in addition to `sys.boot_completed`. Fail early with captured diagnostics rather than retrying adb blindly for a long interval.
-3. For PR #111, add deterministic screenshot + UI hierarchy capture on first launch failure.
-4. Run an A/B test with `AlphaVideoSurfaceView` disabled/static to determine whether SurfaceView/GL rendering causes missing UI nodes or stalls. Keep the animated orb only if the functional controls remain visible and responsive.
+2. The current smoke script already checks `sys.boot_completed`, PackageManager and ActivityManager before instrumentation. However, the later APK install logs show those services disappearing after the initial readiness gate. Add a bounded re-check/monitor immediately before installation and capture the exact service state at the point of failure; do not blindly restart ADB.
+3. For PR #111, add deterministic screenshot + UI hierarchy capture on first launch failure and pull those files into the Actions evidence artifact.
+4. After UI captures are available, run an A/B test with `AlphaVideoSurfaceView` disabled/static to determine whether SurfaceView/GL rendering causes missing UI nodes or stalls. Keep the animated orb only if the functional controls remain visible and responsive.
 5. Re-run JVM tests, debug APK build, and Android instrumentation separately. Do not merge or publish until all required checks pass.
 
 ## Guardrails
