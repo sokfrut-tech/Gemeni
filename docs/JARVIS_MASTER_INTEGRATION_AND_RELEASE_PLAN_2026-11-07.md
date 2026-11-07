@@ -608,3 +608,15 @@ Commits on PR #108:
 - `6e551a25fe4f9db4d9beb6386b138c5fdc4ad92d` — isolate model-consent test.
 
 This review exposed why emulator instrumentation is a separate release gate: JVM-only success does not compile or execute androidTest sources. The previous CI run `42392341968` is now superseded; new exact-head evidence is required.
+
+
+## 57. PR #108 exact-head CI rerun after emulator-readiness gate (2026-11-07)
+
+- PR #108 current head: `78c0c98ececc9fd4d843ee25160ce295bee2ad49`; exact-head workflow run #289 / `42395610346`: https://github.com/sokfrut-tech/Gemeni/actions/runs/42395610346.
+- Secret scanning SUCCESS. CodeQL/static analysis SUCCESS, including Kotlin compilation, JVM unit tests, full Debug APK build, APK verification/hash and SARIF upload.
+- Debug APK artifact `13583034365`: 86,961,305 bytes; SHA-256 `acaf0b469c80065fdf6e611612aa0791fd0bbc3f83e03af971646bb8049dee3c`.
+- JUnit report artifact `13582769743` uploaded successfully. The JVM test job is green; the exact test count should be taken from the XML artifact, not inferred from the job badge.
+- The Android emulator smoke job `128473342706` started after CodeQL and reached the workflow step `Run Android emulator smoke tests`. At the time of this update it remains `in_progress`; diagnostic capture and emulator evidence upload have not run. Therefore no emulator instrumentation test count or pass is established.
+- This run includes the CI-only readiness change from commit `78c0c98`: wait up to 180 seconds for ADB, boot completion, PackageManager and ActivityManager before installing/running instrumentation; on timeout collect bounded device/framework/logcat diagnostics and fail. This is a diagnostic gate, not a relaxation of test assertions.
+- The prior run `42392521775` on head `6e551a25fe4f9db4d9beb6386b138c5fdc4ad92d` had a failed emulator job with **zero tests executed** because the emulator was offline and Android package/activity services were unavailable. That run is superseded for current-head evidence.
+- PR #108 remains Draft. Keep the emulator non-zero-test requirement, Android API compatibility decision (current `minSdk=29` vs original API 24+ target), and physical OPPO Find X6 Pro microphone/VAD/ASR/TTS validation as open release gates. Do not merge or publish an APK as a qualified release based only on this build artifact.
