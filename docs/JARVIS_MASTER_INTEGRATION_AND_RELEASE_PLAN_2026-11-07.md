@@ -590,3 +590,21 @@ For integrated head `603ff6894d60dc7cba7a4f6b9b691315f15717ed`, workflow run `42
 - Commits on PR #108: `e2f01847c174ceec672ddfaf648cb3b726e94c39` (permission UX), `46a9289da768885c30b63f0d281085455ac07050` (instrumentation), `432964ed8d5c4bf7e03b8d5ec953346eec7829da` (correct Package Manager permission query argument order).
 - This is a permission-denial UI test only. It does not prove permission grant, AudioRecord/HAL capture, VAD endpointing with microphone samples, ASR transcription, TTS playback, or OPPO behavior.
 - These commits supersede run `42391861171` for current-head evidence. Its 69/69 JVM result belongs to parent `97010e0ae1c3e77befdead8d844fd0b79e0ed401`; do not attribute it to the new head until fresh CI completes.
+
+
+## 56. Voice setup ordering and instrumentation test drift correction (2026-11-07)
+
+A deeper review of the new permission test found that the original UI flow checked model readiness before requesting RECORD_AUDIO. On a clean install, the model-consent dialog therefore appeared first and the microphone-denial path could not be exercised. The flow now requests microphone permission first; only after a grant does it inspect local model readiness and, if needed, show the combined ASR+VAD consent dialog. Denial exits without model/network setup.
+
+The same review found stale instrumentation assumptions from the pre-VAD flow:
+- Consent dialog title still expected the former ASR-only wording.
+- A runtime test called the removed ASR-only download method.
+- A prepare() assertion expected an obsolete error phrase.
+These now match the current combined voice-model API and dialog. The model-consent test explicitly grants RECORD_AUDIO so it tests model consent independently of Android's microphone prompt.
+
+Commits on PR #108:
+- `5f6e4dd85c6c6a21c99565b62dee6cb86f49a857` — permission-first flow.
+- `9bfedf6116309973e12808d0b1d666e5e22f5778` — align stale instrumentation API/text.
+- `6e551a25fe4f9db4d9beb6386b138c5fdc4ad92d` — isolate model-consent test.
+
+This review exposed why emulator instrumentation is a separate release gate: JVM-only success does not compile or execute androidTest sources. The previous CI run `42392341968` is now superseded; new exact-head evidence is required.
