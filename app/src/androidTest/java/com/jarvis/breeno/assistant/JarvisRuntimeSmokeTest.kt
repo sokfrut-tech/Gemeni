@@ -63,6 +63,33 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
+    fun denyingMicrophonePermissionShowsActionableStatus() {
+        device.executeShellCommand("pm revoke $packageName android.permission.RECORD_AUDIO")
+        launchJarvis()
+        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
+        assertNotNull("Microphone button is missing", mic)
+        mic!!.click()
+
+        val denyButton = device.wait(
+            Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")),
+            10_000
+        ) ?: device.wait(Until.findObject(By.text("Don't allow")), 2_000)
+            ?: device.wait(Until.findObject(By.text("Deny")), 2_000)
+        assertNotNull("Android microphone permission dialog did not offer a deny action", denyButton)
+        denyButton!!.click()
+
+        assertTrue(
+            "Jarvis should explain how to recover after microphone permission is denied",
+            device.wait(
+                Until.hasObject(By.textContains("Доступ к микрофону не предоставлен")),
+                5_000
+            )
+        )
+        val permissionState = device.executeShellCommand("pm check-permission $packageName android.permission.RECORD_AUDIO")
+        assertTrue("Microphone permission must remain denied", permissionState.trim() == "denied")
+    }
+
+    @Test
     fun runtimePrepareRejectsMissingModelWithoutDownloading() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val runtime = JarvisRuntimeController(context)
