@@ -423,3 +423,11 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - Latest PR #107 exact head is `cb840f2b84382e92268c9b6c3eb0516a6212c910`. Run #241 was for the earlier head; run #243 was cancelled/superseded after the follow-up test commits. A fresh exact-head run is required before treating this slice as verified.
 - PR #105 CodeQL and full debug APK build have now completed successfully, along with secret scanning. Its emulator smoke job is still active and has not supplied a final instrumentation count.
 - PR #106 secret scanning is green; CodeQL is still in the full APK build step. No complete CI or release status is claimed for #106.
+
+
+## 38. Silero VAD model provenance and tighter cap (2026-11-07)
+
+- Cross-checked the model source against official sherpa-onnx documentation: the documented VAD download URL is the pinned GitHub release asset, and the exported `silero_vad.onnx` is the 16 kHz model (documented size approximately 629 KiB). The Android engine is configured for 16 kHz, so this is the correct model family for the current audio pipeline.
+- Tightened the downloader's maximum permitted body from 32 MiB to 4 MiB, leaving headroom above the documented asset size without a needlessly wide limit.
+- Added a truncated-response test that asserts neither the final model nor the .part file is left behind. PR #107 now has 10 deterministic JVM regression cases.
+- Latest PR #107 head: `1627987fe43897ed6d33dc43122a1f8ee563bddb`; run #247 (`42388826653`) is pending. Previous run #244 was superseded by these changes and is not an exact-head result.
