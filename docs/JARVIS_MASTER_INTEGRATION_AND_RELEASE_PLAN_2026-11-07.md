@@ -197,3 +197,13 @@ The previously identified sibling-branch privacy blocker has now been addressed 
 Exact PR #95 head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`. Its Factory Security Baseline run #191 (42386652892) started; secret scanning passed and CodeQL/Gradle was still running at the time of this update. The code is not yet verified by terminal CI and must remain Draft.
 
 Remaining validation: ensure UI cancellation test passes, verify exact instrumentation test count is non-zero, inspect emulator diagnostics if it fails, and verify already-installed verified models bypass the consent dialog. Physical OPPO validation remains required.
+
+
+## 12. Consent-first emulator smoke branch re-based (2026-11-07)
+
+- The earlier PR #97 was based on the pre-consent #95 head. Once #95 changed, GitHub reported #97 as non-mergeable and its microphone permission smoke test no longer matched the new consent-first UX.
+- Created replacement PR #104 directly on the updated #95 head (`15a0a970b32d3bbd33fb8407cb83611fc5230a73`). It carries the improved in-action ADB/logcat capture and a deterministic smoke suite: launch UI, decline model-download consent, assert no model setup begins, verify runtime `prepare()` rejects a missing model without creating files, and open the Qwen settings panel. CI does not approve a download or depend on downloading a model.
+- Closed stale PR #97 with an explanation and link to #104; its branch remains in Git history.
+- PR #104 exact head: `023446aeafbf20f9f368322a4b513b60a7fdfd94`; Factory Security Baseline run #193 (42386800592) started. Secret scanning passed; CodeQL/build and emulator instrumentation are pending.
+- PR #95 exact head: `15a0a970b32d3bbd33fb8407cb83611fc5230a73`; run #191 (42386652892) has secret scanning passed; CodeQL is still running before compile/build steps have completed.
+- Neither PR is merge-ready. Keep #95 and #104 Draft until their exact-head required checks finish green and emulator test reports show a non-zero test count.
