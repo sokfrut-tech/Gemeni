@@ -478,3 +478,6 @@ PR #107 hardening follow-up: added constructor validation for the injected size 
 
 
 PR #108 static review follow-up: `SileroVadEngine.load()` now clears the reference to the released native VAD object before attempting to construct a replacement. This prevents a failed native reinitialization from leaving a stale released pointer that a later `close()` could release again. Latest PR #108 head `e8da5277b68d17f760368e850beabf5bcdbb84a4`; exact-head run #261 is pending. PR #107 latest run #255 has secret scanning passed; CodeQL is still at full Debug APK build. PR #105/#106 emulator jobs remain active without a terminal instrumentation count.
+
+
+PR #108 responsiveness hardening: changed `AudioRecordPipeline` from blocking reads to `READ_NON_BLOCKING`. When the HAL returns no samples, the flow emits an empty heartbeat every 20 ms after a short delay. This allows the existing 8 s no-speech and 30 s hard-capture policy to advance even during temporary silent/stalled input, and keeps coroutine cancellation responsive instead of waiting on a blocking native read. `SileroVadEngine.accept()` treats empty arrays as a no-op. Commit `1011ec4248277a08a8c9193c506e09bf59a1ea6e`; this supersedes PR #108's earlier exact-head CI run and requires a fresh run.
