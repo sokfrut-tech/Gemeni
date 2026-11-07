@@ -42,6 +42,9 @@ class JarvisRuntimeSmokeTest {
 
     @Test
     fun decliningModelDownloadConsentDoesNotStartNetworkSetup() {
+        // This test targets model consent, so pre-grant microphone access to
+        // avoid the Android runtime permission prompt taking precedence.
+        device.executeShellCommand("pm grant $packageName android.permission.RECORD_AUDIO")
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
