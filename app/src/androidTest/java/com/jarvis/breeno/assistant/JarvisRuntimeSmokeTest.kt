@@ -42,12 +42,15 @@ class JarvisRuntimeSmokeTest {
 
     @Test
     fun decliningModelDownloadConsentDoesNotStartNetworkSetup() {
+        // This test targets model consent, so pre-grant microphone access to
+        // avoid the Android runtime permission prompt taking precedence.
+        device.executeShellCommand("pm grant $packageName android.permission.RECORD_AUDIO")
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
 
-        val consent = device.wait(Until.findObject(By.text("Загрузить русскую модель?")), 10_000)
+        val consent = device.wait(Until.findObject(By.text("Загрузить голосовые модели?")), 10_000)
         assertNotNull("Explicit model-download consent dialog is missing", consent)
         assertNotNull("Consent dialog must offer a clear decline action", device.wait(Until.findObject(By.text("Не сейчас")), 5_000))
         device.findObject(By.text("Не сейчас")).click()
@@ -63,12 +66,39 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
+    fun denyingMicrophonePermissionShowsActionableStatus() {
+        device.executeShellCommand("pm revoke $packageName android.permission.RECORD_AUDIO")
+        launchJarvis()
+        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
+        assertNotNull("Microphone button is missing", mic)
+        mic!!.click()
+
+        val denyButton = device.wait(
+            Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")),
+            10_000
+        ) ?: device.wait(Until.findObject(By.text("Don't allow")), 2_000)
+            ?: device.wait(Until.findObject(By.text("Deny")), 2_000)
+        assertNotNull("Android microphone permission dialog did not offer a deny action", denyButton)
+        denyButton!!.click()
+
+        assertTrue(
+            "Jarvis should explain how to recover after microphone permission is denied",
+            device.wait(
+                Until.hasObject(By.textContains("Доступ к микрофону не предоставлен")),
+                5_000
+            )
+        )
+        val permissionState = device.executeShellCommand("pm check-permission android.permission.RECORD_AUDIO $packageName")
+        assertTrue("Microphone permission must remain denied", permissionState.trim() == "denied")
+    }
+
+    @Test
     fun runtimePrepareRejectsMissingModelWithoutDownloading() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val runtime = JarvisRuntimeController(context)
         try {
             val deniedDownload = runCatching {
-                runtime.downloadRussianAsrAfterConsent(userConsent = false) {}
+                runtime.downloadVoiceModelsAfterConsent(userConsent = false) {}
             }.exceptionOrNull()
             assertNotNull("Downloader must reject a missing explicit consent flag", deniedDownload)
             assertTrue(
@@ -80,7 +110,7 @@ class JarvisRuntimeSmokeTest {
             assertNotNull("Runtime must reject preparation when ASR is not installed", failure)
             assertTrue(
                 "Runtime must explain that separate model-download consent is required",
-                failure!!.message.orEmpty().contains("отдельно подтвердите")
+                failure!!.message.orEmpty().contains("Русская ASR-модель не установлена")
             )
             val modelFiles = File(context.filesDir, "models").walkTopDown().filter { it.isFile }.toList()
             assertTrue("prepare() and denied download must not create model files or access the network", modelFiles.isEmpty())

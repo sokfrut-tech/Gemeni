@@ -12,9 +12,13 @@ import com.jarvis.breeno.assistant.core.ai.JarvisModelRequest
 import com.jarvis.breeno.assistant.core.ai.JarvisModelResult
 import com.jarvis.breeno.assistant.core.ai.LocalOnlyJarvisModelProvider
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
+import com.jarvis.breeno.assistant.updater.SileroVadModelManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
+import com.jarvis.breeno.assistant.voice.SileroVadEngine
+import com.jarvis.breeno.assistant.voice.VadCapturePolicy
+import android.os.SystemClock
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.takeWhile
 
@@ -22,8 +26,10 @@ import kotlinx.coroutines.flow.takeWhile
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
     private val models = ModelDownloadManager(appContext)
+    private val vadModels = SileroVadModelManager(appContext)
     private val audio = AudioRecordPipeline(appContext)
     private val asr = SherpaRussianAsrEngine()
+    private val vad = SileroVadEngine()
     private val tools = AndroidJarvisToolRegistry(appContext)
     private var reasoning: JarvisModelProvider = LocalOnlyJarvisModelProvider()
     private val qwenRuntime = LlamaCppRuntime()
@@ -66,29 +72,40 @@ class JarvisRuntimeController(context: Context) {
         }
     }
 
-    suspend fun isRussianAsrReady(): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        models.isRussianAsrReady()
-    }
+    suspend fun areVoiceModelsReady(): Boolean =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            models.isRussianAsrReady() && vadModels.isReady()
+        }
 
-    /** Requires an explicit caller consent token before any model network access. */
-    suspend fun downloadRussianAsrAfterConsent(
+    /** One explicit user action authorizes both local speech models; neither downloads at startup. */
+    suspend fun downloadVoiceModelsAfterConsent(
         userConsent: Boolean,
         onProgress: (String) -> Unit
     ) {
-        require(userConsent) { "Для загрузки русской ASR-модели требуется явное согласие пользователя" }
-        onProgress("Загружаю файлы русской модели из Hugging Face…")
-        models.ensureRussianAsr { percent -> onProgress("Загрузка модели: $percent%") }
-        check(models.isRussianAsrReady()) { "Проверка целостности русской модели не пройдена" }
-        onProgress("Модель загружена и проверена")
+        require(userConsent) { "Для загрузки голосовых моделей требуется явное согласие пользователя" }
+        onProgress("Загружаю русскую модель распознавания…")
+        models.ensureRussianAsr { percent -> onProgress("Русская модель: $percent%") }
+        check(models.isRussianAsrReady()) { "Проверка целостности русской ASR-модели не пройдена" }
+
+        onProgress("Загружаю компактную модель определения речи Silero VAD…")
+        vadModels.ensure(userConsent = true) { percent ->
+            onProgress("Модель Silero VAD: $percent%")
+        }
+        check(vadModels.isReady()) { "Проверка целостности Silero VAD не пройдена" }
+        onProgress("Обе голосовые модели загружены и проверены")
     }
 
     suspend fun prepare(onProgress: (String) -> Unit) {
-        onProgress("Проверяю русскую модель…")
+        onProgress("Проверяю локальные голосовые модели…")
         check(models.isRussianAsrReady()) {
-            "Русская модель не установлена. Сначала отдельно подтвердите её загрузку."
+            "Русская ASR-модель не установлена. Подтвердите её загрузку."
+        }
+        check(vadModels.isReady()) {
+            "Модель Silero VAD не установлена. Подтвердите загрузку голосовых моделей."
         }
         asr.load(models.modelDir())
-        onProgress("Русский ASR готов")
+        vad.load(vadModels.modelFile())
+        onProgress("Русский ASR и Silero VAD готовы")
     }
 
     suspend fun listenOnce(
@@ -96,17 +113,57 @@ class JarvisRuntimeController(context: Context) {
         onState: (AssistantState) -> Unit = {},
         onConversation: (userText: String, assistantText: String) -> Unit = { _, _ -> }
     ): String {
-        val samples = ArrayList<ShortArray>()
-        val started = System.nanoTime()
+        val segments = ArrayList<FloatArray>()
+        val policy = VadCapturePolicy()
+        val started = SystemClock.elapsedRealtime()
+        var decision = VadCapturePolicy.Decision.CONTINUE
         onState(AssistantState.LISTENING)
         onProgress("Микрофон активен — говорите")
-        audio.frames()
-            .takeWhile { (System.nanoTime() - started) / 1_000_000 < 4_500 }
-            .collect { samples += it }
+        vad.reset()
+        try {
+            audio.frames().takeWhile { frame ->
+                val speechDetected = vad.accept(frame)
+                var emittedSegment = false
+                while (true) {
+                    val segment = vad.pollSegment() ?: break
+                    segments += segment
+                    emittedSegment = true
+                }
+                decision = policy.onFrame(
+                    elapsedMs = SystemClock.elapsedRealtime() - started,
+                    speechDetected = speechDetected,
+                    completedSegmentAvailable = emittedSegment
+                )
+                decision == VadCapturePolicy.Decision.CONTINUE
+            }.collect { /* Frames are processed in the takeWhile predicate. */ }
+            if (decision == VadCapturePolicy.Decision.HARD_LIMIT) {
+                vad.flush()
+                while (true) {
+                    val segment = vad.pollSegment() ?: break
+                    segments += segment
+                }
+            }
+        } finally {
+            vad.reset()
+        }
 
-        val pcm = ShortArray(samples.sumOf { it.size })
+        if (decision == VadCapturePolicy.Decision.NO_SPEECH_TIMEOUT || segments.isEmpty()) {
+            onState(AssistantState.IDLE)
+            onProgress("Речь не обнаружена. Нажмите микрофон и попробуйте ещё раз.")
+            return ""
+        }
+
+        val sampleCount = segments.sumOf { it.size }
+        val pcm = ShortArray(sampleCount)
         var offset = 0
-        samples.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
+        segments.forEach { segment ->
+            segment.forEach { sample ->
+                pcm[offset++] = (sample * 32768f)
+                    .toInt()
+                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                    .toShort()
+            }
+        }
 
         onState(AssistantState.TRANSCRIBING)
         onProgress("Распознаю локально…")
@@ -184,5 +241,11 @@ class JarvisRuntimeController(context: Context) {
         return response
     }
 
-    fun close() { pendingConfirmationJson = null; qwenRuntime.close(); asr.close() }
+    fun close() {
+        pendingConfirmationJson = null
+        speaker.close()
+        qwenRuntime.close()
+        asr.close()
+        vad.close()
+    }
 }
