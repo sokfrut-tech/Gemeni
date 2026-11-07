@@ -32,6 +32,9 @@ class AudioRecordPipeline(private val context: Context) {
         check(minBuffer > 0) { "AudioRecord.getMinBufferSize failed: $minBuffer" }
 
         val bufferSize = maxOf(minBuffer, SAMPLE_RATE / 5 * 2)
+        // Allocate the Kotlin buffer before opening the native recorder so an
+        // allocation failure cannot strand an already-created AudioRecord.
+        val buffer = ShortArray(bufferSize / 2)
         val recorder = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
             SAMPLE_RATE,
@@ -39,10 +42,10 @@ class AudioRecordPipeline(private val context: Context) {
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize
         )
-        check(recorder.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord initialization failed" }
-
-        val buffer = ShortArray(bufferSize / 2)
         try {
+            // Keep every operation after native resource creation inside the
+            // release-protected block, including the initialization-state check.
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord initialization failed" }
             recorder.startRecording()
             while (currentCoroutineContext().isActive) {
                 // Non-blocking reads keep coroutine cancellation and VAD deadlines responsive.
