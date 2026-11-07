@@ -504,3 +504,13 @@ PR #108 test refinement: added a seventh deterministic policy test proving that 
 
 
 PR #108 exact-head run #266 (`42389826211`) for `82eab794842be36942fa8cc934001a86516db7f4`: Secret scanning SUCCESS; Kotlin compile SUCCESS; JVM unit tests SUCCESS. Downloaded/parsed JUnit XML artifact `13580524835`: **64 tests, 0 failures, 0 errors, 0 skipped**, 11 suites; `VadCapturePolicyTest` 7/7. At this evidence update, full Debug APK build is in progress; APK verification and CodeQL analyze not yet complete. Emulator job has not yet started. PR #108 remains draft; run #266 is exact-head.
+
+
+## 46. Exact-head CI evidence for PR #105–#108 (2026-11-07)
+
+- PR #105, head `46013ce1ddd09dd6281ef72248a6288a478c12e2`, run #233 (`42388091023`): secret scanning, Kotlin compile, JVM tests, full Debug APK build/verification, and CodeQL all SUCCESS. JUnit artifact `13580511925`: **45 tests, 0 failures, 0 errors, 0 skipped**, 9 suites. APK artifact `13580716262` uploaded (86,948,286 bytes).
+- PR #106, head `2a9a0aef3c887433a46cfe9660ecacca18372e6f`, run #238 (`42388285102`): same CI stages SUCCESS. JUnit artifact `13580233903`: **50 tests, 0 failures, 0 errors, 0 skipped**, 10 suites; includes 5 speaker lifecycle tests. APK artifact `13580786536` uploaded (86,953,604 bytes).
+- PR #107, head `54a69a4c2f1dbf139007453a2fa7253c423e434f`, run #255 (`42389152047`): **57/57** JVM tests; secret scan, CodeQL, Kotlin compile, full APK build/verification all SUCCESS. APK artifact `13580633488` uploaded (86,954,012 bytes).
+- PR #108, head `82eab794842be36942fa8cc934001a86516db7f4`, run #266 (`42389826211`): **64/64** JVM tests; secret scan, Kotlin compile, full APK build/verification, CodeQL all SUCCESS. Emulator job `128456229885` is queued.
+- Emulator jobs for PR #105/#106/#107 are still in progress at latest check. No terminal instrumentation XML/count has been confirmed for any of these branches. Therefore emulator release gate remains open and PRs stay draft. Physical OPPO Find X6 Pro test remains outstanding.
+- Exact evidence comments posted on PRs #105, #106, #107 and #108. Do not interpret a successful JVM/APK/CodeQL run as emulator or device acceptance.
