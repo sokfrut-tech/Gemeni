@@ -446,3 +446,6 @@ PR #106 compile-safety refinement: the Android `TextToSpeech.OnInitListener` is 
 - Added `docs/JARVIS_VAD_VOICE_LOOP_INTEGRATION_BRIEF_2026-11-07.md` with the current fixed-window limitation, two-model consent flow, privacy disclosure, proposed local endpointing targets, cancellation/resource lifecycle, test matrix and OPPO device acceptance scenarios.
 - The brief explicitly defers VAD runtime wiring until PR #107's secure downloader passes exact-head CI. It keeps always-on hotword out of this slice and preserves the existing guarded tool-confirmation policy.
 - Initial tuning targets: 0.55 s trailing silence, 8 s no-speech timeout, 25 s max segment and 30 s hard capture ceiling. These are starting values, not validated device measurements; adjust only from repeatable fixtures and OPPO testing.
+
+
+PR #107 hardening follow-up: added constructor validation for the injected size cap and SHA-256 manifest, and delete a stale/corrupt final target before beginning a fresh consented download. Commit `735196a692f8755a26f6e2327119008772ea2b5d`; the previous CI run must be superseded and a new exact-head run inspected.
