@@ -322,3 +322,10 @@ The official Alpha Cephei model commit prefix `5fbd908` was resolved to full imm
 
 - PR #85 contained only the two ASR consent implementation files; those changes are now integrated in PR #95, with stronger runtime consent enforcement and tests in PR #104/#105.
 - Closed PR #85 with a comment linking to the active integrated stack. Its branch remains available for history; no code was lost.
+
+
+## 25. ASR downloader cancellation race found and corrected (2026-11-07)
+
+- PR #105 run #214 (42387501472) executed the new JVM unit suite: **43 tests, 1 failure**. The failing case was `cancellationDisconnectsActiveConnectionAndCleansPartialFile`; the failure occurred at the post-stream completeness check because a socket disconnect can unblock a blocking `read()` by returning EOF instead of throwing.
+- Corrected the downloader loop to call `currentCoroutineContext().ensureActive()` immediately after each blocking `input.read(buffer)`, before interpreting EOF. Cancellation is now observed before a disconnect-induced EOF can be mistaken for a completed response.
+- Fix commit: `18ce5f8aceb80a3c7732df939a7a2f25cc3f80d1`. Exact-head CI rerun is required; no passing claim until the full unit suite completes.
