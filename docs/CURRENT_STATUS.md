@@ -83,3 +83,13 @@ Important limitation: `LocalOnlyJarvisModelProvider` is a deterministic parser a
 - The earlier emulator jobs are abnormally long-running at the step `Run Android emulator smoke tests`; job logs could not be retrieved through the connected GitHub log endpoint (Azure BlobNotFound). Do not label them passed or failed until GitHub reports a terminal result. PR #93 includes failure-only diagnostics, which should be inspected if that job terminates unsuccessfully.
 - Test strategy going forward: keep emulator UI/permission smoke tests deterministic and offline; test ASR/model download/inference separately with explicit network/model prerequisites; validate Qwen on the physical OPPO Find X6 Pro before claiming on-device or offline generation.
 - Product remains **NOT RELEASE READY**. No merge, release, or physical OPPO verification is claimed.
+
+
+## 2026-11-07 — bounded emulator diagnostics follow-up
+
+- PR #97 latest head: `484a33dc327640d75b0d96428f0dc901e04a7b4b`; run #168: https://github.com/sokfrut-tech/Gemeni/actions/runs/42342370703.
+- On the earlier PR #93 diagnostics branch, the emulator smoke step did fail, but the subsequent diagnostic shell step itself remained in progress and no diagnostic artifact was produced. This shows the original diagnostic commands can also hang when ADB/emulator communication is unhealthy; it does not identify the underlying test failure.
+- PR #97 workflow now runs each ADB diagnostic command under a short timeout and uploads emulator logs plus connected-test reports/results on failure. This is a diagnostics reliability improvement, not a test pass.
+- At the time of this update, run #168 had completed secret scanning successfully; CodeQL was still running and the emulator job had not yet started. Do not infer a result for either pending job.
+- Older PR #95 emulator run #164 (42340498895) ended in failure after the permission-test revision was not yet present. PR #97 is the intended deterministic test path. Previous run #167 was cancelled by the newer workflow commit.
+- APK builds from previous exact heads are successful, but instrumentation still needs a fresh terminal result. Product remains **NOT RELEASE READY**; no merge/release and no physical OPPO test claimed.
