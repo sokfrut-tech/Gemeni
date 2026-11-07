@@ -620,3 +620,15 @@ This review exposed why emulator instrumentation is a separate release gate: JVM
 - This run includes the CI-only readiness change from commit `78c0c98`: wait up to 180 seconds for ADB, boot completion, PackageManager and ActivityManager before installing/running instrumentation; on timeout collect bounded device/framework/logcat diagnostics and fail. This is a diagnostic gate, not a relaxation of test assertions.
 - The prior run `42392521775` on head `6e551a25fe4f9db4d9beb6386b138c5fdc4ad92d` had a failed emulator job with **zero tests executed** because the emulator was offline and Android package/activity services were unavailable. That run is superseded for current-head evidence.
 - PR #108 remains Draft. Keep the emulator non-zero-test requirement, Android API compatibility decision (current `minSdk=29` vs original API 24+ target), and physical OPPO Find X6 Pro microphone/VAD/ASR/TTS validation as open release gates. Do not merge or publish an APK as a qualified release based only on this build artifact.
+
+
+## 58. PR #108 emulator failure root cause and CI harness correction (2026-11-07)
+
+The terminal result of exact-head run `42395610346` (head `78c0c98ececc9fd4d843ee25160ce295bee2ad49`) is now inspected from the Android emulator job log:
+
+- The emulator did boot: the runner reported `sys.boot_completed=1` and `Emulator booted`; its boot took approximately 609,900 ms (about 10 minutes).
+- The failure was **not** a PackageManager/ActivityManager readiness timeout and did not show `Can't find service: package`. The action invoked each line of its multiline `script:` as a separate `/usr/bin/sh -c` command. The line `for attempt in $(seq 1 90); do` was therefore executed without the following loop body and failed with `Syntax error: end of file unexpected (expecting "done")`.
+- This is a CI harness/script-boundary bug introduced by the multiline shell control flow, not evidence of an Android `system_server` crash. Zero instrumentation tests ran. The emulator diagnostics folder was not uploaded because the script failed before creating its files.
+- Corrective change: move the complete readiness, diagnostics, Gradle instrumentation and non-zero JUnit XML-count logic into a checked-in Bash script `.github/scripts/run-android-emulator-smoke.sh`; invoke it as a **single command** from the emulator-runner `script:` input. The script explicitly restarts host ADB (`adb kill-server` / `adb start-server`), waits for device/framework services, and retains the hard non-zero instrumentation test requirement.
+- Infrastructure experiment, limited to the emulator job: pin runner to `ubuntu-22.04`, switch API 35 image target from `google_apis` to `aosp_atd`, and use cold boot / no snapshot save / wipe-data options. The CodeQL and secret-scan jobs remain on their existing runner configuration.
+- These are new CI changes and require a fresh exact-head workflow. They are not evidence that emulator tests now pass. PR #108 stays Draft pending non-zero instrumentation results and physical OPPO validation.
