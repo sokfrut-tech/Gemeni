@@ -5,17 +5,18 @@ package com.jarvis.breeno.assistant.voice
  * for push-to-talk/testing and as a controlled fallback when the KWS model is
  * not downloaded yet.
  */
-class HotwordDetector {
+class HotwordDetector : WakeWordGate {
     @Volatile private var armed = true
     @Volatile private var kws: SherpaJarvisKwsEngine? = null
 
-    fun arm() { armed = true; kws?.reset() }
-    fun disarm() { armed = false }
+    override fun arm() { armed = true; kws?.reset() }
+    override fun disarm() { armed = false }
     fun isArmed(): Boolean = armed
 
     fun bindKws(engine: SherpaJarvisKwsEngine) { kws = engine }
 
-    fun accepts(samples: ShortArray): Boolean {
+    @Synchronized
+    override fun accepts(samples: ShortArray): Boolean {
         if (!armed) return false
         return kws?.accept(samples) == true
     }
@@ -29,6 +30,7 @@ class HotwordDetector {
         return normalized == "джарвис" || normalized.startsWith("джарвис ")
     }
 
+    @Synchronized
     fun close() {
         kws?.close()
         kws = null
