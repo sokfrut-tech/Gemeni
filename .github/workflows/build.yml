@@ -108,16 +108,29 @@ jobs:
 
       - name: Capture emulator diagnostics
         if: always()
+        timeout-minutes: 2
+        shell: bash
         run: |
+          set +e
           mkdir -p emulator-diagnostics
-          adb devices -l > emulator-diagnostics/adb-devices.txt 2>&1 || true
-          adb shell getprop sys.boot_completed > emulator-diagnostics/boot-completed.txt 2>&1 || true
-          adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1 || true
-          adb shell dumpsys activity > emulator-diagnostics/activity.txt 2>&1 || true
-          adb shell dumpsys meminfo > emulator-diagnostics/meminfo.txt 2>&1 || true
+          echo "Diagnostics started at $(date -u +%FT%TZ)" > emulator-diagnostics/diagnostics-status.txt
+          # Bound every adb call: a wedged emulator must never block artifact upload.
+          timeout --signal=TERM 10s adb devices -l > emulator-diagnostics/adb-devices.txt 2>&1
+          echo "adb_devices_exit=$?" >> emulator-diagnostics/diagnostics-status.txt
+          timeout --signal=TERM 10s adb shell getprop sys.boot_completed > emulator-diagnostics/boot-completed.txt 2>&1
+          echo "boot_property_exit=$?" >> emulator-diagnostics/diagnostics-status.txt
+          timeout --signal=TERM 25s adb logcat -d -v threadtime > emulator-diagnostics/logcat.txt 2>&1
+          echo "logcat_exit=$?" >> emulator-diagnostics/diagnostics-status.txt
+          timeout --signal=TERM 15s adb shell dumpsys activity > emulator-diagnostics/activity.txt 2>&1
+          echo "activity_dump_exit=$?" >> emulator-diagnostics/diagnostics-status.txt
+          timeout --signal=TERM 15s adb shell dumpsys meminfo > emulator-diagnostics/meminfo.txt 2>&1
+          echo "meminfo_dump_exit=$?" >> emulator-diagnostics/diagnostics-status.txt
+          echo "Diagnostics finished at $(date -u +%FT%TZ)" >> emulator-diagnostics/diagnostics-status.txt
+          exit 0
 
       - name: Upload runtime test results and emulator diagnostics
         if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@v4
         with:
           name: jarvis-runtime-test-results
