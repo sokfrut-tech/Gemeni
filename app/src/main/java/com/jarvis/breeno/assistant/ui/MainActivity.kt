@@ -316,9 +316,27 @@ class MainActivity : ComponentActivity() {
                             Text("Рабочие команды", color = Color(0xFFB8C5D6), style = MaterialTheme.typography.labelLarge)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                QuickCommand("Навигатор") { transcript = runQuickCommand("Навигатор") }
-                                QuickCommand("Поиск") { transcript = runQuickCommand("Поиск") }
-                                QuickCommand("Телефон") { transcript = runQuickCommand("Телефон") }
+                                QuickCommand("Навигатор") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Навигатор") }
+                                        status = transcript
+                                    }
+                                }
+                                QuickCommand("Поиск") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Поиск") }
+                                        status = transcript
+                                    }
+                                }
+                                QuickCommand("Телефон") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Телефон") }
+                                        status = transcript
+                                    }
+                                }
                             }
                         }
                     }
@@ -327,16 +345,21 @@ class MainActivity : ComponentActivity() {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             androidx.compose.material3.TextButton(
                                 onClick = {
-                                    transcript = runtime.confirmPendingAction()
-                                    status = transcript
-                                    assistantState = AssistantState.IDLE
+                                    lifecycleScope.launch {
+                                        status = "Выполняю подтверждённое действие…"
+                                        transcript = withContext(Dispatchers.IO) { runtime.confirmPendingAction() }
+                                        status = transcript
+                                        assistantState = AssistantState.IDLE
+                                    }
                                 }
                             ) { Text("Подтвердить", color = Color(0xFF8DEBFF)) }
                             androidx.compose.material3.TextButton(
                                 onClick = {
-                                    transcript = runtime.cancelPendingAction()
-                                    status = transcript
-                                    assistantState = AssistantState.IDLE
+                                    lifecycleScope.launch {
+                                        transcript = withContext(Dispatchers.IO) { runtime.cancelPendingAction() }
+                                        status = transcript
+                                        assistantState = AssistantState.IDLE
+                                    }
                                 }
                             ) { Text("Отмена", color = Color(0xFFFFB38A)) }
                         }
