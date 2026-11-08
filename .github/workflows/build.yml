@@ -36,6 +36,11 @@ jobs:
       - name: Build debug APK
         id: build-apk
         run: gradle :app:assembleDebug --no-daemon --stacktrace
+      # Run fast JVM tests independently of the emulator so lifecycle and policy
+      # tests (including KWS/VAD/audio coordination) cannot be silently skipped.
+      - name: Run JVM unit tests
+        timeout-minutes: 8
+        run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - name: Security and native compatibility checks
         run: |
           set -euo pipefail
