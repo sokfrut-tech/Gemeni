@@ -8,10 +8,11 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import java.io.File
 
 /**
- * Always-on acoustic wake-word detector. The bundled KWS model is zh/en; the
- * wake word is encoded as the English phonemes for "Jarvis". Russian ASR is
- * deliberately not used for wake detection because that would require decoding
- * the microphone continuously and would increase CPU use and false triggers.
+ * Acoustic wake-word detector used only inside an explicitly started session.
+ * The bundled KWS model is zh/en; the wake word is encoded as English phonemes
+ * for "Jarvis". Russian-speaker accuracy is not yet validated on-device.
+ * Russian ASR is deliberately not used for wake detection because that would
+ * require decoding the microphone continuously and increase CPU use.
  */
 class SherpaJarvisKwsEngine {
     companion object {
@@ -63,9 +64,17 @@ class SherpaJarvisKwsEngine {
         if (samples.isEmpty()) return false
         s.acceptWaveform(FloatArray(samples.size) { samples[it] / 32768.0f }, SAMPLE_RATE)
         val detector = spotter ?: return false
-        while (detector.isReady(s)) detector.decode(s)
-        val result = detector.getResult(s)
-        return result.keyword.equals(KEYWORD, ignoreCase = true)
+        while (detector.isReady(s)) {
+            detector.decode(s)
+            val result = detector.getResult(s)
+            if (result.keyword.equals(KEYWORD, ignoreCase = true)) {
+                // Sherpa's KWS example resets immediately after a hit; without
+                // this, a previous result may be observed again on later frames.
+                detector.reset(s)
+                return true
+            }
+        }
+        return false
     }
 
     @Synchronized

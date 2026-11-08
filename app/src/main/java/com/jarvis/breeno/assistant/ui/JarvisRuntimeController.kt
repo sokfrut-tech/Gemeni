@@ -6,6 +6,7 @@ import com.jarvis.breeno.assistant.core.AssistantState
 import com.jarvis.breeno.assistant.core.ToolResult
 import com.jarvis.breeno.assistant.core.LlamaCppRuntime
 import com.jarvis.breeno.assistant.core.QwenModelInstaller
+import com.jarvis.breeno.assistant.core.thermal.AndroidThermalGuard
 import com.jarvis.breeno.assistant.core.ai.JarvisModelProvider
 import com.jarvis.breeno.assistant.core.ai.LlamaCppJarvisModelProvider
 import com.jarvis.breeno.assistant.core.ai.JarvisModelRequest
@@ -36,6 +37,7 @@ class JarvisRuntimeController(context: Context) {
     private val qwenInstaller = QwenModelInstaller(appContext)
     private var pendingConfirmationJson: String? = null
     private val speaker = JarvisSpeaker(appContext)
+    private val thermalGuard = AndroidThermalGuard(appContext)
 
     fun hasQwenModelFile(): Boolean = qwenInstaller.installedModelFile().isFile
 
@@ -55,7 +57,7 @@ class JarvisRuntimeController(context: Context) {
             QwenModelInstaller.MODEL_SHA256
         )) {
             is LlamaCppRuntime.LoadResult.Loaded -> {
-                reasoning = LlamaCppJarvisModelProvider(qwenRuntime)
+                reasoning = LlamaCppJarvisModelProvider(qwenRuntime) { thermalGuard.budget() }
                 "Qwen загружена и подключена. Запросы обрабатываются локально."
             }
             is LlamaCppRuntime.LoadResult.Rejected -> result.reason
@@ -176,6 +178,8 @@ class JarvisRuntimeController(context: Context) {
 
         onState(AssistantState.UNDERSTANDING)
         onProgress("Формирую безопасное предложение действия…")
+        val budget = thermalGuard.budget()
+        if (budget.level != com.jarvis.breeno.assistant.core.thermal.ThermalLevel.NORMAL) onProgress("Тепловая защита: ${budget.level.name}. Нагрузка Jarvis ограничена.")
         val modelResult = reasoning.propose(JarvisModelRequest(userText = text))
         onState(AssistantState.EXECUTING)
 
@@ -245,6 +249,7 @@ class JarvisRuntimeController(context: Context) {
         pendingConfirmationJson = null
         speaker.close()
         qwenRuntime.close()
+        thermalGuard.close()
         asr.close()
         vad.close()
     }

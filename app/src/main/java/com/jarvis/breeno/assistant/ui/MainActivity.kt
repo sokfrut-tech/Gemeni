@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,7 +66,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    private lateinit var runtime: JarvisRuntimeController
+    // Do not construct ASR/VAD/TTS/audio runtime before the first Compose frame.
+    // Voice components are created lazily after an explicit user action.
+    private val runtimeDelegate = lazy(LazyThreadSafetyMode.NONE) {
+        JarvisRuntimeController(this)
+    }
+    private val runtime: JarvisRuntimeController
+        get() = runtimeDelegate.value
     private var pendingListen = false
     private var statusSink: ((String) -> Unit)? = null
     private var transcriptSink: ((String) -> Unit)? = null
@@ -83,7 +91,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runtime = JarvisRuntimeController(this)
         setContent { JarvisTheme { JarvisHome() } }
     }
 
@@ -167,7 +174,7 @@ class MainActivity : ComponentActivity() {
         statusSink = null
         transcriptSink = null
         stateSink = null
-        runtime.close()
+        if (runtimeDelegate.isInitialized()) runtimeDelegate.value.close()
         super.onDestroy()
     }
 
@@ -311,9 +318,27 @@ class MainActivity : ComponentActivity() {
                             Text("Рабочие команды", color = Color(0xFFB8C5D6), style = MaterialTheme.typography.labelLarge)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                QuickCommand("Навигатор") { transcript = runQuickCommand("Навигатор") }
-                                QuickCommand("Поиск") { transcript = runQuickCommand("Поиск") }
-                                QuickCommand("Телефон") { transcript = runQuickCommand("Телефон") }
+                                QuickCommand("Навигатор") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Навигатор") }
+                                        status = transcript
+                                    }
+                                }
+                                QuickCommand("Поиск") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Поиск") }
+                                        status = transcript
+                                    }
+                                }
+                                QuickCommand("Телефон") {
+                                    lifecycleScope.launch {
+                                        status = "Выполняю команду…"
+                                        transcript = withContext(Dispatchers.IO) { runQuickCommand("Телефон") }
+                                        status = transcript
+                                    }
+                                }
                             }
                         }
                     }
@@ -322,23 +347,33 @@ class MainActivity : ComponentActivity() {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             androidx.compose.material3.TextButton(
                                 onClick = {
-                                    transcript = runtime.confirmPendingAction()
-                                    status = transcript
-                                    assistantState = AssistantState.IDLE
+                                    lifecycleScope.launch {
+                                        status = "Выполняю подтверждённое действие…"
+                                        transcript = withContext(Dispatchers.IO) { runtime.confirmPendingAction() }
+                                        status = transcript
+                                        assistantState = AssistantState.IDLE
+                                    }
                                 }
                             ) { Text("Подтвердить", color = Color(0xFF8DEBFF)) }
                             androidx.compose.material3.TextButton(
                                 onClick = {
-                                    transcript = runtime.cancelPendingAction()
-                                    status = transcript
-                                    assistantState = AssistantState.IDLE
+                                    lifecycleScope.launch {
+                                        transcript = withContext(Dispatchers.IO) { runtime.cancelPendingAction() }
+                                        status = transcript
+                                        assistantState = AssistantState.IDLE
+                                    }
                                 }
                             ) { Text("Отмена", color = Color(0xFFFFB38A)) }
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
-                    FloatingActionButton(onClick = { requestAndListen() }, containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536), contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)) {
-                        Icon(Icons.Default.Mic, contentDescription = "Микрофон", modifier = Modifier.size(28.dp))
+                    FloatingActionButton(
+                        onClick = { requestAndListen() },
+                        modifier = Modifier.semantics { contentDescription = "Микрофон" },
+                        containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536),
+                        contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(28.dp))
                     }
                 }
             }

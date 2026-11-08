@@ -13,7 +13,10 @@ import kotlinx.coroutines.withContext
  * owns all execution and confirmation decisions.
  */
 class LlamaCppJarvisModelProvider(
-    private val runtime: JarvisTextGenerationRuntime
+    private val runtime: JarvisTextGenerationRuntime,
+    private val thermalBudget: () -> com.jarvis.breeno.assistant.core.thermal.ThermalBudget = {
+        com.jarvis.breeno.assistant.core.thermal.ThermalBudget(com.jarvis.breeno.assistant.core.thermal.ThermalLevel.NORMAL, 160, true)
+    }
 ) : JarvisModelProvider {
     override val providerId: String = "llama.cpp-qwen-local"
     override val isLocalOnly: Boolean = true
@@ -33,9 +36,11 @@ class LlamaCppJarvisModelProvider(
                 )
             }
 
+            val budget = thermalBudget()
+            if (!budget.allowHeavyInference) return@withContext JarvisModelResult.Failure("Локальная нейросеть временно приостановлена: устройство перегрето. Офлайн-команды остаются доступны.")
             val prompt = buildPrompt(userText, request.localeTag)
             val generated = runCatching {
-                runtime.generateForPlanning(prompt, maxTokens = MAX_PROPOSAL_TOKENS)
+                runtime.generateForPlanning(prompt, maxTokens = budget.maxGenerationTokens.coerceIn(1, MAX_PROPOSAL_TOKENS))
             }.getOrElse {
                 return@withContext JarvisModelResult.Failure(
                     "Ошибка локальной модели: ${it.message ?: "неизвестная ошибка"}"

@@ -8,7 +8,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-/** Downloads and verifies the small always-on KWS model separately from the APK. */
+/**
+ * Installs the acoustic KWS model only after a dedicated, explicit user consent.
+ * Merely entering the assistant or using push-to-talk must never trigger this download.
+ * The model is not active in the microphone pipeline yet; installation alone does not
+ * enable background or always-on listening.
+ */
 class KwsModelDownloadManager(private val context: Context) {
     companion object {
         const val MODEL_ID = "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20"
@@ -36,31 +41,40 @@ class KwsModelDownloadManager(private val context: Context) {
             runCatching { keywords.readText(Charsets.UTF_8) == KEYWORDS_CONTENT }.getOrDefault(false)
     }
 
-    suspend fun ensure(onProgress: (Int) -> Unit = {}): File = withContext(Dispatchers.IO) {
-        val dir = modelDir()
-        FILES.forEachIndexed { index, item ->
-            val target = dir.resolve(item.name)
-            if (!target.isFile || sha256(target) != item.sha256) {
-                download(URL(BASE + item.name), target)
-                check(sha256(target) == item.sha256) { "KWS SHA-256 mismatch: ${item.name}" }
+    /**
+     * Download is deliberately impossible unless the caller passes the result of a
+     * dedicated user confirmation. Keep this separate from ASR/VAD model consent.
+     */
+    suspend fun ensure(userConsent: Boolean, onProgress: (Int) -> Unit = {}): File {
+        require(userConsent) {
+            "Для загрузки модели ключевого слова требуется отдельное явное согласие пользователя"
+        }
+        return withContext(Dispatchers.IO) {
+            val dir = modelDir()
+            FILES.forEachIndexed { index, item ->
+                val target = dir.resolve(item.name)
+                if (!target.isFile || sha256(target) != item.sha256) {
+                    download(URL(BASE + item.name), target)
+                    check(sha256(target) == item.sha256) { "KWS SHA-256 mismatch: ${item.name}" }
+                }
+                onProgress((index + 1) * 100 / FILES.size)
             }
-            onProgress((index + 1) * 100 / FILES.size)
-        }
 
-        // Commit the generated keyword manifest atomically; an interrupted write
-        // must never make a partially configured KWS installation appear ready.
-        val keywords = dir.resolve("keywords.txt")
-        val part = dir.resolve("keywords.txt.part")
-        try {
-            part.writeText(KEYWORDS_CONTENT, Charsets.UTF_8)
-            check(part.length() > 0) { "Generated KWS keywords file is empty" }
-            if (keywords.exists()) check(keywords.delete()) { "Cannot replace KWS keywords file" }
-            check(part.renameTo(keywords)) { "Cannot commit KWS keywords file" }
-        } finally {
-            part.delete()
+            // Commit the generated keyword manifest atomically; an interrupted write
+            // must never make a partially configured KWS installation appear ready.
+            val keywords = dir.resolve("keywords.txt")
+            val part = dir.resolve("keywords.txt.part")
+            try {
+                part.writeText(KEYWORDS_CONTENT, Charsets.UTF_8)
+                check(part.length() > 0) { "Generated KWS keywords file is empty" }
+                if (keywords.exists()) check(keywords.delete()) { "Cannot replace KWS keywords file" }
+                check(part.renameTo(keywords)) { "Cannot commit KWS keywords file" }
+            } finally {
+                part.delete()
+            }
+            check(isReady()) { "KWS model installation is incomplete" }
+            dir
         }
-        check(isReady()) { "KWS model installation is incomplete" }
-        dir
     }
 
     private fun download(url: URL, destination: File) {
