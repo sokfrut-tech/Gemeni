@@ -117,3 +117,31 @@ The launch test looks for exact visible text `ДЖАРВИС`; the runtime test 
 4. Keep emulator smoke red until all assertions pass on a healthy emulator. Keep PR Draft and do not merge/release.
 
 No physical OPPO validation is implied by this CI run.
+
+
+## Artifact-level diagnosis of run #353 — 2026-11-08
+
+The evidence ZIP (artifact 13620146274) was downloaded and inspected, including the PNG, XML hierarchy, JUnit XML, and full instrumentation log.
+
+### Confirmed from the screenshot and hierarchy
+
+- The saved screenshot visibly shows the Jarvis home screen rendered behind an Android system modal: **“Process system isn't responding”** with “Close app” and “Wait”.
+- The captured XML hierarchy is dominated by that Android parentPanel; the app's Compose nodes are not exposed in the captured accessibility hierarchy while the system modal is on top. This explains why the launch test's exact-text selector can fail even though the screenshot shows the app underneath.
+- JUnit XML confirms 6 tests, 2 failures, 0 errors. launcherShowsFunctionalJarvisUi, model consent decline, local model panel, and missing-model runtime rejection passed in that run.
+- The app Activity reached RESUMED. ActivityManager logged the Jarvis Activity displayed after approximately 19.5 seconds in this run. This is still slow and must be profiled; the platform overlay does not make the launch-time concern disappear.
+- The instrumentation log also contains severe frame stalls: Skipped 826 frames, Skipped 231 frames, and renderer frame durations in the multi-second range. The emulator's system dialog is direct evidence of a system process ANR, not a Jarvis Java/Kotlin fatal exception.
+
+### A real accessibility defect found in source/log correlation
+
+The microphone content description was attached to the inner Icon, while the clickable action belongs to the parent FloatingActionButton. UiAutomator logged the Микрофон node as an android.view.View with clickable=false. This is a genuine accessibility/testability mismatch independent of the platform ANR.
+
+A source fix was committed on the PR branch:
+- Commit: 6d8e87629e05ed898a92c9d566f468b73b2132e3
+- Move contentDescription = Микрофон to the clickable FloatingActionButton via Compose semantics.
+- Set the decorative inner microphone Icon description to null, so accessibility exposes one actionable control rather than a non-clickable child.
+
+This change is awaiting its own CI run; it is not yet verified by instrumentation.
+
+### Updated interpretation
+
+Run #353 was not simply “the emulator is bad”: it exposed both (1) a platform ANR that obscured the accessibility tree and (2) a concrete microphone semantics issue. Keep both causes separate. Do not weaken assertions. Re-check the exact UI selector after the new semantics fix and require the emulator smoke job to complete successfully before treating it as resolved.
