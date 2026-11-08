@@ -22,8 +22,9 @@ class JarvisRuntimeSmokeTest {
     @Before
     fun setUp() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
+        // Do not run pm clear / force-stop from inside instrumentation: Android may
+        // kill the instrumented process while the test runner is still executing.
+        device.pressHome()
     }
 
     @Test
