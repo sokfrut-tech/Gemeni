@@ -192,3 +192,30 @@ PR #114 remains open and Draft, unmerged. No release or APK publication was perf
 ### Conclusion and limitations
 Run #339 independently confirms the exact PR head `5d8d2af` builds and passes the complete configured CI suite, including all six Android emulator instrumentation tests. The bounded emulator workflow and evidence upload both completed successfully. This remains emulator/CI verification only: it does not establish behavior on physical OPPO Find X6 Pro / ColorOS hardware, production-release readiness, or complete feature acceptance.
 PR #114 remains open and Draft, unmerged. No release or APK publication was performed. Do not merge or release without the owner's explicit authorization.
+
+
+## Follow-up: exact-head CI run #340 independently inspected — 2026-11-08
+
+### Workflow evidence
+- Workflow run: [42459924283](https://github.com/sokfrut-tech/Gemeni/actions/runs/42459924283), run #340.
+- PR #114, branch `fix/jarvis-emulator-permission-render-fallback-2026-11-08`.
+- Exact tested head: `83526048dbaa6e9f52a08465f9cb0d2d488fdb27`.
+- Secret scanning job `128666814109`: success.
+- CodeQL/build job `128666813937`: success; Kotlin compilation, JVM unit tests, full debug APK build, APK verification/hash, artifact upload, CodeQL analysis and SARIF staging all completed.
+- Android emulator job `128667693591`: success; smoke tests and evidence upload completed; failure-only diagnostics step was skipped.
+
+### Downloaded and inspected emulator evidence
+- Artifact ID: `13609219469`, GitHub SHA-256: `9ab77db694b84ef0e7fb0dee958774d230da7a9e6f779a377126905b5d5d4a9d`.
+- Downloaded the ZIP and inspected its JUnit XML, test reports, UTP textproto and per-test logcat files.
+- JUnit: 6 tests, 0 failures, 0 errors, 0 skipped; total test time 29.596 seconds.
+- UTP/instrumentation result: passed. Six test cases: launcher ready state, missing-model fail-closed behavior, microphone permission denial, functional launcher UI visibility, settings model panel, and declining model download without network setup.
+
+### Exact-head APK artifact
+- Artifact ID: `13608829468`, size 86,965,169 bytes.
+- GitHub artifact SHA-256: `e3cf9c56eeb7573a2bc32edcce8fdca297986cda4ef4a80e94f76654e19762f5`.
+- Unit test report artifact: `13609620563`, SHA-256 `386402f7aa34a6fc0ecc174ecd3ac8de1a160f5763b19f495d7727d0f75f086d`.
+- CodeQL SARIF artifact: `13608994069`, SHA-256 `e3698d3fadc935d5c7f41c6e9f75798268efc306672dd3573d5bc42e67c2a2fe`.
+- Secret scan SARIF artifact: `13609027185`, SHA-256 `65d1be823ccd55c7abcc858f7065d0cf2f17bbf61adca51cfa726f57b70613aa`.
+
+### Conclusion and limitations
+Run #340 confirms the exact PR head passes all three configured CI jobs and all six emulator instrumentation tests. This is repeatable CI/emulator evidence, not proof of complete voice-runtime functionality, neural local reasoning, visible non-black native frame, or physical OPPO/ColorOS compatibility. The PR remains Draft/open/unmerged; no release or APK publication was performed.
