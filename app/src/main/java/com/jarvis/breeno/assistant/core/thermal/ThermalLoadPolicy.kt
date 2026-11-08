@@ -13,8 +13,8 @@ object ThermalLoadPolicy {
 }
 
 /**
- * Applies worsening thermal signals immediately and delays recovery until a
- * cooler status remains stable for [cooldownMs]. Time is injected for tests.
+ * Applies worsening thermal signals immediately and delays recovery until the
+ * same cooler status remains stable for [cooldownMs]. Time is injected for tests.
  */
 internal class ThermalBudgetHysteresis(
     private val cooldownMs: Long = 30_000L
@@ -23,26 +23,33 @@ internal class ThermalBudgetHysteresis(
 
     private var current = ThermalLoadPolicy.fromAndroidStatus(0)
     private var coolingSinceMs: Long? = null
+    private var coolingTarget: ThermalBudget? = null
 
     @Synchronized
     fun update(androidStatus: Int, nowMs: Long): ThermalBudget {
         val candidate = ThermalLoadPolicy.fromAndroidStatus(androidStatus)
         if (severity(candidate) >= severity(current)) {
             current = candidate
-            coolingSinceMs = null
+            resetCoolingWindow()
             return current
         }
 
         val started = coolingSinceMs
-        if (started == null || nowMs < started) {
+        if (coolingTarget != candidate || started == null || nowMs < started) {
+            coolingTarget = candidate
             coolingSinceMs = nowMs
             return current
         }
         if (nowMs - started >= cooldownMs) {
             current = candidate
-            coolingSinceMs = null
+            resetCoolingWindow()
         }
         return current
+    }
+
+    private fun resetCoolingWindow() {
+        coolingSinceMs = null
+        coolingTarget = null
     }
 
     private fun severity(budget: ThermalBudget): Int = when (budget.level) {
