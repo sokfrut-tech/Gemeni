@@ -219,3 +219,21 @@ PR #114 remains open and Draft, unmerged. No release or APK publication was perf
 
 ### Conclusion and limitations
 Run #340 confirms the exact PR head passes all three configured CI jobs and all six emulator instrumentation tests. This is repeatable CI/emulator evidence, not proof of complete voice-runtime functionality, neural local reasoning, visible non-black native frame, or physical OPPO/ColorOS compatibility. The PR remains Draft/open/unmerged; no release or APK publication was performed.
+
+
+## Follow-up: KWS manifest integrity and hotword gate tests — 2026-11-08
+
+### Source review findings
+- The existing runtime path is push-to-talk: `MainActivity.startRealListening()` calls `JarvisRuntimeController.prepare()` and then `listenOnce()`.
+- `listenOnce()` connects AudioRecord -> Silero VAD -> completed speech segments -> Sherpa Russian ASR -> guarded tool proposal -> speech response.
+- The acoustic wake-word implementation (`SherpaJarvisKwsEngine` / `HotwordDetector.accepts(ShortArray)`) is not wired into this path. KWS must not be described as active or always-on.
+- KWS model files were checksum-verified, but `KwsModelDownloadManager.isReady()` previously did not check the generated `keywords.txt`. A partial installation could therefore be reported ready even though the keyword spotter could not load.
+
+### Changes committed
+- `4f9e69a1dea073853dc009446bb91ca9311623ae`: added `HotwordDetectorTest` coverage for Russian wake-word normalization, punctuation, disarmed/rearmed state, and acoustic fail-closed behavior when no KWS engine is bound.
+- `8c3df07276f037654037a5dbd40439aa53c77300`: fixed KWS installation readiness. All four model files must pass SHA-256 checks and the generated keyword manifest must exactly match the expected content. The manifest is written through a temporary file and renamed into place; installation performs a final readiness check. Model replacement also avoids leaving a corrupt destination after a failed rename.
+
+### Verification status
+- Source files were re-read from the branch after the changes.
+- No workflow run was returned for commit `8c3df07276f037654037a5dbd40439aa53c77300` at the time of this update; build, unit tests, APK and emulator checks are therefore pending.
+- The hotword engine remains disconnected from the user-facing capture session. This change improves KWS installation integrity and protects its gate with tests; it does not yet deliver always-on wake-word operation.
