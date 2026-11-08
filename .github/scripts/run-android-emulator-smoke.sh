@@ -4,7 +4,7 @@ mkdir -p emulator-diagnostics
 
 capture_diagnostics() {
   local suffix="${1:-failure}"
-  adb devices -l > "emulator-diagnostics/devices-${suffix}.txt" 2>&1 || true
+  timeout 5s adb devices -l > "emulator-diagnostics/devices-${suffix}.txt" 2>&1 || true
   timeout 12s adb shell getprop > "emulator-diagnostics/getprop-${suffix}.txt" 2>&1 || true
   timeout 12s adb shell service check package > "emulator-diagnostics/package-service-${suffix}.txt" 2>&1 || true
   timeout 12s adb shell service check activity > "emulator-diagnostics/activity-service-${suffix}.txt" 2>&1 || true
@@ -13,7 +13,7 @@ capture_diagnostics() {
   timeout 20s adb logcat -d -v threadtime > "emulator-diagnostics/logcat-${suffix}.txt" 2>&1 || true
 }
 
-echo "Waiting for Android boot and live framework services without restarting ADB."
+echo "Waiting for Android boot and live framework services with a hard six-minute deadline."
 if ! timeout 60s adb wait-for-device; then
   echo "ERROR: ADB did not connect to the emulator within 60 seconds."
   capture_diagnostics "adb-connect"
@@ -21,18 +21,21 @@ if ! timeout 60s adb wait-for-device; then
 fi
 
 ready=0
-for attempt in $(seq 1 180); do
-  device_state="$(adb get-state 2>/dev/null || true)"
-  boot_completed="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-  package_service="$(timeout 5s adb shell service check package 2>/dev/null || true)"
-  activity_service="$(timeout 5s adb shell service check activity 2>/dev/null || true)"
-  package_list="$(timeout 8s adb shell cmd package list packages 2>/dev/null || true)"
-  package_count="$(printf '%s\n' "$package_list" | grep -c '^package:' || true)"
+deadline=$((SECONDS + 360))
+attempt=0
+while (( SECONDS < deadline )); do
+  attempt=$((attempt + 1))
+  device_state="$(timeout 3s adb get-state 2>/dev/null || true)"
+  probe="$(timeout 10s adb shell 'printf "boot="; getprop sys.boot_completed; printf "package="; service check package; printf "activity="; service check activity; printf "packages="; cmd package list packages | wc -l' 2>/dev/null || true)"
+  boot_completed="$(sed -n 's/^boot=//p' <<< "$probe" | head -n 1 | tr -d '\r')"
+  package_service="$(sed -n 's/^package=//p' <<< "$probe" | head -n 1)"
+  activity_service="$(sed -n 's/^activity=//p' <<< "$probe" | head -n 1)"
+  package_count="$(sed -n 's/^packages=//p' <<< "$probe" | head -n 1 | tr -dc '0-9')"
 
   if [[ "$device_state" == "device" && "$boot_completed" == "1" ]] \
     && grep -q "found" <<< "$package_service" \
     && grep -q "found" <<< "$activity_service" \
-    && [[ "$package_count" -ge 5 ]]; then
+    && [[ "${package_count:-0}" -ge 5 ]]; then
     ready=1
     echo "Android boot and framework services are ready (attempt $attempt; packages=$package_count)."
     break
@@ -41,16 +44,19 @@ for attempt in $(seq 1 180); do
 done
 
 if [[ "$ready" -ne 1 ]]; then
-  echo "ERROR: Android PackageManager/ActivityManager did not remain available within 360 seconds."
+  echo "ERROR: Android PackageManager/ActivityManager did not become ready within the hard 360-second deadline."
   capture_diagnostics "framework-readiness"
   exit 1
 fi
 
 adb logcat -c >/dev/null 2>&1 || true
 set +e
-gradle --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
+timeout --signal=TERM --kill-after=30s 24m gradle --no-daemon --max-workers=2 :app:connectedDebugAndroidTest
 test_status=$?
 set -e
+if [[ "$test_status" -eq 124 || "$test_status" -eq 137 ]]; then
+  echo "ERROR: Gradle instrumentation exceeded its 24-minute hard timeout."
+fi
 
 if [[ -d app/build/reports/androidTests/connected ]]; then
   cp -R app/build/reports/androidTests/connected emulator-diagnostics/test-reports
@@ -61,6 +67,9 @@ fi
 if [[ -d app/build/outputs/androidTest-results ]]; then
   cp -R app/build/outputs/androidTest-results emulator-diagnostics/all-test-results
 fi
+
+mkdir -p emulator-diagnostics/ui-captures
+timeout 20s adb pull /sdcard/Download/jarvis-test emulator-diagnostics/ui-captures >/dev/null 2>&1 || true
 
 if [[ "$test_status" -eq 0 ]]; then
   python3 - <<'PY' || test_status=$?

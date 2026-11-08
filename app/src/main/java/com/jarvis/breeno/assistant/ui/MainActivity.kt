@@ -5,9 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.net.Uri
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -174,7 +177,7 @@ class MainActivity : ComponentActivity() {
         var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
         var status by remember { mutableStateOf("Runtime не запускался") }
         var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
-        var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
+        var sphereUnavailable by remember { mutableStateOf(false) }
         var showQwenPanel by remember { mutableStateOf(false) }
         var showModelDownloadConsent by remember { mutableStateOf(false) }
         var modelDownloadInProgress by remember { mutableStateOf(false) }
@@ -242,11 +245,6 @@ class MainActivity : ComponentActivity() {
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
             Box(modifier = Modifier.fillMaxSize()) {
-                AndroidView(
-                    modifier = Modifier.size(330.dp).align(Alignment.TopCenter).padding(top = 112.dp),
-                    factory = { context -> AlphaVideoSurfaceView(context).also { it.contentDescription = "JarvisSphere"; sphere = it } },
-                    update = { it.setListening(listening) }
-                )
                 Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -256,7 +254,34 @@ class MainActivity : ComponentActivity() {
                         }
                         IconButton(onClick = { showQwenPanel = true }) { Icon(Icons.Default.Settings, contentDescription = "Модель и настройки", tint = Color(0xFFB8C5D6)) }
                     }
-                    Spacer(modifier = Modifier.height(330.dp))
+                    // Flexible middle region keeps controls visible on compact displays.
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (sphereUnavailable) {
+                            JarvisSphereFallback(modifier = Modifier.size(240.dp), listening = listening)
+                        } else {
+                            AndroidView(
+                                modifier = Modifier.size(240.dp),
+                                factory = { context ->
+                                    try {
+                                        AlphaVideoSurfaceView(context).also {
+                                            it.contentDescription = "JarvisSphere"
+                                            it.onRendererUnavailable = { sphereUnavailable = true }
+                                        }
+                                    } catch (_: UnsatisfiedLinkError) {
+                                        sphereUnavailable = true
+                                        View(context)
+                                    } catch (_: ExceptionInInitializerError) {
+                                        sphereUnavailable = true
+                                        View(context)
+                                    }
+                                },
+                                update = { view -> (view as? AlphaVideoSurfaceView)?.setListening(listening) }
+                            )
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(painter = painterResource(R.drawable.assistant_mascot), contentDescription = "Джарвис", modifier = Modifier.size(92.dp), contentScale = ContentScale.Fit)
                         Spacer(modifier = Modifier.width(10.dp))
@@ -323,5 +348,23 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun QuickCommand(label: String, onClick: () -> Unit) {
         androidx.compose.material3.TextButton(onClick = onClick) { Text(label, color = Color(0xFF8DEBFF)) }
+    }
+}
+
+
+@Composable
+private fun JarvisSphereFallback(
+    modifier: Modifier = Modifier,
+    listening: Boolean
+) {
+    Canvas(modifier = modifier) {
+        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+        val scale = size.minDimension
+        val glow = if (listening) Color(0xFF54DFFF) else Color(0xFF2D9DCE)
+        drawCircle(color = glow.copy(alpha = 0.10f), radius = scale * 0.39f, center = center)
+        drawCircle(color = Color(0xFFFF9A43).copy(alpha = 0.85f), radius = scale * 0.31f, center = center, style = Stroke(width = scale * 0.012f))
+        drawCircle(color = glow.copy(alpha = 0.85f), radius = scale * 0.37f, center = center, style = Stroke(width = scale * 0.009f))
+        drawCircle(color = Color(0xFF8DEBFF).copy(alpha = 0.9f), radius = scale * 0.12f, center = center)
+        drawCircle(color = Color.White.copy(alpha = 0.85f), radius = scale * 0.045f, center = center)
     }
 }

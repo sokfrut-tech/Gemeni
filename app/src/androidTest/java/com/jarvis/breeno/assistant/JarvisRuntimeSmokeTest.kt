@@ -1,6 +1,8 @@
 package com.jarvis.breeno.assistant
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -9,23 +11,18 @@ import androidx.test.uiautomator.Until
 import com.jarvis.breeno.assistant.ui.JarvisRuntimeController
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class JarvisRuntimeSmokeTest {
-    private lateinit var device: UiDevice
-    private val packageName = "com.jarvis.breeno.assistant"
-
-    @Before
-    fun setUp() {
-        device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
+    private val device: UiDevice by lazy {
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     }
+    private val packageName = "com.jarvis.breeno.assistant"
 
     @Test
     fun launcherShowsFunctionalJarvisUi() {
@@ -37,6 +34,8 @@ class JarvisRuntimeSmokeTest {
         assertVisible(By.text("Телефон"), "Phone action missing")
         assertVisible(By.desc("Микрофон"), "Microphone action missing")
         assertVisible(By.desc("JarvisSphere"), "Native sphere missing")
+        val mic = device.findObject(By.desc("Микрофон"))
+        assertTrue("Microphone action must have a non-empty on-screen area", mic.visibleBounds.width() > 0 && mic.visibleBounds.height() > 0)
         assertVisible(By.textContains("Runtime"), "Runtime status missing")
     }
 
@@ -57,7 +56,7 @@ class JarvisRuntimeSmokeTest {
 
         assertTrue(
             "Consent dialog should close after declining",
-            device.wait(Until.gone(By.text("Загрузить русскую модель?")), 5_000)
+            device.wait(Until.gone(By.text("Загрузить голосовые модели?")), 5_000)
         )
         assertTrue(
             "Declining consent should not start model network setup",
@@ -67,18 +66,24 @@ class JarvisRuntimeSmokeTest {
 
     @Test
     fun denyingMicrophonePermissionShowsActionableStatus() {
-        device.executeShellCommand("pm revoke $packageName android.permission.RECORD_AUDIO")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.revokeRuntimePermission(packageName, Manifest.permission.RECORD_AUDIO)
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
 
+        // Android permission-controller labels vary by system language and
+        // image. Prefer the stable framework resource id, then localized text.
         val denyButton = device.wait(
             Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")),
             10_000
-        ) ?: device.wait(Until.findObject(By.text("Don't allow")), 2_000)
-            ?: device.wait(Until.findObject(By.text("Deny")), 2_000)
-        assertNotNull("Android microphone permission dialog did not offer a deny action", denyButton)
+        ) ?: device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_and_dont_ask_again_button")), 1_000)
+            ?: listOf("Не разрешать", "Запретить", "Отказать", "Don't allow", "Deny")
+                .firstNotNullOfOrNull { label ->
+                    device.wait(Until.findObject(By.text(label)), 1_000)
+                }
+        assertNotNull("Android microphone permission dialog did not offer a deny action (resource id and localized labels checked)", denyButton)
         denyButton!!.click()
 
         assertTrue(
@@ -88,8 +93,8 @@ class JarvisRuntimeSmokeTest {
                 5_000
             )
         )
-        val permissionState = device.executeShellCommand("pm check-permission android.permission.RECORD_AUDIO $packageName")
-        assertTrue("Microphone permission must remain denied", permissionState.trim() == "denied")
+        val permissionState = instrumentation.targetContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+        assertEquals("Microphone permission must remain denied", PackageManager.PERMISSION_DENIED, permissionState)
     }
 
     @Test
@@ -138,11 +143,14 @@ class JarvisRuntimeSmokeTest {
     }
 
     private fun launchJarvis() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        device.pressHome()
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
         assertNotNull("Launcher activity is missing", launchIntent)
         launchIntent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(launchIntent)
+        instrumentation.startActivitySync(launchIntent)
+        instrumentation.waitForIdleSync()
     }
 
     private fun saveFailureScreenshot(name: String) {
@@ -150,5 +158,6 @@ class JarvisRuntimeSmokeTest {
         device.executeShellCommand("mkdir -p ${dir.absolutePath}")
         dir.mkdirs()
         device.takeScreenshot(File(dir, "$name.png"))
+        device.dumpWindowHierarchy(File(dir, "$name.xml"))
     }
 }
