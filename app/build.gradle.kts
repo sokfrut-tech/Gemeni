@@ -17,12 +17,18 @@ android {
         versionName = "0.53-runtime-diagnostics"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Android Test Orchestrator clears app data from its own process,
+        // preventing per-test cleanup from killing the active instrumentation process.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
     buildFeatures { compose = true; aidl = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.31.6" } }
     packaging { jniLibs { useLegacyPackaging = true } }
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
 }
 
 protobuf {
@@ -60,4 +66,5 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
 }
