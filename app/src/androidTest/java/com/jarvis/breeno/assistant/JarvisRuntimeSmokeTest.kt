@@ -10,22 +10,16 @@ import com.jarvis.breeno.assistant.ui.JarvisRuntimeController
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class JarvisRuntimeSmokeTest {
-    private lateinit var device: UiDevice
-    private val packageName = "com.jarvis.breeno.assistant"
-
-    @Before
-    fun setUp() {
-        device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
+    private val device: UiDevice by lazy {
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     }
+    private val packageName = "com.jarvis.breeno.assistant"
 
     @Test
     fun launcherShowsFunctionalJarvisUi() {
@@ -37,6 +31,8 @@ class JarvisRuntimeSmokeTest {
         assertVisible(By.text("Телефон"), "Phone action missing")
         assertVisible(By.desc("Микрофон"), "Microphone action missing")
         assertVisible(By.desc("JarvisSphere"), "Native sphere missing")
+        val mic = device.findObject(By.desc("Микрофон"))
+        assertTrue("Microphone action must have a non-empty on-screen area", mic.visibleBounds.width() > 0 && mic.visibleBounds.height() > 0)
         assertVisible(By.textContains("Runtime"), "Runtime status missing")
     }
 
@@ -57,7 +53,7 @@ class JarvisRuntimeSmokeTest {
 
         assertTrue(
             "Consent dialog should close after declining",
-            device.wait(Until.gone(By.text("Загрузить русскую модель?")), 5_000)
+            device.wait(Until.gone(By.text("Загрузить голосовые модели?")), 5_000)
         )
         assertTrue(
             "Declining consent should not start model network setup",
@@ -138,11 +134,14 @@ class JarvisRuntimeSmokeTest {
     }
 
     private fun launchJarvis() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        device.pressHome()
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
         assertNotNull("Launcher activity is missing", launchIntent)
         launchIntent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(launchIntent)
+        instrumentation.startActivitySync(launchIntent)
+        instrumentation.waitForIdleSync()
     }
 
     private fun saveFailureScreenshot(name: String) {
@@ -150,5 +149,6 @@ class JarvisRuntimeSmokeTest {
         device.executeShellCommand("mkdir -p ${dir.absolutePath}")
         dir.mkdirs()
         device.takeScreenshot(File(dir, "$name.png"))
+        device.dumpWindowHierarchy(File(dir, "$name.xml"))
     }
 }

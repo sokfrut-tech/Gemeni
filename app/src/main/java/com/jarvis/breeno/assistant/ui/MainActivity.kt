@@ -242,11 +242,6 @@ class MainActivity : ComponentActivity() {
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
             Box(modifier = Modifier.fillMaxSize()) {
-                AndroidView(
-                    modifier = Modifier.size(330.dp).align(Alignment.TopCenter).padding(top = 112.dp),
-                    factory = { context -> AlphaVideoSurfaceView(context).also { it.contentDescription = "JarvisSphere"; sphere = it } },
-                    update = { it.setListening(listening) }
-                )
                 Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -256,7 +251,22 @@ class MainActivity : ComponentActivity() {
                         }
                         IconButton(onClick = { showQwenPanel = true }) { Icon(Icons.Default.Settings, contentDescription = "Модель и настройки", tint = Color(0xFFB8C5D6)) }
                     }
-                    Spacer(modifier = Modifier.height(330.dp))
+                    // Flexible middle region keeps controls visible on compact displays.
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AndroidView(
+                            modifier = Modifier.size(240.dp),
+                            factory = { context ->
+                                AlphaVideoSurfaceView(context).also {
+                                    it.contentDescription = "JarvisSphere"
+                                    sphere = it
+                                }
+                            },
+                            update = { it.setListening(listening) }
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(painter = painterResource(R.drawable.assistant_mascot), contentDescription = "Джарвис", modifier = Modifier.size(92.dp), contentScale = ContentScale.Fit)
                         Spacer(modifier = Modifier.width(10.dp))

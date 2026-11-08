@@ -62,6 +62,11 @@ if [[ -d app/build/outputs/androidTest-results ]]; then
   cp -R app/build/outputs/androidTest-results emulator-diagnostics/all-test-results
 fi
 
+# UIAutomator failure screenshots and accessibility hierarchy are saved by tests
+# under Download; pull them into the artifact on both pass and fail.
+mkdir -p emulator-diagnostics/ui-captures
+timeout 20s adb pull /sdcard/Download/jarvis-test emulator-diagnostics/ui-captures >/dev/null 2>&1 || true
+
 if [[ "$test_status" -eq 0 ]]; then
   python3 - <<'PY' || test_status=$?
 import glob
