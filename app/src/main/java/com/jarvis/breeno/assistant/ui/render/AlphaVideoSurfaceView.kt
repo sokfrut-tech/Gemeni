@@ -16,11 +16,13 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
         setEGLContextClientVersion(2)
         setZOrderOnTop(false)
         setRenderer(renderer)
-        renderMode = RENDERMODE_CONTINUOUSLY
+        // Render on demand: continuous shader redraws starved compact emulators.
+        renderMode = RENDERMODE_WHEN_DIRTY
     }
 
     fun setListening(listening: Boolean) {
         renderer.listening = listening
+        requestRender()
     }
 
     private class JarvisSphereRenderer : Renderer {
