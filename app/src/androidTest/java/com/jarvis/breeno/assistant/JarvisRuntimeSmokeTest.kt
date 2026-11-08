@@ -69,12 +69,17 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Microphone button is missing", mic)
         mic!!.click()
 
+        // Android permission-controller labels vary by system language and
+        // image. Prefer the stable framework resource id, then localized text.
         val denyButton = device.wait(
             Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")),
             10_000
-        ) ?: device.wait(Until.findObject(By.text("Don't allow")), 2_000)
-            ?: device.wait(Until.findObject(By.text("Deny")), 2_000)
-        assertNotNull("Android microphone permission dialog did not offer a deny action", denyButton)
+        ) ?: device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_and_dont_ask_again_button")), 1_000)
+            ?: listOf("Не разрешать", "Запретить", "Отказать", "Don't allow", "Deny")
+                .firstNotNullOfOrNull { label ->
+                    device.wait(Until.findObject(By.text(label)), 1_000)
+                }
+        assertNotNull("Android microphone permission dialog did not offer a deny action (resource id and localized labels checked)", denyButton)
         denyButton!!.click()
 
         assertTrue(
