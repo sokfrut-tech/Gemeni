@@ -2,6 +2,8 @@ package com.jarvis.breeno.assistant.ui.render
 
 import android.content.Context
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -10,7 +12,8 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : GLSurfaceView(context, attrs) {
-    private val renderer = JarvisSphereRenderer()
+    var onRendererUnavailable: (() -> Unit)? = null
+    private val renderer = JarvisSphereRenderer { onRendererUnavailable?.invoke() }
 
     init {
         setEGLContextClientVersion(2)
@@ -25,10 +28,11 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
         requestRender()
     }
 
-    private class JarvisSphereRenderer : Renderer {
+    private class JarvisSphereRenderer(private val onUnavailable: () -> Unit) : Renderer {
         var listening = false
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-            nativeCreate()
+            val ready = runCatching { nativeCreate() != 0L }.getOrDefault(false)
+            if (!ready) Handler(Looper.getMainLooper()).post(onUnavailable)
         }
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
             nativeResize(width, height)
