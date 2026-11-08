@@ -6,10 +6,14 @@ import android.net.Uri
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
+import com.jarvis.breeno.assistant.voice.AudioCaptureCoordinator
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** Real runtime bridge: microphone -> local Russian ASR -> intent -> device action -> speech. */
 class JarvisRuntimeController(context: Context) {
@@ -36,16 +40,26 @@ class JarvisRuntimeController(context: Context) {
     }
 
     suspend fun listenOnce(onProgress: (String) -> Unit): String {
-        val samples = ArrayList<ShortArray>()
-        val started = System.nanoTime()
+        val samples = java.util.Collections.synchronizedList(mutableListOf<ShortArray>())
+        val coordinator = AudioCaptureCoordinator(
+            scope = CoroutineScope(currentCoroutineContext()),
+            frames = { audio.frames() },
+            onFrame = { frame -> samples.add(frame) },
+            onFailure = { error -> onProgress("Ошибка микрофона: ${error.message ?: error.javaClass.simpleName}") },
+        )
         onProgress("Микрофон активен — говорите")
-        audio.frames()
-            .takeWhile { (System.nanoTime() - started) / 1_000_000 < 4_500 }
-            .collect { samples += it }
+        try {
+            check(coordinator.start()) { "Microphone capture is already owned by another session" }
+            delay(4_500)
+        } finally {
+            // Cancellation must not skip AudioRecordPipeline's finally/release block.
+            withContext(NonCancellable) { coordinator.stop() }
+        }
 
-        val pcm = ShortArray(samples.sumOf { it.size })
+        val snapshot = synchronized(samples) { samples.toList() }
+        val pcm = ShortArray(snapshot.sumOf { it.size })
         var offset = 0
-        samples.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
+        snapshot.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
         onProgress("Распознаю локально…")
         val text = asr.transcribe(pcm)
         if (text.isBlank()) {

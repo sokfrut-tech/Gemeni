@@ -54,6 +54,8 @@ dependencies {
         exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
     }
 
+    testImplementation("junit:junit:4.13.2")
+
     // Runtime UI smoke tests. UI Automator is intentionally kept in androidTest only.
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
