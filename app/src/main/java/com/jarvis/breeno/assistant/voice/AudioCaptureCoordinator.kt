@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The single owner for microphone frame collection.
@@ -45,10 +46,13 @@ class AudioCaptureCoordinator(
     private val mutableState = MutableStateFlow(State.IDLE)
     val state: StateFlow<State> = mutableState.asStateFlow()
     private var captureJob: Job? = null
+    private val processLockHeld = AtomicBoolean(false)
 
     suspend fun start(): Boolean = gate.withLock {
         if (mutableState.value != State.IDLE && mutableState.value != State.FAILED) return@withLock false
         if (captureJob?.isActive == true) return@withLock false
+        if (!PROCESS_CAPTURE_ACTIVE.compareAndSet(false, true)) return@withLock false
+        processLockHeld.set(true)
 
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
@@ -61,6 +65,7 @@ class AudioCaptureCoordinator(
                 mutableState.value = State.FAILED
                 runCatching { onFailure(error) }
             } finally {
+                releaseProcessCaptureLock()
                 if (mutableState.value == State.CAPTURING ||
                     mutableState.value == State.STOPPING
                 ) {
@@ -68,6 +73,7 @@ class AudioCaptureCoordinator(
                 }
             }
         }
+        job.invokeOnCompletion { releaseProcessCaptureLock() }
         captureJob = job
         mutableState.value = State.CAPTURING
         job.start()
@@ -108,5 +114,17 @@ class AudioCaptureCoordinator(
         true
     }
 
+    private fun releaseProcessCaptureLock() {
+        if (processLockHeld.compareAndSet(true, false)) {
+            PROCESS_CAPTURE_ACTIVE.set(false)
+        }
+    }
+
     suspend fun close() = stop()
+
+    private companion object {
+        // Process-wide guard prevents two runtime controllers in the main app
+        // process from opening independent AudioRecord collectors concurrently.
+        val PROCESS_CAPTURE_ACTIVE = AtomicBoolean(false)
+    }
 }
