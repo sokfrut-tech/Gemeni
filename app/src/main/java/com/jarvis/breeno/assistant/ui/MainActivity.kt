@@ -64,7 +64,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    private lateinit var runtime: JarvisRuntimeController
+    // Do not construct ASR/VAD/TTS/audio runtime before the first Compose frame.
+    // Voice components are created lazily after an explicit user action.
+    private val runtimeDelegate = lazy(LazyThreadSafetyMode.NONE) {
+        JarvisRuntimeController(this)
+    }
+    private val runtime: JarvisRuntimeController
+        get() = runtimeDelegate.value
     private var pendingListen = false
     private var statusSink: ((String) -> Unit)? = null
     private var transcriptSink: ((String) -> Unit)? = null
@@ -83,7 +89,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runtime = JarvisRuntimeController(this)
         setContent { JarvisTheme { JarvisHome() } }
     }
 
@@ -167,7 +172,7 @@ class MainActivity : ComponentActivity() {
         statusSink = null
         transcriptSink = null
         stateSink = null
-        runtime.close()
+        if (runtimeDelegate.isInitialized()) runtimeDelegate.value.close()
         super.onDestroy()
     }
 
