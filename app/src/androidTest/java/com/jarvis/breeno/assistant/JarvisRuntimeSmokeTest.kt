@@ -1,6 +1,8 @@
 package com.jarvis.breeno.assistant
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -9,6 +11,7 @@ import androidx.test.uiautomator.Until
 import com.jarvis.breeno.assistant.ui.JarvisRuntimeController
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,7 +66,8 @@ class JarvisRuntimeSmokeTest {
 
     @Test
     fun denyingMicrophonePermissionShowsActionableStatus() {
-        device.executeShellCommand("pm revoke $packageName android.permission.RECORD_AUDIO")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.revokeRuntimePermission(packageName, Manifest.permission.RECORD_AUDIO)
         launchJarvis()
         val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
         assertNotNull("Microphone button is missing", mic)
@@ -89,8 +93,8 @@ class JarvisRuntimeSmokeTest {
                 5_000
             )
         )
-        val permissionState = device.executeShellCommand("pm check-permission android.permission.RECORD_AUDIO $packageName")
-        assertTrue("Microphone permission must remain denied", permissionState.trim() == "denied")
+        val permissionState = instrumentation.targetContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+        assertEquals("Microphone permission must remain denied", PackageManager.PERMISSION_DENIED, permissionState)
     }
 
     @Test
