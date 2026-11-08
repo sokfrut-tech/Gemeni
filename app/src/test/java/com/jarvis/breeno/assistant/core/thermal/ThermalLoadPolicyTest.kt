@@ -51,9 +51,11 @@ class ThermalLoadPolicyTest {
         val policy = ThermalBudgetHysteresis(cooldownMs = 30_000)
         policy.update(4, 0)
         policy.update(0, 1_000)
-        assertEquals(ThermalLevel.HOT, policy.update(2, 10_000).level)
-        assertEquals(ThermalLevel.HOT, policy.update(0, 11_000).level)
-        assertEquals(ThermalLevel.HOT, policy.update(0, 40_999).level)
+        // A partial improvement to HOT starts a new stable-status window;
+        // the current CRITICAL budget must remain in force during cooldown.
+        assertEquals(ThermalLevel.CRITICAL, policy.update(2, 10_000).level)
+        assertEquals(ThermalLevel.CRITICAL, policy.update(0, 11_000).level)
+        assertEquals(ThermalLevel.CRITICAL, policy.update(0, 40_999).level)
         assertEquals(ThermalLevel.NORMAL, policy.update(0, 41_000).level)
     }
 
