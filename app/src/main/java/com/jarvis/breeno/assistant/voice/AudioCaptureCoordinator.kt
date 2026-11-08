@@ -46,7 +46,7 @@ class AudioCaptureCoordinator(
     private var captureJob: Job? = null
 
     suspend fun start(): Boolean = gate.withLock {
-        if (mutableState.value != State.IDLE) return@withLock false
+        if (mutableState.value != State.IDLE && mutableState.value != State.FAILED) return@withLock false
         if (captureJob?.isActive == true) return@withLock false
 
         val job = scope.launch(start = CoroutineStart.LAZY) {
