@@ -52,3 +52,24 @@ The emulator job logs show repeated adb exit code 1 while Android services are u
 - No PR merges, release publishing, or user-consent bypass.
 - Do not describe an APK as device-verified; these are emulator results only.
 - Preserve explicit consent before any model download.
+
+## Follow-up: captured UI evidence and corrective patch — 2026-11-08
+
+Artifact `13592421561` was downloaded and inspected. It contains screenshots, UIAutomator hierarchy XML, per-test logcat, and JUnit XML.
+
+### Evidence-based diagnosis
+
+- JUnit confirms 6 instrumentation tests, 4 failures, 0 errors.
+- The screenshot `ui-captures/jarvis-test/Navigator-action-missing.png` shows the Jarvis header, status, and command card, but the microphone FAB is below the visible viewport.
+- UI hierarchy reports the FAB's button bounds as `[0,0][0,0]`; the fixed `Spacer(height(330.dp))` in a full-height Column pushes controls beyond the 320x640 emulator viewport. This directly explains missing microphone and navigator selectors in the compact emulator layout.
+- The separate `main-screen-missing.xml` capture is Android's system ANR dialog (`Process system isn't responding`), not a Jarvis screen. At the same time, logcat reports Jarvis frames taking 11,060 ms, 518 skipped frames, and repeated GLES invalid-program errors (`glUseProgram`, error 0x501). The emulator also recorded system/SystemUI ANRs earlier in the run. This supports GPU/emulator starvation during continuous native rendering; it does not establish that Jarvis alone caused every system ANR.
+
+### Corrective changes committed on the PR #111 branch
+
+- `MainActivity.kt`: replaced the fixed 330dp vertical spacer / top overlay placement with a flexible weighted middle region containing the sphere, so controls retain space on compact screens.
+- `AlphaVideoSurfaceView.kt`: changed GLSurfaceView from continuous redraw to `RENDERMODE_WHEN_DIRTY`; listening-state changes request a new frame. This retains the orbital artwork while avoiding a permanent shader redraw loop. Continuous animation is intentionally paused pending stable performance measurements.
+- `JarvisRuntimeSmokeTest.kt`: added an assertion that the microphone control has non-empty visible bounds, not merely an accessibility description.
+
+### Verification state
+
+The changes are committed; latest known PR head is `6e14f849d4ef3ef6a07d6f41ebc9404ee0dd638c`. At the time of this update GitHub had not yet created a workflow run or check-runs for this exact SHA (0 check-runs; combined status pending with no statuses). Therefore these changes are NOT yet build- or emulator-verified. Do not merge or release until fresh exact-head JVM, APK, and emulator checks complete.
