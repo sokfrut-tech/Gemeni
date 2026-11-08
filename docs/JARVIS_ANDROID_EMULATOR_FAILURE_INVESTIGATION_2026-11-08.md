@@ -116,3 +116,40 @@ Commit `3449c3dcde0bd0e960102e61ad0905d50dd36ca5` updates `.github/scripts/run-a
 - Confirm whether the prior stuck run terminates under GitHub's configured timeout/concurrency behavior; do not infer cancellation.
 - If the new run fails, inspect uploaded diagnostics and logs before changing emulator configuration. Keep `swiftshader_indirect` unchanged.
 - No merge, release, or APK publication is authorized by this investigation.
+
+
+## Follow-up: exact-head emulator verification passed — 2026-11-08
+
+### Exact workflow evidence
+- Workflow run: [42455974159](https://github.com/sokfrut-tech/Gemeni/actions/runs/42455974159), run #338.
+- PR: #114, branch `fix/jarvis-emulator-permission-render-fallback-2026-11-08`.
+- Exact tested head: `66d46b10367dfaf484155a1bc682df5a1648238d`.
+- Overall workflow conclusion: `success`.
+- Secret scanning job `128654963983`: success.
+- CodeQL static analysis job `128654964214`: success. Steps include Kotlin source build, JVM unit tests, full debug APK build, APK verify/hash, artifact upload, and CodeQL analyze.
+- Android emulator job `128656135348`: success. The bounded smoke-test step completed successfully; failure-only diagnostics step was skipped; evidence upload succeeded.
+
+### Inspected emulator artifact
+- Artifact ID: `13607902431`, name `jarvis-emulator-evidence-9e7512c264ec81f3b3fc13659e0628a851b8073b`.
+- Artifact SHA-256 digest reported by GitHub: `b3090f7723a79a5ee3a996f0ecab4e1ee7e2b218b83501878784f983e45efd63`.
+- Downloaded and unpacked the artifact; inspected JUnit XML, UTP textproto, instrumentation test log, and per-test logcat files.
+- JUnit XML: 6 tests, 0 failures, 0 errors, 0 skipped; total test time 25.285 seconds.
+- Instrumentation runner log ends with `OK (6 tests)`.
+- UTP reports `test_status: PASSED` and `use_orchestrator: true`.
+- All six tests passed:
+  1. `mainScreenLaunchesAndShowsReadyState`
+  2. `runtimePrepareRejectsMissingModelWithoutDownloading`
+  3. `denyingMicrophonePermissionShowsActionableStatus`
+  4. `launcherShowsFunctionalJarvisUi`
+  5. `settingsOpensLocalModelPanel`
+  6. `decliningModelDownloadConsentDoesNotStartNetworkSetup`
+
+### Build artifact
+- Debug APK artifact ID: `13607647764`, name `jarvis-debug-apk-9e7512c264ec81f3b3fc13659e0628a851b8073b`.
+- Size: 86,965,171 bytes.
+- GitHub artifact SHA-256 digest: `14a7521b2f996cbc6d138f3cef2a25e0343bd70503225360a6ccd0fc1de09b84`.
+- This confirms a CI-built debug APK artifact exists for the exact tested head. It is not a production release and has not been verified on the owner's OPPO device.
+
+### Conclusion and guardrails
+The previous emulator hang is resolved for this exact CI run: the real wall-clock readiness deadline and bounded instrumentation command completed, all six instrumentation tests passed, and the evidence artifact uploaded. This validates the CI emulator smoke suite, not every runtime feature or hardware behavior.
+PR #114 remains open and Draft, unmerged. No release or APK publication was performed. Do not merge or release without the owner's explicit authorization and any required independent review.
