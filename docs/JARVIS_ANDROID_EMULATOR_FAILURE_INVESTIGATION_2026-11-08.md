@@ -153,3 +153,42 @@ Commit `3449c3dcde0bd0e960102e61ad0905d50dd36ca5` updates `.github/scripts/run-a
 ### Conclusion and guardrails
 The previous emulator hang is resolved for this exact CI run: the real wall-clock readiness deadline and bounded instrumentation command completed, all six instrumentation tests passed, and the evidence artifact uploaded. This validates the CI emulator smoke suite, not every runtime feature or hardware behavior.
 PR #114 remains open and Draft, unmerged. No release or APK publication was performed. Do not merge or release without the owner's explicit authorization and any required independent review.
+
+
+## Follow-up: exact-head CI run #339 independently inspected — 2026-11-08
+
+### Exact workflow evidence
+- Workflow run: [42458733893](https://github.com/sokfrut-tech/Gemeni/actions/runs/42458733893), run #339.
+- PR: #114, branch `fix/jarvis-emulator-permission-render-fallback-2026-11-08`.
+- Exact tested head: `5d8d2af69f71012f3ea912eb36a3e5b13279bec6`.
+- Secret scanning job `128663211938`: success.
+- CodeQL static analysis job `128663212112`: success, including Kotlin compilation, JVM unit tests, full debug APK build, APK verification/hash, artifact upload, and CodeQL analysis.
+- Android emulator smoke job `128664208688`: success. Smoke-test step completed; failure-only diagnostics were skipped; emulator evidence upload succeeded.
+- Overall workflow: all three jobs completed successfully.
+
+### Independently inspected emulator evidence
+- Artifact ID: `13608663765`, name `jarvis-emulator-evidence-c942a866001bd09d4f8bdf9acc1c2762aac5a644`.
+- GitHub artifact SHA-256: `417ab4c7b4c6d3ff31df3b45f121353088faf39d81a064b53430b694c3c2d0bc`.
+- Downloaded and unpacked the artifact. Inspected JUnit XML, UTP textproto, instrumentation runner output, and six per-test logcat files.
+- JUnit XML: 6 tests, 0 failures, 0 errors, 0 skipped; total test time 22.422 seconds.
+- Instrumentation runner: `OK (6 tests)`.
+- UTP: `test_status: PASSED`.
+- All six tests passed:
+  1. `mainScreenLaunchesAndShowsReadyState`
+  2. `runtimePrepareRejectsMissingModelWithoutDownloading`
+  3. `denyingMicrophonePermissionShowsActionableStatus`
+  4. `launcherShowsFunctionalJarvisUi`
+  5. `settingsOpensLocalModelPanel`
+  6. `decliningModelDownloadConsentDoesNotStartNetworkSetup`
+
+### Exact-head build artifact
+- Debug APK artifact ID: `13608971908`, name `jarvis-debug-apk-c942a866001bd09d4f8bdf9acc1c2762aac5a644`.
+- Size: 86,965,167 bytes.
+- GitHub artifact SHA-256: `3aaf5c66e0c0a4bebd85de67abfd8e50ffe789ae8aff4dbb267015cfb9d8ec98`.
+- Unit-test report artifact ID: `13609205911`, GitHub SHA-256: `951dd2a77388666462b35caf7b3c5a3c723fb561a41c7d29c31a4cadbccd6be5`.
+- CodeQL SARIF artifact ID: `13609266007`, GitHub SHA-256: `3981b42330cf99edd9e5534ebf7c783a2aeab5675f074f130dd5d1a4c66b8f79`.
+- Secret-scan SARIF artifact ID: `13609180787`, GitHub SHA-256: `f9fcfb958b041932550760e8e26711a6cf826aded95912c3bd54f2812cfb7858`.
+
+### Conclusion and limitations
+Run #339 independently confirms the exact PR head `5d8d2af` builds and passes the complete configured CI suite, including all six Android emulator instrumentation tests. The bounded emulator workflow and evidence upload both completed successfully. This remains emulator/CI verification only: it does not establish behavior on physical OPPO Find X6 Pro / ColorOS hardware, production-release readiness, or complete feature acceptance.
+PR #114 remains open and Draft, unmerged. No release or APK publication was performed. Do not merge or release without the owner's explicit authorization.
