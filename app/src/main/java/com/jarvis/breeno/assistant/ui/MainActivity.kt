@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
-        if (listeningJob?.isActive == true) return
+        if (listeningJob != null) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             startRealListening()
         } else {
@@ -128,7 +128,6 @@ class MainActivity : ComponentActivity() {
     private fun stopListening() {
         pendingListen = false
         listeningJob?.cancel()
-        listeningJob = null
         statusSink?.invoke("Прослушивание остановлено")
     }
 
