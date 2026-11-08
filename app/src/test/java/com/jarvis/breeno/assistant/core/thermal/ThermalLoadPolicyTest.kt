@@ -28,7 +28,7 @@ class ThermalLoadPolicyTest {
         assertFalse(policy.update(4, 2_000).allowHeavyInference)
     }
 
-    @Test fun recoveryRequiresStableCooldown() {
+    @Test fun recoveryRequiresSameCoolerStatusForFullCooldown() {
         val policy = ThermalBudgetHysteresis(cooldownMs = 30_000)
         assertEquals(ThermalLevel.CRITICAL, policy.update(4, 0).level)
         assertEquals(ThermalLevel.CRITICAL, policy.update(0, 1_000).level)
@@ -36,6 +36,15 @@ class ThermalLoadPolicyTest {
         val recovered = policy.update(0, 31_000)
         assertEquals(ThermalLevel.NORMAL, recovered.level)
         assertTrue(recovered.allowHeavyInference)
+    }
+
+    @Test fun changingCoolerStatusRestartsRecoveryWindow() {
+        val policy = ThermalBudgetHysteresis(cooldownMs = 30_000)
+        policy.update(4, 0)
+        assertEquals(ThermalLevel.CRITICAL, policy.update(0, 1_000).level)
+        assertEquals(ThermalLevel.CRITICAL, policy.update(1, 20_000).level)
+        assertEquals(ThermalLevel.CRITICAL, policy.update(1, 49_999).level)
+        assertEquals(ThermalLevel.WARM, policy.update(1, 50_000).level)
     }
 
     @Test fun renewedHeatingRestartsRecoveryWindow() {
