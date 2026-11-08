@@ -53,4 +53,68 @@ class WakeWordSessionStateMachineTest {
         assertTrue(machine.start())
         assertEquals(WakeWordSessionStateMachine.State.PREPARING, machine.state)
     }
+
+    @Test
+    fun callSuspendsEveryActiveLifecycleStage() {
+        val activeStates = listOf(
+            WakeWordSessionStateMachine.State.PREPARING,
+            WakeWordSessionStateMachine.State.WAITING_FOR_HOTWORD,
+            WakeWordSessionStateMachine.State.CAPTURING_COMMAND,
+            WakeWordSessionStateMachine.State.PROCESSING
+        )
+        activeStates.forEach { active ->
+            val machine = WakeWordSessionStateMachine()
+            assertTrue(machine.start())
+            when (active) {
+                WakeWordSessionStateMachine.State.PREPARING -> Unit
+                WakeWordSessionStateMachine.State.WAITING_FOR_HOTWORD -> assertTrue(machine.modelsReady())
+                WakeWordSessionStateMachine.State.CAPTURING_COMMAND -> {
+                    assertTrue(machine.modelsReady()); assertTrue(machine.hotwordDetected())
+                }
+                WakeWordSessionStateMachine.State.PROCESSING -> {
+                    assertTrue(machine.modelsReady()); assertTrue(machine.hotwordDetected())
+                    assertTrue(machine.commandCaptured())
+                }
+                else -> error("Unexpected test state")
+            }
+            assertTrue(machine.suspendForCall())
+            assertEquals(WakeWordSessionStateMachine.State.SUSPENDED_FOR_CALL, machine.state)
+            assertFalse(machine.commandFinished())
+        }
+    }
+
+    @Test
+    fun callInterruptionDoesNotResumeWithoutExplicitOptIn() {
+        val machine = WakeWordSessionStateMachine()
+        assertTrue(machine.start())
+        assertTrue(machine.modelsReady())
+        assertTrue(machine.suspendForCall())
+        assertFalse(machine.resumeAfterInterruption(userOptInStillActive = false))
+        assertEquals(WakeWordSessionStateMachine.State.SUSPENDED_FOR_CALL, machine.state)
+        assertTrue(machine.resumeAfterInterruption(userOptInStillActive = true))
+        assertEquals(WakeWordSessionStateMachine.State.PREPARING, machine.state)
+    }
+
+    @Test
+    fun systemAudioContentionRequiresExplicitResume() {
+        val machine = WakeWordSessionStateMachine()
+        assertTrue(machine.start())
+        assertTrue(machine.modelsReady())
+        assertTrue(machine.suspendForSystemAudio())
+        assertFalse(machine.resumeAfterInterruption(userOptInStillActive = false))
+        assertTrue(machine.resumeAfterInterruption(userOptInStillActive = true))
+        assertEquals(WakeWordSessionStateMachine.State.PREPARING, machine.state)
+    }
+
+    @Test
+    fun suspendedSessionCannotRestartOrReceiveFramesUntilExplicitResume() {
+        val machine = WakeWordSessionStateMachine()
+        assertTrue(machine.start())
+        assertTrue(machine.modelsReady())
+        assertTrue(machine.suspendForCall())
+        assertFalse(machine.start())
+        assertFalse(machine.hotwordDetected())
+        assertFalse(machine.suspendForSystemAudio())
+        assertEquals(WakeWordSessionStateMachine.State.SUSPENDED_FOR_CALL, machine.state)
+    }
 }
