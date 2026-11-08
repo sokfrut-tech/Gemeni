@@ -85,3 +85,35 @@ New evidence from the second artifact:
 
 Updated conclusion:
 Two consecutive emulator runs now show broad Android platform ANRs/process restarts and graphics-buffer errors, alongside a variable Jarvis launch time (about 9.3s in #351, 28.5s in #352). This supports classifying the emulator as unhealthy during these runs, but does not exonerate Jarvis startup/rendering. Keep the smoke gate failed. Next, isolate launch profiling in a healthy emulator and capture a clean permission-controller hierarchy. Do not remove assertions or increase timeouts as a substitute for diagnosis.
+
+
+## Follow-up run #353 — instrumentation UI assertions still failing
+
+Workflow: [#353](https://github.com/sokfrut-tech/Gemeni/actions/runs/42484753120)  
+Run ID: `42484753120`  
+PR head tested: `779e91f354e30e902e22847ca6e4b459ecf1cccd`  
+Test merge SHA shown by evidence artifact: `395f06f754261ace30cfd0836cddca6d8627a860`  
+Evidence artifact: [jarvis emulator evidence](https://github.com/sokfrut-tech/Gemeni/actions/runs/42484753120/artifacts/13620146274), artifact ID `13620146274`.
+
+### Exact failures
+
+- `JarvisLaunchSmokeTest.mainScreenLaunchesAndShowsReadyState`: assertion `Jarvis main screen did not appear` after waiting for exact text `ДЖАРВИС` (30 seconds).
+- `JarvisRuntimeSmokeTest.denyingMicrophonePermissionShowsActionableStatus`: assertion `Microphone button is missing` after waiting for content description `Микрофон` (10 seconds), before the permission dialog interaction.
+- Emulator graphics emitted `Failed to find ColorBuffer: 107`.
+- Instrumentation summary: 6 tests, 2 failures; Gradle task `:app:connectedDebugAndroidTest` failed after 14m30s.
+- Secret scanning and CodeQL jobs passed. This job's log does not establish the status of any separate JVM/APK jobs; don't infer them from the emulator result.
+
+### What this changes
+
+Earlier runs showed system-wide ANRs and graphics errors. Run #353 again contains a graphics-buffer error, but the two direct test failures are UI-element discovery failures. The permission-denial test failed before trying to locate the Android permission dialog: it could not find the app microphone control. This makes it necessary to investigate app UI composition, semantics/content descriptions, launch state, and screenshots/window hierarchy—not merely increase permission-selector timeouts.
+
+The launch test looks for exact visible text `ДЖАРВИС`; the runtime test looks for content description `Микрофон`. Compare these selectors against the actual Compose UI semantics and captured XML/screenshot in the artifact. Preserve assertions until a real mismatch is understood. Do not replace them with weaker generic checks.
+
+### Next actions
+
+1. Inspect artifact screenshots and XML hierarchy for `main-screen-missing` and the microphone-button failure; identify whether the activity, system overlay, or wrong semantics are present.
+2. Inspect the actual Compose screen source and align test selectors with intentional, stable accessibility semantics; prefer stable test tags/content descriptions, not brittle localized display text, where feasible.
+3. Capture app process logs and activity lifecycle around each failure; distinguish activity launch failure, Compose first-frame delay, and selector mismatch.
+4. Keep emulator smoke red until all assertions pass on a healthy emulator. Keep PR Draft and do not merge/release.
+
+No physical OPPO validation is implied by this CI run.
