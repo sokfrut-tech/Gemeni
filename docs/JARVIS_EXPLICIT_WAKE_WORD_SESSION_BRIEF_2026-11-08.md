@@ -79,3 +79,14 @@ A red CI blocks release. Emulator success is not physical OPPO validation.
 - Do not publish or distribute APK from this branch.
 - Keep PR #114 isolated; do not add KWS changes to it.
 - No claim of Claude/Gemini review unless an actual review artifact exists.
+
+
+## Implementation log — 2026-11-08 (KWS lifecycle guard + engine result handling)
+- Branch head before this entry: `fd5fcbdcb2c55c65b5f847bed4dc5142bfde29df`.
+- Commit `fd5fcbdcb2c55c65b5f847bed4dc5142bfde29df` added `WakeWordSessionStateMachine.kt`, its four JVM tests, and corrected the misleading always-on KWS engine comment.
+- CI run #346 / `42464117074` failed before compilation: `github/codeql-action/init@v4` could not download CodeQL CLI `2.27.4`; GitHub returned HTTP 504 on the streaming request and both fallback attempts. Secret scanning passed; Kotlin compilation, unit tests, APK build, CodeQL analysis, and emulator smoke tests were skipped. Failed CodeQL job was explicitly re-run; outcome pending.
+- API review against Sherpa-ONNX Kotlin API confirms `KeywordSpotter.createStream(keywords)`, `isReady`, `decode`, `getResult`, `reset`, and `OnlineStream.release()` are the supported lifecycle. The official KWS sample checks the result after each decode and resets immediately after a hit.
+- Root cause fixed here: previous `accept()` drained all ready frames before reading one result and did not reset after a keyword hit. This could delay detection and leave a previous detection latched across later audio frames.
+- Changed file: `app/src/main/java/com/jarvis/breeno/assistant/voice/SherpaJarvisKwsEngine.kt`; result is checked after each decode, and the stream is reset immediately on a positive match.
+- Verification: not yet compiled or tested in this commit. No live microphone integration is claimed. The session state machine is not yet wired to UI or AudioRecord; push-to-talk remains unchanged.
+- Evidence reference: Sherpa-ONNX Kotlin API and official Android KWS sample (reviewed 2026-11-08); CI log for run #346 records the HTTP 504 failure.

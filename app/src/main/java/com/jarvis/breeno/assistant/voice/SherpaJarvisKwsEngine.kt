@@ -64,9 +64,17 @@ class SherpaJarvisKwsEngine {
         if (samples.isEmpty()) return false
         s.acceptWaveform(FloatArray(samples.size) { samples[it] / 32768.0f }, SAMPLE_RATE)
         val detector = spotter ?: return false
-        while (detector.isReady(s)) detector.decode(s)
-        val result = detector.getResult(s)
-        return result.keyword.equals(KEYWORD, ignoreCase = true)
+        while (detector.isReady(s)) {
+            detector.decode(s)
+            val result = detector.getResult(s)
+            if (result.keyword.equals(KEYWORD, ignoreCase = true)) {
+                // Sherpa's KWS example resets immediately after a hit; without
+                // this, a previous result may be observed again on later frames.
+                detector.reset(s)
+                return true
+            }
+        }
+        return false
     }
 
     @Synchronized
