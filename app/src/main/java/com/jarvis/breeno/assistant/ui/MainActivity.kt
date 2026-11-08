@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -365,8 +367,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
-                    FloatingActionButton(onClick = { requestAndListen() }, containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536), contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)) {
-                        Icon(Icons.Default.Mic, contentDescription = "Микрофон", modifier = Modifier.size(28.dp))
+                    FloatingActionButton(
+                        onClick = { requestAndListen() },
+                        modifier = Modifier.semantics { contentDescription = "Микрофон" },
+                        containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536),
+                        contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(28.dp))
                     }
                 }
             }
