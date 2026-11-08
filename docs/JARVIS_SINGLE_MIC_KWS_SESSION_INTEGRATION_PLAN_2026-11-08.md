@@ -25,6 +25,32 @@ Engineering plan based on source inspection of the KWS feature branch. This docu
 7. Thermal protection applies to the always-on KWS loop as well as ASR, inference, and TTS. Under severe/unknown thermal state, stop or suspend wake listening safely and communicate why.
 8. A successful build or emulator smoke test does not prove microphone behavior, acoustic accuracy, battery impact, or OPPO ColorOS background behavior.
 
+
+## Critical audio priority: phone calls and system capture
+
+**Phone calls take priority over Jarvis wake-word listening.** Always-on KWS is opportunistic, never an exclusive claim on the microphone.
+
+- Android's telephony and audio-focus/session policy is authoritative. Jarvis must not try to bypass it, seize audio input during a call, or repeatedly reopen the microphone while another app/system component owns capture.
+- Observe call state using supported Android APIs and required permissions. Treat call-state callbacks as an early signal, not the only safety mechanism: also handle AudioRecord initialization/read failures, audio server/device changes, and capture interruption.
+- On an incoming, active, or otherwise relevant telephony call state, immediately stop feeding frames to KWS, cancel the active capture Job, release AudioRecord and native KWS/VAD resources, and transition to a visible `SUSPENDED_FOR_CALL` state. Do not record, transcribe, or react to call audio.
+- Do not automatically resume during a call or immediately when it ends. Resume only if the user had explicitly enabled wake listening and Android confirms capture can be reacquired; use a bounded backoff and visible status. If reacquisition fails, remain suspended and let the user retry.
+- If Android/ColorOS does not expose reliable call state on a device, fail safe: on capture interruption/error, release resources and suspend rather than retry-looping.
+- Phone call UI/audio, emergency calls, and system services must never be delayed, muted, intercepted, or modified by Jarvis.
+- Also yield to other legitimate microphone use (camera video, voice recorder, other assistant, conferencing apps) whenever the platform indicates capture contention or privacy restriction. No microphone fight and no polling loop.
+- KWS listening should be implemented as a foreground, user-visible session where required by Android version/policy. Never hide microphone use or attempt to keep listening through platform restrictions.
+
+### Required call-priority tests
+
+1. Simulated incoming call while waiting for the wake word: capture Job cancels and AudioRecord is released.
+2. Active call while Jarvis is processing a command: no new capture begins; no call audio reaches ASR.
+3. Call ends: no implicit microphone restart unless the explicit user opt-in remains valid and policy permits; retry is bounded.
+4. AudioRecord read error / audio focus or device interruption: suspend and release; no tight retry loop.
+5. Repeated call start/end events: idempotent state transitions and exactly-once cleanup.
+6. Competing recorder / microphone privacy toggle / permission revocation: suspend safely and explain the reason.
+7. Emergency-call and real telephony behavior must be validated on a physical device; emulator tests alone are insufficient.
+
+Add `SUSPENDED_FOR_CALL` (and, if useful, a general `SUSPENDED_FOR_SYSTEM_AUDIO`) to the session state model. Telephony priority is a release-blocking acceptance criterion, not a later optimization.
+
 ## Confirmed gaps and risks
 
 - The current `listenOnce` path does not call the KWS engine, router, or state machine.
