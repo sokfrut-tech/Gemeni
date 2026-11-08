@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -82,12 +84,15 @@ private val Muted = Color(0xFF9AAABD)
 class MainActivity : ComponentActivity() {
     private lateinit var runtime: JarvisRuntimeController
     private var pendingListen = false
+    private var pendingModelDownloadConsent = false
+    private var modelConsentSink: (() -> Unit)? = null
     private var statusSink: ((String) -> Unit)? = null
     private var listeningJob: Job? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && pendingListen) startRealListening()
+        if (granted && pendingListen) startRealListening(pendingModelDownloadConsent)
         pendingListen = false
+        pendingModelDownloadConsent = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,20 +103,34 @@ class MainActivity : ComponentActivity() {
 
     private fun requestAndListen() {
         if (listeningJob != null) return
+        if (!runtime.isRussianAsrReady()) {
+            modelConsentSink?.invoke()
+            return
+        }
+        requestMicrophoneAndListen(allowModelDownload = false)
+    }
+
+    private fun requestModelDownloadAndListen() {
+        if (listeningJob != null) return
+        requestMicrophoneAndListen(allowModelDownload = true)
+    }
+
+    private fun requestMicrophoneAndListen(allowModelDownload: Boolean) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startRealListening()
+            startRealListening(allowModelDownload)
         } else {
             pendingListen = true
+            pendingModelDownloadConsent = allowModelDownload
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    private fun startRealListening() {
+    private fun startRealListening(allowModelDownload: Boolean) {
         if (listeningJob != null) return
         listeningJob = lifecycleScope.launch {
             try {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
-                withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
+                withContext(Dispatchers.IO) { runtime.prepare(allowModelDownload) { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 statusSink?.invoke("Микрофон активен — говорите")
                 val text = withContext(Dispatchers.IO) { runtime.listenOnce { status -> runOnUiThread { statusSink?.invoke(status) } } }
                 if (text.isNotBlank()) statusSink?.invoke("Распознано: $text")
@@ -153,10 +172,12 @@ class MainActivity : ComponentActivity() {
     private fun JarvisHome() {
         var listening by remember { mutableStateOf(false) }
         var busy by remember { mutableStateOf(false) }
+        var showModelConsent by remember { mutableStateOf(false) }
         var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
         var status by remember { mutableStateOf("Ожидаю команду") }
 
         DisposableEffect(Unit) {
+            modelConsentSink = { showModelConsent = true }
             statusSink = { value ->
                 status = value
                 listening = value.contains("Микрофон активен") || value.contains("говорите")
@@ -173,7 +194,27 @@ class MainActivity : ComponentActivity() {
                     transcript = value
                 }
             }
-            onDispose { statusSink = null }
+            onDispose { statusSink = null; modelConsentSink = null }
+        }
+
+        if (showModelConsent) {
+            AlertDialog(
+                onDismissRequest = { showModelConsent = false },
+                title = { Text("Загрузить русскую голосовую модель?") },
+                text = { Text("Для локального распознавания речи нужны файлы модели. Они будут загружены из интернета в память приложения. Без вашего подтверждения загрузка не начнётся.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showModelConsent = false
+                        requestModelDownloadAndListen()
+                    }) { Text("ЗАГРУЗИТЬ И ПРОДОЛЖИТЬ") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showModelConsent = false
+                        status = "Загрузка модели отменена — ничего не скачано"
+                    }) { Text("НЕ СЕЙЧАС") }
+                }
+            )
         }
 
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
