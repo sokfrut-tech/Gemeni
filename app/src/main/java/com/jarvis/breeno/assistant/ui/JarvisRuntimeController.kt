@@ -20,9 +20,17 @@ class JarvisRuntimeController(context: Context) {
     private val intents = RussianIntentDispatcher()
     private val speaker = JarvisSpeaker(appContext)
 
-    suspend fun prepare(onProgress: (String) -> Unit) {
+    fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
+
+    suspend fun prepare(onProgress: (String) -> Unit) = prepare(userConsentToDownload = false, onProgress = onProgress)
+
+    suspend fun prepare(userConsentToDownload: Boolean, onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
-        val dir = models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
+        if (!models.isRussianAsrReady() && !userConsentToDownload) {
+            error("Русская ASR-модель не установлена. Для загрузки требуется явное согласие пользователя.")
+        }
+        val dir = if (models.isRussianAsrReady()) models.modelDir()
+        else models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
         asr.load(dir)
         onProgress("Русский ASR готов")
     }

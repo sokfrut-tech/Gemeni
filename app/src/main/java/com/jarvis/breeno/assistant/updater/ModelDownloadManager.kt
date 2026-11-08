@@ -2,6 +2,8 @@ package com.jarvis.breeno.assistant.updater
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
@@ -44,19 +46,35 @@ class ModelDownloadManager(private val context: Context) {
         dir
     }
 
-    private fun download(url: URL, destination: File) {
+    private suspend fun download(url: URL, destination: File) {
+        val coroutineContext = currentCoroutineContext()
         val tmp = File(destination.parentFile, destination.name + ".part")
         val connection = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
-            readTimeout = 60_000
+            readTimeout = 5_000
             instanceFollowRedirects = true
             requestMethod = "GET"
         }
         try {
             check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
-            connection.inputStream.use { input -> tmp.outputStream().use { output -> input.copyTo(output, 64 * 1024) } }
+            connection.inputStream.use { input ->
+                tmp.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        coroutineContext.ensureActive()
+                        val count = input.read(buffer)
+                        coroutineContext.ensureActive()
+                        if (count < 0) break
+                        if (count > 0) output.write(buffer, 0, count)
+                    }
+                }
+            }
+            coroutineContext.ensureActive()
             check(tmp.length() > 0) { "Empty model file: ${destination.name}" }
             check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
+        } catch (error: Throwable) {
+            coroutineContext.ensureActive()
+            throw error
         } finally {
             connection.disconnect()
             tmp.delete()
