@@ -30,6 +30,7 @@ class AudioCaptureCoordinator(
     private val scope: CoroutineScope,
     private val frames: () -> Flow<ShortArray>,
     private val onFrame: (ShortArray) -> Unit,
+    private val onFailure: (Throwable) -> Unit = {},
 ) {
     enum class State {
         IDLE,
@@ -58,7 +59,7 @@ class AudioCaptureCoordinator(
                 throw cancelled
             } catch (error: Throwable) {
                 mutableState.value = State.FAILED
-                throw error
+                runCatching { onFailure(error) }
             } finally {
                 if (mutableState.value == State.CAPTURING ||
                     mutableState.value == State.STOPPING
