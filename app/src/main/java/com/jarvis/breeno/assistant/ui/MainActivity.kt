@@ -105,11 +105,19 @@ class MainActivity : ComponentActivity() {
     private fun requestAndListen() {
         if (listeningJob != null || modelCheckJob != null) return
         modelCheckJob = lifecycleScope.launch {
-            statusSink?.invoke("Проверяю локальную модель…")
-            val ready = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
-            modelCheckJob = null
-            if (ready) requestMicrophoneAndListen(allowModelDownload = false)
-            else modelConsentSink?.invoke()
+            try {
+                statusSink?.invoke("Проверяю локальную модель…")
+                val ready = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+                if (ready) requestMicrophoneAndListen(allowModelDownload = false)
+                else modelConsentSink?.invoke()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                statusSink?.invoke("Ошибка проверки модели: ${error.message ?: error.javaClass.simpleName}")
+            } finally {
+                // Keep the job reference until cleanup finishes to prevent overlapping preflight work.
+                modelCheckJob = null
+            }
         }
     }
 
@@ -150,7 +158,6 @@ class MainActivity : ComponentActivity() {
     private fun stopListening() {
         pendingListen = false
         modelCheckJob?.cancel()
-        modelCheckJob = null
         listeningJob?.cancel()
         statusSink?.invoke("Прослушивание остановлено")
     }
