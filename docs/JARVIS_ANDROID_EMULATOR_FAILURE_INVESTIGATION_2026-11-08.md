@@ -73,3 +73,17 @@ Artifact `13592421561` was downloaded and inspected. It contains screenshots, UI
 ### Verification state
 
 The changes are committed; latest known PR head is `6e14f849d4ef3ef6a07d6f41ebc9404ee0dd638c`. At the time of this update GitHub had not yet created a workflow run or check-runs for this exact SHA (0 check-runs; combined status pending with no statuses). Therefore these changes are NOT yet build- or emulator-verified. Do not merge or release until fresh exact-head JVM, APK, and emulator checks complete.
+
+
+## Follow-up: Orchestrator verification and permission assertion — 2026-11-08
+
+Run #331 (workflow run 42450820913, PR #114 head before follow-up commit) confirms Android Test Orchestrator is active: all six instrumentation tests completed and the earlier instrumentation-process SIGKILL did not recur. Secret scanning, CodeQL, JVM tests, debug APK build, and APK hash verification passed. The emulator suite had one failure.
+
+The only failing test was `denyingMicrophonePermissionShowsActionableStatus`. Its log shows the Android Permission Controller displayed the microphone permission dialog, the deny selector was found, and a button was clicked. The final test assertion queried permission state through the shell command `pm check-permission` and failed. This assertion used a shell interface unnecessarily and was not equivalent to checking the app's runtime permission state through Android's framework API.
+
+Follow-up commit `aef42ba9019ea6b8db41df0a59f4a72de7496927` changes the test to:
+- Revoke microphone permission through `UiAutomation.revokeRuntimePermission(packageName, Manifest.permission.RECORD_AUDIO)`.
+- Verify the resulting state with `Context.checkSelfPermission` against `PackageManager.PERMISSION_DENIED`.
+- Keep the permission-dialog interaction and user-visible denial-status assertion intact.
+
+This is a test reliability correction, not a production permission behavior change. Await a fresh exact-head CI run before claiming the permission test is fixed. No merge or release.
