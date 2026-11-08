@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
     private var modelConsentSink: (() -> Unit)? = null
     private var statusSink: ((String) -> Unit)? = null
     private var listeningJob: Job? = null
+    private var modelCheckJob: Job? = null
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && pendingListen) startRealListening(pendingModelDownloadConsent)
@@ -102,12 +103,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAndListen() {
-        if (listeningJob != null) return
-        if (!runtime.isRussianAsrReady()) {
-            modelConsentSink?.invoke()
-            return
+        if (listeningJob != null || modelCheckJob != null) return
+        modelCheckJob = lifecycleScope.launch {
+            statusSink?.invoke("Проверяю локальную модель…")
+            val ready = withContext(Dispatchers.IO) { runtime.isRussianAsrReady() }
+            modelCheckJob = null
+            if (ready) requestMicrophoneAndListen(allowModelDownload = false)
+            else modelConsentSink?.invoke()
         }
-        requestMicrophoneAndListen(allowModelDownload = false)
     }
 
     private fun requestModelDownloadAndListen() {
@@ -146,6 +149,8 @@ class MainActivity : ComponentActivity() {
 
     private fun stopListening() {
         pendingListen = false
+        modelCheckJob?.cancel()
+        modelCheckJob = null
         listeningJob?.cancel()
         statusSink?.invoke("Прослушивание остановлено")
     }
@@ -162,6 +167,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         statusSink = null
+        modelCheckJob?.cancel()
+        modelCheckJob = null
         listeningJob?.cancel()
         listeningJob = null
         runtime.close()
