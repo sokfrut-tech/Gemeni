@@ -8,6 +8,8 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
@@ -38,15 +40,18 @@ class AudioRecordPipeline(private val context: Context) {
             AudioFormat.ENCODING_PCM_16BIT,
             bufferSize
         )
-        check(recorder.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord initialization failed" }
-
-        val buffer = ShortArray(bufferSize / 2)
         try {
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord initialization failed" }
+            val buffer = ShortArray(bufferSize / 2)
             recorder.startRecording()
             while (currentCoroutineContext().isActive) {
-                val read = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                currentCoroutineContext().ensureActive()
+                // Non-blocking reads make coroutine cancellation observable without waiting
+                // for an indefinitely blocked AudioRecord.read(READ_BLOCKING).
+                val read = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
                 when {
                     read > 0 -> emit(buffer.copyOf(read))
+                    read == 0 -> delay(10)
                     read == AudioRecord.ERROR_DEAD_OBJECT -> break
                     read < 0 -> throw IllegalStateException("AudioRecord.read failed: $read")
                 }
