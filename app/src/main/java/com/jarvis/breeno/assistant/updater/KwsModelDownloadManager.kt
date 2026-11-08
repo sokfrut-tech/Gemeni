@@ -13,7 +13,7 @@ class KwsModelDownloadManager(private val context: Context) {
     companion object {
         const val MODEL_ID = "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20"
         private const val BASE = "https://huggingface.co/moeru-ai/$MODEL_ID/resolve/main/"
-        private const val KEYWORDS_CONTENT = "JH AA1 R V IH0 S:2.0 #0.25 @JARVIS\\n"
+        private const val KEYWORDS_CONTENT = "JH AA1 R V IH0 S:2.0 #0.25 @JARVIS\n"
         private val FILES = listOf(
             ModelFile("encoder.onnx", "540ff509ed89bd22afe04bf7049a54bb1c95c6d8a18742ea9691910cdb5f859e"),
             ModelFile("decoder.onnx", "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21"),
@@ -25,13 +25,15 @@ class KwsModelDownloadManager(private val context: Context) {
 
     fun modelDir(): File = context.filesDir.resolve("models/$MODEL_ID").also { it.mkdirs() }
 
+    /** A model is ready only when every hashed model file and the generated keyword manifest exist. */
     fun isReady(): Boolean {
         val dir = modelDir()
         val modelFilesValid = FILES.all { item ->
             dir.resolve(item.name).let { it.isFile && it.length() > 0 && sha256(it) == item.sha256 }
         }
         val keywords = dir.resolve("keywords.txt")
-        return modelFilesValid && keywords.isFile && keywords.readText(Charsets.UTF_8) == KEYWORDS_CONTENT
+        return modelFilesValid && keywords.isFile &&
+            runCatching { keywords.readText(Charsets.UTF_8) == KEYWORDS_CONTENT }.getOrDefault(false)
     }
 
     suspend fun ensure(onProgress: (Int) -> Unit = {}): File = withContext(Dispatchers.IO) {
@@ -44,8 +46,20 @@ class KwsModelDownloadManager(private val context: Context) {
             }
             onProgress((index + 1) * 100 / FILES.size)
         }
+
+        // Commit the generated keyword manifest atomically; an interrupted write
+        // must never make a partially configured KWS installation appear ready.
         val keywords = dir.resolve("keywords.txt")
-        keywords.writeText("JH AA1 R V IH0 S:2.0 #0.25 @JARVIS\n", Charsets.UTF_8)
+        val part = dir.resolve("keywords.txt.part")
+        try {
+            part.writeText(KEYWORDS_CONTENT, Charsets.UTF_8)
+            check(part.length() > 0) { "Generated KWS keywords file is empty" }
+            if (keywords.exists()) check(keywords.delete()) { "Cannot replace KWS keywords file" }
+            check(part.renameTo(keywords)) { "Cannot commit KWS keywords file" }
+        } finally {
+            part.delete()
+        }
+        check(isReady()) { "KWS model installation is incomplete" }
         dir
     }
 
@@ -59,8 +73,11 @@ class KwsModelDownloadManager(private val context: Context) {
         }
         try {
             check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
-            connection.inputStream.use { input -> tmp.outputStream().use { output -> input.copyTo(output, 64 * 1024) } }
+            connection.inputStream.use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output, 64 * 1024) }
+            }
             check(tmp.length() > 0) { "Empty KWS model: ${destination.name}" }
+            if (destination.exists()) check(destination.delete()) { "Cannot replace ${destination.name}" }
             check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
         } finally {
             connection.disconnect()
