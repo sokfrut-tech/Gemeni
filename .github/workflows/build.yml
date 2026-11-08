@@ -85,7 +85,7 @@ jobs:
           force-avd-creation: false
           emulator-boot-timeout: 300
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader -noaudio -no-boot-anim -camera-back none
           script: echo "Clean API 35 AVD booted; snapshot will be cached."
 
       - name: Runtime smoke tests on Android emulator
@@ -98,7 +98,7 @@ jobs:
           force-avd-creation: false
           emulator-boot-timeout: 300
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
+          emulator-options: -no-window -gpu swiftshader -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
 
       - name: Capture emulator diagnostics
