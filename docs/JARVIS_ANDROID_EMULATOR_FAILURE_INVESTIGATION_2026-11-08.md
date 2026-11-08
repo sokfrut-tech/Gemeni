@@ -87,3 +87,32 @@ Follow-up commit `aef42ba9019ea6b8db41df0a59f4a72de7496927` changes the test to:
 - Keep the permission-dialog interaction and user-visible denial-status assertion intact.
 
 This is a test reliability correction, not a production permission behavior change. Await a fresh exact-head CI run before claiming the permission test is fixed. No merge or release.
+
+
+## Follow-up: emulator smoke-test hang and hard timeout correction — 2026-11-08
+
+### Observed run
+- Workflow run: [42455416539](https://github.com/sokfrut-tech/Gemeni/actions/runs/42455416539)
+- PR: #114, branch `fix/jarvis-emulator-permission-render-fallback-2026-11-08`
+- Exact head before timeout correction: `c00db7c44d991d4e5ff3a5440c6baa91eb106eed`
+- Secret scanning: passed.
+- CodeQL job: passed, including Kotlin compilation, JVM unit tests, full debug APK build, APK verification/hash, and SARIF analysis.
+- Android emulator smoke job: remained in progress far beyond the expected duration as reported by the project owner. Its step was `Run Android emulator smoke tests`; no conclusion or usable live log was available during inspection.
+
+### Root cause found in smoke script
+The script's readiness loop claimed a 360-second limit but used 180 iterations, not a wall-clock deadline. Each iteration performed several serial ADB calls. Most had individual timeouts, but `adb get-state` had no timeout at all. A stalled ADB command could therefore hold the loop indefinitely; even when calls returned, the aggregate loop duration could substantially exceed the stated six minutes. This invalidated the claimed bounded-readiness guarantee.
+
+### Corrective change
+Commit `3449c3dcde0bd0e960102e61ad0905d50dd36ca5` updates `.github/scripts/run-android-emulator-smoke.sh`:
+- Uses a real `SECONDS`-based six-minute readiness deadline.
+- Bounds `adb get-state` and groups framework readiness probes into a single bounded ADB shell call.
+- Adds a hard 24-minute timeout to Gradle instrumentation, leaving time within the 32-minute step / 35-minute job budget for diagnostics and artifact upload.
+- Emits an explicit timeout error when instrumentation exceeds its budget.
+- Preserves diagnostics capture and test-report validation.
+
+### Verification state / next actions
+- This is a targeted CI reliability correction based on direct source inspection; it is not yet emulator-verified.
+- The push should create a fresh workflow run for the new exact branch head; inspect that run and its emulator diagnostics.
+- Confirm whether the prior stuck run terminates under GitHub's configured timeout/concurrency behavior; do not infer cancellation.
+- If the new run fails, inspect uploaded diagnostics and logs before changing emulator configuration. Keep `swiftshader_indirect` unchanged.
+- No merge, release, or APK publication is authorized by this investigation.
