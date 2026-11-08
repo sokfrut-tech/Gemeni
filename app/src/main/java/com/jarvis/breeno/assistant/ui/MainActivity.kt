@@ -177,8 +177,7 @@ class MainActivity : ComponentActivity() {
         var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
         var status by remember { mutableStateOf("Runtime не запускался") }
         var assistantState by remember { mutableStateOf(AssistantState.IDLE) }
-        var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null)
-        var sphereUnavailable by remember { mutableStateOf(false)} }
+        var sphereUnavailable by remember { mutableStateOf(false) }
         var showQwenPanel by remember { mutableStateOf(false) }
         var showModelDownloadConsent by remember { mutableStateOf(false) }
         var modelDownloadInProgress by remember { mutableStateOf(false) }
@@ -270,7 +269,6 @@ class MainActivity : ComponentActivity() {
                                         AlphaVideoSurfaceView(context).also {
                                             it.contentDescription = "JarvisSphere"
                                             it.onRendererUnavailable = { sphereUnavailable = true }
-                                            sphere = it
                                         }
                                     } catch (_: UnsatisfiedLinkError) {
                                         sphereUnavailable = true
