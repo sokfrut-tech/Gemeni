@@ -13,6 +13,7 @@ class KwsModelDownloadManager(private val context: Context) {
     companion object {
         const val MODEL_ID = "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20"
         private const val BASE = "https://huggingface.co/moeru-ai/$MODEL_ID/resolve/main/"
+        private const val KEYWORDS_CONTENT = "JH AA1 R V IH0 S:2.0 #0.25 @JARVIS\\n"
         private val FILES = listOf(
             ModelFile("encoder.onnx", "540ff509ed89bd22afe04bf7049a54bb1c95c6d8a18742ea9691910cdb5f859e"),
             ModelFile("decoder.onnx", "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21"),
@@ -24,8 +25,13 @@ class KwsModelDownloadManager(private val context: Context) {
 
     fun modelDir(): File = context.filesDir.resolve("models/$MODEL_ID").also { it.mkdirs() }
 
-    fun isReady(): Boolean = FILES.all { item ->
-        modelDir().resolve(item.name).let { it.isFile && it.length() > 0 && sha256(it) == item.sha256 }
+    fun isReady(): Boolean {
+        val dir = modelDir()
+        val modelFilesValid = FILES.all { item ->
+            dir.resolve(item.name).let { it.isFile && it.length() > 0 && sha256(it) == item.sha256 }
+        }
+        val keywords = dir.resolve("keywords.txt")
+        return modelFilesValid && keywords.isFile && keywords.readText(Charsets.UTF_8) == KEYWORDS_CONTENT
     }
 
     suspend fun ensure(onProgress: (Int) -> Unit = {}): File = withContext(Dispatchers.IO) {
