@@ -59,3 +59,29 @@ The microphone-permission test also failed to locate a deny button. Its log show
 ## Release gate
 
 No merge, release, or APK publication is authorized by this analysis. The emulator smoke gate remains failed pending a reproducible, trustworthy run.
+
+
+## Follow-up run #352 — repeated failure
+
+Workflow: [#352](https://github.com/sokfrut-tech/Gemeni/actions/runs/42481057977)  
+Run ID: `42481057977`  
+Tested head: `930e81b2d66944e9b78e0fd02b00f1ffe365af69`  
+Evidence artifact: [emulator diagnostics](https://github.com/sokfrut-tech/Gemeni/actions/runs/42481057977/artifacts/13618861566), artifact ID `13618861566`.
+
+Results:
+- Secret scanning: passed.
+- CodeQL, Kotlin compilation, JVM tests: passed.
+- Full debug APK build, SHA256 verification, artifact upload: passed.
+- Emulator smoke: failed, again 2/6 tests.
+
+New evidence from the second artifact:
+- ActivityManager logged Jarvis MainActivity as displayed after `+28s548ms` (not the approximately 9.3 seconds observed in run #351).
+- JarvisOrb GLES2 renderer did initialize.
+- Before/during Jarvis tests, the emulator logged ANRs in `com.android.systemui`, `system`, `android.ext.services`, `com.android.phone`, `com.android.keychain`, `com.android.printspooler`, `com.android.providers.media.module`, and `com.android.bluetooth`.
+- SystemUI and phone/Bluetooth processes were killed/restarted during the run.
+- Emulator graphics logged `Failed to find ColorBuffer` and `Failed to bind to texture: invalid color buffer`.
+- The first test's screenshot again captures a system ANR overlay over the app. The app's launch delay (28.5s) remains a real performance concern even though the platform was unhealthy.
+- The microphone denial test still fails to launch the Activity within the instrumentation 45-second window in this run; this is separate from the earlier short permission-button selector timeout. The actual permission-dialog hierarchy still needs direct capture in a healthy emulator.
+
+Updated conclusion:
+Two consecutive emulator runs now show broad Android platform ANRs/process restarts and graphics-buffer errors, alongside a variable Jarvis launch time (about 9.3s in #351, 28.5s in #352). This supports classifying the emulator as unhealthy during these runs, but does not exonerate Jarvis startup/rendering. Keep the smoke gate failed. Next, isolate launch profiling in a healthy emulator and capture a clean permission-controller hierarchy. Do not remove assertions or increase timeouts as a substitute for diagnosis.
