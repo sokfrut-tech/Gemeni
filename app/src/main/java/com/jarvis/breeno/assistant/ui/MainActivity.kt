@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startRealListening() {
-        if (listeningJob?.isActive == true) return
+        if (listeningJob != null) return
         listeningJob = lifecycleScope.launch {
             try {
                 statusSink?.invoke("Подготавливаю локальный русский ASR…")
