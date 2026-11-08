@@ -117,6 +117,27 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo "Checking KVM device and CPU virtualization support..."
+          grep -m1 -E 'vmx|svm' /proc/cpuinfo || true
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::/dev/kvm is not exposed by this GitHub Actions runner."
+            exit 1
+          fi
+
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chmod 0666 /dev/kvm
+
+          ls -l /dev/kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+          echo "KVM device is present and readable/writable."
+
       - name: Run Android emulator smoke tests
         timeout-minutes: 32
         uses: reactivecircus/android-emulator-runner@v2
