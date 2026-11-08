@@ -7,6 +7,7 @@ This increment adds and wires a serialized owner around the existing AudioRecord
 ## Implementation
 
 - `AudioCaptureCoordinator` is the only collector used by `JarvisRuntimeController.listenOnce()`.
+- A process-wide atomic guard prevents two runtime controllers in the main app process from opening separate capture flows at the same time.
 - Start, stop, call suspension and system-audio suspension are serialized by a coroutine Mutex.
 - `stop()` and suspension use `cancelAndJoin()`; they do not return until the source Flow's cancellation cleanup has completed.
 - The source remains `AudioRecordPipeline.frames()`, whose `finally` stops and releases the recorder.
@@ -26,6 +27,7 @@ JVM tests cover:
 ## Not yet implemented
 
 - No Android TelephonyCallback / PhoneStateListener adapter is wired.
+- The manifest currently places the voice session service in a separate `:session` process. That process must not open AudioRecord; future voice-session capture must be brokered through one main-process owner over IPC. The process-wide guard does not cross Android process boundaries.
 - No READ_PHONE_STATE permission is added.
 - No guarantee of incoming-call detection on OPPO is claimed.
 - The KWS pipeline and VoiceInteractionService are not yet connected to this owner.
@@ -33,8 +35,9 @@ JVM tests cover:
 
 ## Next integration gate
 
-1. Validate the Android call-state API and least-privilege permission flow for API 29–35 and ColorOS.
-2. Add an injectable call/system-audio interruption source and platform adapter.
-3. Connect the same owner to KWS/VAD and typed UI states.
-4. Prove call preemption and resource release on OPPO Find X6 Pro; do not rely on emulator-only evidence.
-5. Require all CI checks green on the exact head before merge.
+1. Move the capture owner behind a main-process service/Binder boundary before enabling audio from the separate `:session` process.
+2. Validate the Android call-state API and least-privilege permission flow for API 29–35 and ColorOS.
+3. Add an injectable call/system-audio interruption source and platform adapter.
+4. Connect the same owner to KWS/VAD and typed UI states.
+5. Prove call preemption and resource release on OPPO Find X6 Pro; do not rely on emulator-only evidence.
+6. Require all CI checks green on the exact head before merge.
