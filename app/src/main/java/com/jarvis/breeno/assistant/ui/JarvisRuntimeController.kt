@@ -22,7 +22,7 @@ class JarvisRuntimeController(context: Context) {
 
     fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
 
-    suspend fun prepare(onProgress: (String) -> Unit) = prepare(userConsentToDownload = false, onProgress)
+    suspend fun prepare(onProgress: (String) -> Unit) = prepare(userConsentToDownload = false, onProgress = onProgress)
 
     suspend fun prepare(userConsentToDownload: Boolean, onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
