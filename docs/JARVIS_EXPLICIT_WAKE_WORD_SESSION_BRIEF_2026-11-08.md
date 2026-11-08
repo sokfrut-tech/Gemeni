@@ -1,92 +1,42 @@
-# Jarvis explicit wake-word session — engineering brief (2026-11-08)
+# Jarvis explicit KWS implementation handoff — 2026-11-08
 
-## Status
-Planning/implementation boundary: this branch starts from PR #114 head `6d9099774cc91297e773d42936273b72990ba20d`. This document records the scoped design; it does not claim acoustic KWS is integrated or working. Keep this work separate from the emulator-stability PR.
+## Verified repository state
 
-## Confirmed current architecture
-- `MainActivity.requestAndListen()` requests RECORD_AUDIO and then calls `startRealListening()`.
-- `JarvisRuntimeController.listenOnce()` opens `AudioRecordPipeline.frames()`, feeds frames to Silero VAD, converts completed speech segments to PCM, runs Sherpa Russian ASR, then sends the transcript through the guarded tool registry.
-- `AudioRecordPipeline.frames()` owns AudioRecord in a Flow and releases it in `finally`; it checks RECORD_AUDIO permission before constructing the recorder.
-- `SherpaJarvisKwsEngine` wraps Sherpa ONNX KeywordSpotter and accepts 16 kHz mono PCM16 frames.
-- `HotwordDetector` can bind an acoustic engine and gate KWS, but no user-facing capture path currently invokes it.
-- `KwsModelDownloadManager` verifies four model files by SHA-256 and validates the generated `keywords.txt`. Its download must remain behind a separate, explicit user consent action.
-- Existing KWS model is labelled zh/en and maps the wake word to English phonemes. Recognition quality for a Russian speaker saying “Джарвис” is not yet demonstrated; it must be measured, not assumed.
+- Repository: `sokfrut-tech/Gemeni`
+- Working branch: `feat/jarvis-explicit-kws-session-2026-11-08`
+- PR: #115 (Draft, open, not merged)
+- Parent branch: `fix/jarvis-emulator-permission-render-fallback-2026-11-08`
+- Current verified implementation baseline before this commit: `9a2055bb7fc50fcd168b923cc64b02f8d50b04fe`
 
-## Root cause / gap
-The KWS engine and detector exist as isolated components, while the only wired microphone path is a one-shot VAD → ASR flow. Therefore acoustic wake-word detection is not currently active in the app. The engine's old “always-on” wording is misleading: no background microphone session is implemented and none should be silently enabled.
+## CI evidence
 
-## Required user experience
-1. Push-to-talk remains the default and continues to work without downloading KWS assets.
-2. Add a separate, clearly labelled “Режим ключевого слова” opt-in control.
-3. Starting that mode is an explicit user action. Check RECORD_AUDIO permission at start and fail closed if permission is absent/revoked.
-4. If KWS assets are absent, show a separate consent screen explaining model download size/source and do not make network requests until consent.
-5. Show a persistent, visible listening state and a clear Stop control while the session is active.
-6. Do not run a microphone in the background or after the user leaves/stops the session. No boot receiver, hidden service, or automatic restart is part of this scope.
-7. On stop, cancellation, Activity destruction, permission revocation, audio failure, or model error: cancel collection and release AudioRecord, KWS stream/spotter, and any active VAD state.
+- Run #346 / ID `42464117074` targeted old SHA `fd5fcbdcb2c55c65b5f847bed4dc5142bfde29df`.
+- Its retry was cancelled. CodeQL init, Kotlin compilation, JVM tests, APK build, and emulator tests were skipped; secret scanning passed.
+- Run #347 / ID `42464420951` targets `9a2055bb7fc50fcd168b923cc64b02f8d50b04fe` and was in progress when this note was written. Do not treat it as passed until all jobs finish.
 
-## Target pipeline
-Explicit opt-in session → permission/model readiness checks → load KWS → acquire 16 kHz mono PCM frames → acoustic KWS gate → after detection, transition to VAD capture → ASR → guarded command proposal/confirmation → speech response. After a completed command, return to KWS only while the same explicit session remains active; otherwise stop and release all resources.
+## Source-level audio-path findings
 
-## Implementation constraints
-- Prefer a dedicated session coordinator/state machine over adding complex branches to the existing one-shot `listenOnce()`.
-- States should be explicit and testable, e.g. STOPPED, PREPARING, WAITING_FOR_HOTWORD, CAPTURING_COMMAND, PROCESSING, ERROR.
-- Use structured coroutine cancellation and `try/finally`; ensure only one active AudioRecord owner.
-- Reuse the audio pipeline only if its Flow lifecycle can be safely controlled and its ownership is unambiguous. If needed, expose a bounded frame stream with cancellation semantics rather than a second concurrent recorder.
-- KWS and VAD must receive the correct sample rate, mono channel layout, and PCM normalization. Validate frame handling and empty heartbeat behavior.
-- Avoid calling Sherpa native APIs concurrently; synchronize engine lifecycle and processing.
-- Do not claim “always-on”, “background”, “hands-free”, or Russian wake-word accuracy until device/emulator evidence supports those claims.
-- Keep network access limited to the explicit KWS model consent/download path. Verify SHA-256 before loading.
-- Never bypass Android microphone permission, user-visible indicators, or platform privacy restrictions.
+- `MainActivity.startRealListening()` calls `runtime.listenOnce()`.
+- `JarvisRuntimeController.listenOnce()` currently owns a one-shot call to `audio.frames()`, runs Silero VAD, collects completed segments, then runs Russian ASR and the guarded tool pipeline.
+- `AudioRecordPipeline.frames()` creates exactly one AudioRecord per collection and releases it in `finally`.
+- `SherpaJarvisKwsEngine` currently has no wired caller in the user-facing capture flow.
+- Therefore KWS is NOT yet an operational wake-word mode. Do not claim hands-free or always-on operation.
+- Calling `listenOnce()` after KWS detection would open a second sequential AudioRecord collection; the correct design is to consume a single `audio.frames()` flow and switch frame routing from KWS to VAD inside that same collection.
+- `lifecycleScope` is used by MainActivity; verify cancellation propagation and release on Activity destruction, Stop, permission revocation, and audio errors before declaring lifecycle complete.
 
-## Required tests before calling this functional
-### JVM/unit
-- State-machine transitions and invalid transitions.
-- Stop during preparation, KWS wait, VAD capture, ASR, and response.
-- Cancellation releases session resources exactly once.
-- Permission absent/revoked fails closed.
-- KWS not ready causes a consent-required result and no download.
-- Model download is never invoked without explicit consent.
-- KWS positive/negative frame outcomes and disarmed detector behavior.
-- Empty frames/heartbeats do not cause false detection or unbounded waits.
-- A completed command returns to KWS only if the opt-in session remains active.
+## Safety correction in this commit
 
-### Android instrumentation
-- Start session with permission granted.
-- Deny permission and verify no recorder is opened.
-- Stop control cancels the session and returns UI to STOPPED.
-- Activity destruction releases microphone resources.
-- KWS model missing: consent UI appears; declining performs no network request.
-- KWS model invalid/hash mismatch fails closed.
-- No duplicate AudioRecord instances during transitions.
+`KwsModelDownloadManager.ensure()` now requires `userConsent: Boolean` and rejects false before starting network work. This is a separate consent gate from ASR/VAD model consent. The manager documentation explicitly states that model installation does not activate microphone listening. The call site must only pass true after a dedicated KWS-download confirmation dialog.
 
-### Device validation
-- Test on OPPO Find X6 Pro / target ColorOS with real microphone.
-- Measure false accepts/rejects and latency in realistic noise.
-- Verify Russian pronunciation of “Джарвис”; if zh/en KWS is inadequate, evaluate a Russian-capable model or phonetic variants before shipping.
+## Next implementation sequence
 
-## Logging and evidence
-For every implementation commit, update this document with:
-- exact commit SHA and files changed;
-- root cause and behavior change;
-- test command/workflow run IDs and exact head SHA;
-- unit/instrumentation counts and failures;
-- relevant logs/artifact IDs and SHA-256 where available;
-- explicit NOT TESTED items.
-A red CI blocks release. Emulator success is not physical OPPO validation.
+1. Add an explicit KWS model download confirmation in the UI, separate from current ASR/VAD consent. No startup download.
+2. Refactor runtime to process a single AudioRecord frame stream: KWS until hit, then VAD command capture, ASR, safe proposal/tool pipeline, then resume KWS only while explicit session remains active.
+3. Add a visible session status and Stop control. Push-to-talk remains default.
+4. Ensure coroutine cancellation and permission revocation close the single AudioRecord flow, KWS stream/spotter, and VAD state in `finally`.
+5. Add unit tests for routing/state transitions and instrumentation tests for permission denial, Stop, Activity destruction, and no duplicate recorder.
+6. Validate acoustic accuracy on the actual OPPO Find X6 Pro; the current zh/en KWS model's “JARVIS” phoneme mapping is not validated for Russian speakers.
 
-## Guardrails
-- Draft PR only; do not merge.
-- Do not publish or distribute APK from this branch.
-- Keep PR #114 isolated; do not add KWS changes to it.
-- No claim of Claude/Gemini review unless an actual review artifact exists.
+## Verification status
 
-
-## Implementation log — 2026-11-08 (KWS lifecycle guard + engine result handling)
-- Branch head before this entry: `fd5fcbdcb2c55c65b5f847bed4dc5142bfde29df`.
-- Commit `fd5fcbdcb2c55c65b5f847bed4dc5142bfde29df` added `WakeWordSessionStateMachine.kt`, its four JVM tests, and corrected the misleading always-on KWS engine comment.
-- CI run #346 / `42464117074` failed before compilation: `github/codeql-action/init@v4` could not download CodeQL CLI `2.27.4`; GitHub returned HTTP 504 on the streaming request and both fallback attempts. Secret scanning passed; Kotlin compilation, unit tests, APK build, CodeQL analysis, and emulator smoke tests were skipped. Failed CodeQL job was explicitly re-run; outcome pending.
-- API review against Sherpa-ONNX Kotlin API confirms `KeywordSpotter.createStream(keywords)`, `isReady`, `decode`, `getResult`, `reset`, and `OnlineStream.release()` are the supported lifecycle. The official KWS sample checks the result after each decode and resets immediately after a hit.
-- Root cause fixed here: previous `accept()` drained all ready frames before reading one result and did not reset after a keyword hit. This could delay detection and leave a previous detection latched across later audio frames.
-- Changed file: `app/src/main/java/com/jarvis/breeno/assistant/voice/SherpaJarvisKwsEngine.kt`; result is checked after each decode, and the stream is reset immediately on a positive match.
-- Verification: not yet compiled or tested in this commit. No live microphone integration is claimed. The session state machine is not yet wired to UI or AudioRecord; push-to-talk remains unchanged.
-- Evidence reference: Sherpa-ONNX Kotlin API and official Android KWS sample (reviewed 2026-11-08); CI log for run #346 records the HTTP 504 failure.
+This commit is a safety gate and engineering handoff only. It does not claim a working KWS UI, microphone integration, emulator pass, or physical-device validation.
