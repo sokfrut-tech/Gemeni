@@ -31,6 +31,8 @@ class JarvisRuntimeSmokeTest {
         assertVisible(By.text("Телефон"), "Phone action missing")
         assertVisible(By.desc("Микрофон"), "Microphone action missing")
         assertVisible(By.desc("JarvisSphere"), "Native sphere missing")
+        val mic = device.findObject(By.desc("Микрофон"))
+        assertTrue("Microphone action must have a non-empty on-screen area", mic.visibleBounds.width() > 0 && mic.visibleBounds.height() > 0)
         assertVisible(By.textContains("Runtime"), "Runtime status missing")
     }
 
