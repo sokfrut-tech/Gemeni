@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun JarvisHome() {
         var listening by remember { mutableStateOf(false) }
+        var busy by remember { mutableStateOf(false) }
         var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
         var status by remember { mutableStateOf("Ожидаю команду") }
 
@@ -159,6 +160,15 @@ class MainActivity : ComponentActivity() {
             statusSink = { value ->
                 status = value
                 listening = value.contains("Микрофон активен") || value.contains("говорите")
+                busy = !(
+                    value == "Ожидаю команду" ||
+                    value == "Прослушивание остановлено" ||
+                    value == "Речь не распознана" ||
+                    value.startsWith("Ошибка runtime:") ||
+                    value.startsWith("Распознано:") ||
+                    value.startsWith("Открываю") ||
+                    value.startsWith("Вы сказали:")
+                )
                 if (value.startsWith("Распознано:") || value.startsWith("Открываю") || value.startsWith("Вы сказали:")) {
                     transcript = value
                 }
@@ -275,7 +285,7 @@ class MainActivity : ComponentActivity() {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (listening) {
+                        if (busy || listening) {
                             OutlinedButton(
                                 onClick = { stopListening() },
                                 shape = RoundedCornerShape(18.dp),
@@ -283,7 +293,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Icon(Icons.Default.Stop, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("ОСТАНОВИТЬ")
+                                Text(if (listening) "ОСТАНОВИТЬ" else "ОТМЕНИТЬ")
                             }
                         } else {
                             Button(
