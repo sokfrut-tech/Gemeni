@@ -131,9 +131,6 @@ class MainActivity : ComponentActivity() {
     private fun startRealListening() {
         lifecycleScope.launch {
             runCatching {
-                statusSink?.invoke("Подготавливаю локальные ASR и VAD…")
-                withContext(Dispatchers.IO) { runtime.prepare { status -> runOnUiThread { statusSink?.invoke(status) } } }
-                statusSink?.invoke("Микрофон активен — говорите")
                 withContext(Dispatchers.IO) {
                     runtime.listenOnce(
                         onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
@@ -178,6 +175,14 @@ class MainActivity : ComponentActivity() {
         var showQwenPanel by remember { mutableStateOf(false) }
         var showModelDownloadConsent by remember { mutableStateOf(false) }
         var modelDownloadInProgress by remember { mutableStateOf(false) }
+        val voiceBusy = assistantState in setOf(
+            AssistantState.LISTENING,
+            AssistantState.TRANSCRIBING,
+            AssistantState.UNDERSTANDING,
+            AssistantState.EXECUTING,
+            AssistantState.SPEAKING,
+            AssistantState.WAITING_FOR_APPROVAL
+        )
 
         DisposableEffect(Unit) {
             statusSink = { value -> status = value }
@@ -322,8 +327,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
-                    FloatingActionButton(onClick = { requestAndListen() }, containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536), contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)) {
-                        Icon(Icons.Default.Mic, contentDescription = "Микрофон", modifier = Modifier.size(28.dp))
+                    FloatingActionButton(
+                        onClick = {
+                            if (!voiceBusy && !modelDownloadInProgress) requestAndListen()
+                        },
+                        containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536),
+                        contentColor = if (voiceBusy || modelDownloadInProgress) Color(0xFF647789) else Color(0xFFBDEFFF)
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = if (voiceBusy || modelDownloadInProgress) "Микрофон занят" else "Микрофон",
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                 }
             }

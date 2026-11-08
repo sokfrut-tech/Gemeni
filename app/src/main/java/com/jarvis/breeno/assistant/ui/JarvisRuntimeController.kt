@@ -108,10 +108,30 @@ class JarvisRuntimeController(context: Context) {
         onProgress("Русский ASR и Silero VAD готовы")
     }
 
+    private val listenSessionGate = ListenSessionGate()
+
     suspend fun listenOnce(
         onProgress: (String) -> Unit,
         onState: (AssistantState) -> Unit = {},
         onConversation: (userText: String, assistantText: String) -> Unit = { _, _ -> }
+    ): String {
+        if (!listenSessionGate.tryEnter()) {
+            onProgress("Уже обрабатываю предыдущую голосовую команду. Подождите.")
+            return ""
+        }
+        return try {
+            onProgress("Подготавливаю локальные ASR и VAD…")
+            prepare(onProgress)
+            listenOnceInternal(onProgress, onState, onConversation)
+        } finally {
+            listenSessionGate.leave()
+        }
+    }
+
+    private suspend fun listenOnceInternal(
+        onProgress: (String) -> Unit,
+        onState: (AssistantState) -> Unit,
+        onConversation: (userText: String, assistantText: String) -> Unit
     ): String {
         val segments = ArrayList<FloatArray>()
         val policy = VadCapturePolicy()
@@ -243,9 +263,11 @@ class JarvisRuntimeController(context: Context) {
 
     fun close() {
         pendingConfirmationJson = null
-        speaker.close()
-        qwenRuntime.close()
-        asr.close()
-        vad.close()
+        listenSessionGate.closeWhenIdle {
+            speaker.close()
+            qwenRuntime.close()
+            asr.close()
+            vad.close()
+        }
     }
 }
