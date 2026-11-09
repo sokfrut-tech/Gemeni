@@ -185,3 +185,22 @@ Important correction to older notes:
 - PR #65 is docs-only and its checks passed, but GitHub refused merging while it remained draft. Do not bypass draft state or merge it by force.
 
 Do not describe #62 as a Kotlin compile failure. Preserve its compile correction. Next work is a carefully reconciled integration branch combining the #58/#59/#60 gateway/parser dependency chain with the corrected Phase A implementation from #62, retaining the #61 tests and documentation where they add value. Refresh all branch heads and inspect exact diffs before any branch mutation. No PRs were merged and no app source was changed in this checkpoint.
+
+
+## 15. 2026-11-09 — current PR chain and next voice integration
+
+Read [the KWS/VAD runtime integration plan](JARVIS_KWS_VAD_RUNTIME_INTEGRATION_2026-11-09.md) before continuing.
+
+Current verified PR chain in `sokfrut-tech/Gemeni`:
+- #123 responsive Compose home + visible Stop control; Draft, based on `main`.
+- #124 single-owner serialized AudioCaptureCoordinator; Draft, based on #123.
+- #126 testable KWS/VAD/local-ASR pipeline contracts and interruption gating; Draft, based on #124.
+- #125 Android PR build/emulator workflow; Draft, based on `main`.
+
+PR #126 head `283da9e4cdcf1f995f0e17a33ec4e1f3c706bba9` had Factory Security Baseline run #382 pass CodeQL and secret scanning. This is not Android build or emulator evidence. PR #125 Build Jarvis run #200 passed debug APK assembly, JVM unit tests, security/native compatibility and APK manifest/ABI inspection, but failed emulator runtime smoke on attempt 1. Attempt 2 was running at the 2026-11-09 handoff; refresh its status before relying on it.
+
+Source inspection confirms the active `JarvisRuntimeController.listenOnce()` still buffers a fixed 4.5 seconds of microphone audio and runs ASR only after capture stops. The new KWS/VAD pipeline is not yet wired into runtime/UI. KWS and VAD model managers exist, but model consent, native lifecycle, a persistent visible wake session, call preemption and OPPO validation remain gates. The `:session` process must not independently open AudioRecord; the process-wide atomic guard is main-process-only.
+
+Next implementation: one lifecycle-managed capture coordinator; explicit consent for separate KWS/VAD downloads; load models off main thread; feed frames through KWS → VAD → local ASR; keep the wake trigger frame out of command audio; expose typed visible states and Stop; suspend on call/system-audio interruption and require explicit re-opt-in; apply thermal budget before inference; add cancellation/resource-release tests and physical OPPO Find X6 Pro validation.
+
+Do not merge Draft PRs, weaken failing emulator assertions, enable hidden microphone behavior, claim Russian «Джарвис» acoustic recognition works, or publish an APK without exact-head checks and full runtime evidence.

@@ -68,3 +68,22 @@ Do not provide an APK to the user as “ready” unless:
 - PRs #58/#59/#60/#61/#62/#63 and #65 remain open/draft as observed; they contain useful implementation work but are branch-dependent and not safe to merge blindly. Exact-head logs confirm #61 has Kotlin compilation errors; #62 fixes compilation and builds the APK, but connected Android instrumentation still fails; #63 passes CodeQL and secret scanning but its emulator job times out during boot. See [the 2026-11-06 PR integration checkpoint](engineering/2026-11-06-pr-integration-checkpoint.md) for exact SHAs, logs and the safe integration sequence.
 - Latest Director/Repair Crew workflow successes are not proof of autonomous coding agents: specialist lanes currently run deterministic evidence collectors; Test Factory is mostly static grep/file-contract checks. The 2026-11-06 Director artifact review also found the configured Qwen endpoint returned HTTP 404 and all seven OpenRouter role reviews returned HTTP 401; live LLM reviewers are currently unavailable. The workflows now label this state explicitly instead of implying that a successful job means a successful model review.
 - Overall product remains NOT RELEASE READY. No physical OPPO runtime test was performed in this audit.
+
+## 2026-11-09 — voice pipeline continuation checkpoint
+
+**Current state: NOT RELEASE READY.** No PR in the current voice/CI chain has been merged and no APK release is authorized.
+
+- PR #123: responsive Compose home and explicit listening Stop control; Draft, stacked on `main`.
+- PR #124: serialized single-owner AudioCaptureCoordinator; Draft, stacked on #123.
+- PR #126: injectable KWS/VAD/local-ASR contracts and fail-closed interruption handling; Draft, stacked on #124. Factory Security Baseline #382 passed CodeQL and secret scanning only; Android build/JVM/emulator checks for this exact head remain unverified.
+- PR #125: Android build/emulator workflow; Draft. Build Jarvis run #200 attempt 1 passed APK build, JVM unit tests, security/native checks and APK manifest/ABI inspection, but failed Android emulator runtime smoke. Failed job was re-run as attempt 2 and was still in progress at this checkpoint.
+
+### Verified runtime gap
+
+`JarvisRuntimeController.listenOnce()` still captures a fixed 4.5-second push-to-talk sample into memory, then runs Russian ASR after capture stops. The new KWS/VAD pipeline is not wired to the controller or Compose UI. Existing KWS/VAD adapters and model managers are building blocks, not proof of a working wake-word session.
+
+### Immediate next milestone
+
+Implement a user-started, visibly active wake-word session using one lifecycle-managed capture coordinator shared by all voice modes. Keep model downloads explicitly consent-gated; keep Stop synchronous with resource cleanup; add typed UI states; keep phone-call/system-audio interruption fail-closed; and validate thermal policy before inference. Full acceptance criteria and the staged plan are in [JARVIS_KWS_VAD_RUNTIME_INTEGRATION_2026-11-09.md](JARVIS_KWS_VAD_RUNTIME_INTEGRATION_2026-11-09.md).
+
+No emulator, physical OPPO, always-on wake-word, Russian acoustic accuracy, or full voice-to-action acceptance is claimed by the above checks.
