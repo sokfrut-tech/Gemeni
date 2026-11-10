@@ -78,7 +78,15 @@ class JarvisRuntimeController(context: Context) {
                 openNavigator()
                 "Открываю навигацию"
             }
-            command.startsWith("OPEN:") -> "Пытаюсь открыть: $text"
+            command.startsWith("OPEN:") && (text.contains("телефон", true) || text.contains("звони", true)) -> {
+                launch(Intent(Intent.ACTION_DIAL))
+                "Открываю телефон"
+            }
+            command.startsWith("OPEN:") && (text.contains("браузер", true) || text.contains("интернет", true)) -> {
+                launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")))
+                "Открываю браузер"
+            }
+            command.startsWith("OPEN:") -> "Пока не знаю, как выполнить эту команду: $text"
             text.contains("позвони", true) || text.contains("телефон", true) -> {
                 launch(Intent(Intent.ACTION_DIAL))
                 "Открываю телефон"
