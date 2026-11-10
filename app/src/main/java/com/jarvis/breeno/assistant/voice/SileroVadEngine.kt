@@ -6,7 +6,7 @@ import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.File
 
 /** Streaming speech segmenter backed by Sherpa-ONNX Silero VAD. */
-class SileroVadEngine {
+class SileroVadEngine : SpeechSegmenter {
     companion object { const val SAMPLE_RATE = 16_000 }
 
     private var vad: Vad? = null
@@ -33,7 +33,7 @@ class SileroVadEngine {
     }
 
     @Synchronized
-    fun accept(samples: ShortArray): Boolean {
+    override fun accept(samples: ShortArray): Boolean {
         val engine = vad ?: error("Silero VAD is not loaded")
         if (samples.isEmpty()) return false
         engine.acceptWaveform(FloatArray(samples.size) { samples[it] / 32768.0f })
@@ -42,7 +42,7 @@ class SileroVadEngine {
 
     /** Returns the next completed speech segment, or null while speech is ongoing. */
     @Synchronized
-    fun pollSegment(): FloatArray? {
+    override fun pollSegment(): FloatArray? {
         val engine = vad ?: return null
         if (engine.empty()) return null
         val segment = engine.front()
@@ -51,7 +51,7 @@ class SileroVadEngine {
     }
 
     @Synchronized
-    fun reset() { vad?.reset() }
+    override fun reset() { vad?.reset() }
 
     @Synchronized
     fun close() { vad?.release(); vad = null }

@@ -8,7 +8,7 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import java.io.File
 
 /** Real local Russian ASR backed by Sherpa-ONNX Zipformer2. */
-class SherpaRussianAsrEngine {
+class SherpaRussianAsrEngine : LocalSpeechTranscriber {
     @Volatile private var recognizer: OnlineRecognizer? = null
 
     @Synchronized
@@ -43,8 +43,12 @@ class SherpaRussianAsrEngine {
         )
     }
 
+    override fun transcribe(samples: ShortArray, sampleRate: Int): String = transcribeInternal(samples, sampleRate)
+
+    fun transcribe(samples: ShortArray): String = transcribeInternal(samples, 16_000)
+
     @Synchronized
-    fun transcribe(samples: ShortArray, sampleRate: Int = 16_000): String {
+    private fun transcribeInternal(samples: ShortArray, sampleRate: Int): String {
         val r = recognizer ?: return ""
         if (samples.isEmpty()) return ""
         val stream = r.createStream()

@@ -6,10 +6,14 @@ import android.net.Uri
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
+import com.jarvis.breeno.assistant.voice.AudioCaptureCoordinator
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /** Real runtime bridge: microphone -> local Russian ASR -> intent -> device action -> speech. */
 class JarvisRuntimeController(context: Context) {
@@ -20,24 +24,46 @@ class JarvisRuntimeController(context: Context) {
     private val intents = RussianIntentDispatcher()
     private val speaker = JarvisSpeaker(appContext)
 
-    suspend fun prepare(onProgress: (String) -> Unit) {
+    fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
+
+    fun setSpeechStateListener(listener: ((Boolean) -> Unit)?) {
+        speaker.onSpeakingChanged = listener
+    }
+
+    suspend fun prepare(onProgress: (String) -> Unit) = prepare(userConsentToDownload = false, onProgress = onProgress)
+
+    suspend fun prepare(userConsentToDownload: Boolean, onProgress: (String) -> Unit) {
         onProgress("Проверяю русскую модель…")
-        val dir = models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
+        if (!models.isRussianAsrReady() && !userConsentToDownload) {
+            error("Русская ASR-модель не установлена. Для загрузки требуется явное согласие пользователя.")
+        }
+        val dir = if (models.isRussianAsrReady()) models.modelDir()
+        else models.ensureRussianAsr { p -> onProgress("Модель ASR: $p%") }
         asr.load(dir)
         onProgress("Русский ASR готов")
     }
 
     suspend fun listenOnce(onProgress: (String) -> Unit): String {
-        val samples = ArrayList<ShortArray>()
-        val started = System.nanoTime()
+        val samples = java.util.Collections.synchronizedList(mutableListOf<ShortArray>())
+        val coordinator = AudioCaptureCoordinator(
+            scope = CoroutineScope(currentCoroutineContext()),
+            frames = { audio.frames() },
+            onFrame = { frame -> samples.add(frame) },
+            onFailure = { error -> onProgress("Ошибка микрофона: ${error.message ?: error.javaClass.simpleName}") },
+        )
         onProgress("Микрофон активен — говорите")
-        audio.frames()
-            .takeWhile { (System.nanoTime() - started) / 1_000_000 < 4_500 }
-            .collect { samples += it }
+        try {
+            check(coordinator.start()) { "Microphone capture is already owned by another session" }
+            delay(4_500)
+        } finally {
+            // Cancellation must not skip AudioRecordPipeline's finally/release block.
+            withContext(NonCancellable) { coordinator.stop() }
+        }
 
-        val pcm = ShortArray(samples.sumOf { it.size })
+        val snapshot = synchronized(samples) { samples.toList() }
+        val pcm = ShortArray(snapshot.sumOf { it.size })
         var offset = 0
-        samples.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
+        snapshot.forEach { frame -> frame.copyInto(pcm, offset); offset += frame.size }
         onProgress("Распознаю локально…")
         val text = asr.transcribe(pcm)
         if (text.isBlank()) {
@@ -53,10 +79,18 @@ class JarvisRuntimeController(context: Context) {
                 "Открываю поиск: $query"
             }
             command.startsWith("OPEN:") && text.contains("навига", true) -> {
-                launch(Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map")))
-                "Открываю Яндекс Навигатор"
+                openNavigator()
+                "Открываю навигацию"
             }
-            command.startsWith("OPEN:") -> "Пытаюсь открыть: $text"
+            command.startsWith("OPEN:") && (text.contains("телефон", true) || text.contains("звони", true)) -> {
+                launch(Intent(Intent.ACTION_DIAL))
+                "Открываю телефон"
+            }
+            command.startsWith("OPEN:") && (text.contains("браузер", true) || text.contains("интернет", true)) -> {
+                launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")))
+                "Открываю браузер"
+            }
+            command.startsWith("OPEN:") -> "Пока не знаю, как выполнить эту команду: $text"
             text.contains("позвони", true) || text.contains("телефон", true) -> {
                 launch(Intent(Intent.ACTION_DIAL))
                 "Открываю телефон"
@@ -68,10 +102,25 @@ class JarvisRuntimeController(context: Context) {
         return text
     }
 
-    private fun launch(intent: Intent) {
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { appContext.startActivity(intent) }
+    private fun openNavigator() {
+        val yandex = Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val fallback = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q="))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val target = if (yandex.resolveActivity(appContext.packageManager) != null) yandex else fallback
+        check(target.resolveActivity(appContext.packageManager) != null) {
+            "Не найдено приложение навигации. Установите Яндекс Навигатор или карты."
+        }
+        appContext.startActivity(target)
     }
 
-    fun close() { asr.close() }
+    private fun launch(intent: Intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        check(intent.resolveActivity(appContext.packageManager) != null) {
+            "Не найдено приложение для выполнения команды"
+        }
+        appContext.startActivity(intent)
+    }
+
+    fun close() { speaker.close(); asr.close() }
 }
