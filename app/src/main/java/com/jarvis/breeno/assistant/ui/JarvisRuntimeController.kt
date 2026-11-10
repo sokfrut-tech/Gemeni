@@ -79,8 +79,12 @@ class JarvisRuntimeController(context: Context) {
                 "Открываю поиск: $query"
             }
             command.startsWith("OPEN:") && text.contains("навига", true) -> {
-                openNavigator()
-                "Открываю навигацию"
+                val destination = Regex("""\b(?:до|к)\s+(.+)$""", RegexOption.IGNORE_CASE)
+                    .find(text)?.groupValues?.get(1)?.trim()?.trimEnd('.', '!', '?')
+                    ?.takeIf { it.isNotBlank() }
+                openNavigator(destination)
+                if (destination == null) "Открываю навигацию. Назовите пункт назначения."
+                else "Открываю маршрут до $destination"
             }
             command.startsWith("OPEN:") && (text.contains("телефон", true) || text.contains("звони", true)) -> {
                 launch(Intent(Intent.ACTION_DIAL))
@@ -102,15 +106,27 @@ class JarvisRuntimeController(context: Context) {
         return text
     }
 
-    private fun openNavigator() {
-        val yandex = Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val fallback = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q="))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val target = if (yandex.resolveActivity(appContext.packageManager) != null) yandex else fallback
-        check(target.resolveActivity(appContext.packageManager) != null) {
-            "Не найдено приложение навигации. Установите Яндекс Навигатор или карты."
+    private fun openNavigator(destination: String?) {
+        val candidates = if (!destination.isNullOrBlank()) {
+            listOf(
+                Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(destination))),
+                Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(destination))),
+            )
+        } else {
+            listOf(
+                Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map")),
+                Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=")),
+            )
         }
+        val target = candidates.firstOrNull { candidate ->
+            candidate.resolveActivity(appContext.packageManager) != null
+        } ?: error(
+            if (destination.isNullOrBlank())
+                "Не найдено приложение навигации. Установите Яндекс Навигатор или карты."
+            else
+                "Не найдено приложение для построения маршрута. Установите карты или навигатор."
+        )
+        target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         appContext.startActivity(target)
     }
 
