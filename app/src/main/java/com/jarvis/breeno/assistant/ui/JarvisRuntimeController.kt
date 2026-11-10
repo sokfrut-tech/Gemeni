@@ -26,6 +26,10 @@ class JarvisRuntimeController(context: Context) {
 
     fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
 
+    fun setSpeechStateListener(listener: ((Boolean) -> Unit)?) {
+        speaker.onSpeakingChanged = listener
+    }
+
     suspend fun prepare(onProgress: (String) -> Unit) = prepare(userConsentToDownload = false, onProgress = onProgress)
 
     suspend fun prepare(userConsentToDownload: Boolean, onProgress: (String) -> Unit) {
@@ -118,5 +122,5 @@ class JarvisRuntimeController(context: Context) {
         appContext.startActivity(intent)
     }
 
-    fun close() { asr.close() }
+    fun close() { speaker.close(); asr.close() }
 }
