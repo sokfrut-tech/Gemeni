@@ -275,8 +275,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         AndroidView(
                             modifier = Modifier
-                                .size(if (compact) 286.dp else 340.dp)
-                                .widthIn(max = maxWidth),
+                                .size(if (compact) 250.dp else 310.dp),
                             factory = { context ->
                                 AlphaVideoSurfaceView(context).apply {
                                     contentDescription = "Интерактивное энергетическое ядро Джарвиса"
