@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -86,8 +87,7 @@ class ModelDownloadManager(private val context: Context) {
                     }
                 }
                 connection.inputStream.use { input ->
-                    tmp.outputStream().use { raw ->
-                        val output = if (append) raw.apply { channel.position(offset) } else raw
+                    FileOutputStream(tmp, append).use { output ->
                         val buffer = ByteArray(64 * 1024)
                         while (true) {
                             coroutineContext.ensureActive()
