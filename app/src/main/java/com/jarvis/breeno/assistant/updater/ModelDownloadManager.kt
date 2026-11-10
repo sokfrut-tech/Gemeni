@@ -3,6 +3,7 @@ package com.jarvis.breeno.assistant.updater
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,8 +39,15 @@ class ModelDownloadManager(private val context: Context) {
         FILES.forEachIndexed { index, item ->
             val target = dir.resolve(item.name)
             if (!target.isFile || target.length() == 0L || (item.sha256 != null && sha256(target) != item.sha256)) {
+                // Never leave an invalid old or newly downloaded model looking usable.
+                target.delete()
                 download(URL(BASE + item.name), target)
-                item.sha256?.let { expected -> check(sha256(target) == expected) { "SHA-256 mismatch for ${item.name}" } }
+                item.sha256?.let { expected ->
+                    if (sha256(target) != expected) {
+                        target.delete()
+                        error("SHA-256 mismatch for ${item.name}; the invalid file was removed. Retry the download.")
+                    }
+                }
             }
             onProgress(((index + 1) * 100) / FILES.size)
         }
@@ -49,36 +57,49 @@ class ModelDownloadManager(private val context: Context) {
     private suspend fun download(url: URL, destination: File) {
         val coroutineContext = currentCoroutineContext()
         val tmp = File(destination.parentFile, destination.name + ".part")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = 20_000
-            readTimeout = 5_000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-        }
-        try {
-            check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
-            connection.inputStream.use { input ->
-                tmp.outputStream().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        coroutineContext.ensureActive()
-                        val count = input.read(buffer)
-                        coroutineContext.ensureActive()
-                        if (count < 0) break
-                        if (count > 0) output.write(buffer, 0, count)
+        var lastError: Throwable? = null
+
+        // Hugging Face may redirect to Xet/CDN storage. Allow slower mobile links
+        // and retry transient disconnects without ever promoting a partial file.
+        for (attempt in 1..3) {
+            coroutineContext.ensureActive()
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+                instanceFollowRedirects = true
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+            }
+            try {
+                check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
+                connection.inputStream.use { input ->
+                    tmp.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            coroutineContext.ensureActive()
+                            val count = input.read(buffer)
+                            coroutineContext.ensureActive()
+                            if (count < 0) break
+                            if (count > 0) output.write(buffer, 0, count)
+                        }
+                        output.fd.sync()
                     }
                 }
+                coroutineContext.ensureActive()
+                check(tmp.length() > 0L) { "Empty model file: ${destination.name}" }
+                check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
+                return
+            } catch (error: Throwable) {
+                coroutineContext.ensureActive()
+                tmp.delete()
+                lastError = error
+                if (attempt == 3) throw error
+                delay(500L * attempt)
+            } finally {
+                connection.disconnect()
             }
-            coroutineContext.ensureActive()
-            check(tmp.length() > 0) { "Empty model file: ${destination.name}" }
-            check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
-        } catch (error: Throwable) {
-            coroutineContext.ensureActive()
-            throw error
-        } finally {
-            connection.disconnect()
-            tmp.delete()
         }
+        throw lastError ?: IllegalStateException("Model download failed: ${destination.name}")
     }
 
     private fun sha256(file: File): String {
