@@ -104,19 +104,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader -noaudio -no-boot-anim -camera-back none -no-snapshot-save
           script: |
-            set +e
-            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
-            test_exit=$?
-            mkdir -p emulator-diagnostics/ui-evidence
-            if adb shell 'test -d /sdcard/Download/jarvis-test'; then
-              adb pull /sdcard/Download/jarvis-test emulator-diagnostics/ui-evidence
-              pull_exit=$?
-            else
-              echo "No UI evidence directory was created by instrumentation." > emulator-diagnostics/ui-evidence/no-ui-evidence.txt
-              pull_exit=0
-            fi
-            echo "ui_evidence_pull_exit=$pull_exit" > emulator-diagnostics/ui-evidence/pull-status.txt
-            exit "$test_exit"
+            bash -n scripts/run_emulator_smoke.sh
+            bash scripts/run_emulator_smoke.sh
 
       - name: Capture emulator diagnostics
         if: always()
