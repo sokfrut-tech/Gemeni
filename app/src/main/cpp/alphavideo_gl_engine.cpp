@@ -111,9 +111,10 @@ static void ensureProgram() {
             vec2 cell = floor(p);
             vec2 local = fract(p) - 0.5;
             float seed = hash(cell);
-            float radius = mix(0.018, 0.075, hash(cell + 19.7));
-            float star = 1.0 - smoothstep(radius * 0.25, radius, length(local));
-            return star * step(0.965, seed);
+            float radius = mix(0.025, 0.105, hash(cell + 19.7));
+            float twinkle = 0.72 + 0.28 * sin(uTime * (1.4 + seed * 3.0) + seed * 31.0);
+            float star = 1.0 - smoothstep(radius * 0.18, radius, length(local));
+            return star * step(0.91, seed) * twinkle;
         }
         void main() {
             vec2 p = (vUv - 0.5) * vec2(uResolution.x / max(uResolution.y, 1.0), 1.0);
@@ -128,18 +129,20 @@ static void ensureProgram() {
             float cloudA = sin(angle * 3.0 + r * 42.0 - uTime * 0.72);
             float cloudB = sin(angle * 7.0 - r * 28.0 + uTime * 0.43);
             float cloudC = sin((p.x + p.y) * 34.0 + uTime * 0.28);
-            float nebula = 0.5 + 0.22 * cloudA + 0.18 * cloudB + 0.10 * cloudC;
+            float cloudD = sin(angle * 2.0 - r * 17.0 + uTime * 0.19);
+            float nebula = 0.5 + 0.19 * cloudA + 0.16 * cloudB + 0.09 * cloudC + 0.16 * cloudD;
             float stars = starfield(sphereUv * 42.0 + vec2(uTime * 0.012, -uTime * 0.018));
             float interior = 1.0 - smoothstep(sphereRadius - 0.012, sphereRadius + 0.008, r);
             float limb = pow(1.0 - depth, 3.0);
 
-            vec3 deepSpace = vec3(0.008, 0.025, 0.075);
-            vec3 blueNebula = vec3(0.025, 0.24, 0.52);
-            vec3 violetNebula = vec3(0.16, 0.10, 0.42);
-            vec3 cyanLight = vec3(0.24, 0.88, 1.0);
-            vec3 inner = mix(deepSpace, blueNebula, smoothstep(0.12, 0.92, nebula));
-            inner = mix(inner, violetNebula, smoothstep(0.58, 0.96, cloudB) * 0.48);
-            inner += cyanLight * (stars * 0.85 + limb * 0.13);
+            vec3 deepSpace = vec3(0.004, 0.008, 0.026);
+            vec3 blueNebula = vec3(0.018, 0.15, 0.42);
+            vec3 violetNebula = vec3(0.22, 0.055, 0.34);
+            vec3 cyanLight = vec3(0.30, 0.88, 1.0);
+            vec3 inner = mix(deepSpace, blueNebula, smoothstep(0.10, 0.90, nebula));
+            inner = mix(inner, violetNebula, smoothstep(0.58, 0.94, cloudB) * 0.58);
+            inner += cyanLight * (stars * 1.35 + limb * 0.16);
+            inner += vec3(0.22, 0.42, 1.0) * (stars * 0.42);
             inner *= 0.72 + 0.28 * depth;
 
             float halo = exp(-pow(max(r - sphereRadius - 0.035, 0.0) * 17.0, 2.0));
