@@ -11,30 +11,32 @@ class JarvisSpeaker(context: Context) {
     @Volatile private var initialized = false
     @Volatile private var pendingText: String? = null
     @Volatile var onSpeakingChanged: ((Boolean) -> Unit)? = null
+    @Volatile private var engine: TextToSpeech? = null
 
-    private val tts = TextToSpeech(appContext) { status ->
-        if (status == TextToSpeech.SUCCESS) {
-            val languageResult = ttsEngine?.setLanguage(Locale("ru", "RU")) ?: TextToSpeech.LANG_NOT_SUPPORTED
-            initialized = languageResult >= TextToSpeech.LANG_AVAILABLE
-            val queued = pendingText
-            pendingText = null
-            if (initialized && !queued.isNullOrBlank()) speak(queued)
-        } else {
-            pendingText = null
-            onSpeakingChanged?.invoke(false)
+    init {
+        engine = TextToSpeech(appContext) { status ->
+            val current = engine
+            if (status == TextToSpeech.SUCCESS && current != null) {
+                val languageResult = current.setLanguage(Locale("ru", "RU"))
+                initialized = languageResult >= TextToSpeech.LANG_AVAILABLE
+                val queued = pendingText
+                pendingText = null
+                if (initialized && !queued.isNullOrBlank()) speak(queued)
+            } else {
+                pendingText = null
+                onSpeakingChanged?.invoke(false)
+            }
         }
     }
 
-    // Kept separate to avoid touching the lateinit TextToSpeech reference during construction.
-    private val ttsEngine: TextToSpeech? get() = tts
-
     fun speak(text: String) {
         if (text.isBlank()) return
+        val current = engine ?: return
         if (!initialized) {
             pendingText = text
             return
         }
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+        current.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 onSpeakingChanged?.invoke(true)
             }
@@ -49,15 +51,17 @@ class JarvisSpeaker(context: Context) {
                 onSpeakingChanged?.invoke(false)
             }
         })
-        val result = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis")
-        if (result == TextToSpeech.ERROR) onSpeakingChanged?.invoke(false)
+        if (current.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis") == TextToSpeech.ERROR) {
+            onSpeakingChanged?.invoke(false)
+        }
     }
 
     fun close() {
         pendingText = null
         onSpeakingChanged?.invoke(false)
-        tts.stop()
-        tts.shutdown()
+        engine?.stop()
+        engine?.shutdown()
+        engine = null
         initialized = false
     }
 }
