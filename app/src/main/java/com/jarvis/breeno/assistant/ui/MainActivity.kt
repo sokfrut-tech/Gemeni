@@ -187,12 +187,14 @@ class MainActivity : ComponentActivity() {
     private fun JarvisHome() {
         var listening by remember { mutableStateOf(false) }
         var busy by remember { mutableStateOf(false) }
+        var speaking by remember { mutableStateOf(false) }
         var showModelConsent by remember { mutableStateOf(false) }
         var transcript by remember { mutableStateOf("Готов к работе. Коснитесь ядра и скажите команду.") }
         var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
 
         DisposableEffect(Unit) {
             modelConsentSink = { showModelConsent = true }
+            runtime.setSpeechStateListener { active -> runOnUiThread { speaking = active } }
             statusSink = { value ->
                 status = value.uppercase()
                 listening = value.contains("Микрофон активен") || value.contains("говорите")
@@ -209,7 +211,7 @@ class MainActivity : ComponentActivity() {
                     transcript = value
                 }
             }
-            onDispose { statusSink = null; modelConsentSink = null }
+            onDispose { statusSink = null; modelConsentSink = null; runtime.setSpeechStateListener(null) }
         }
 
         if (showModelConsent) {
@@ -281,13 +283,14 @@ class MainActivity : ComponentActivity() {
                                     contentDescription = "Интерактивное энергетическое ядро Джарвиса"
                                 }
                             },
-                            update = { it.setListening(listening) }
+                            update = { it.setListening(listening); it.setSpeaking(speaking) }
                         )
                     }
 
                     Text(
                         when {
                             listening -> "Я СЛУШАЮ"
+                            speaking -> "Я ОТВЕЧАЮ"
                             busy -> "Я ДУМАЮ"
                             else -> "Я РЯДОМ"
                         },
