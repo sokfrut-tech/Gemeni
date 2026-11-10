@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -240,6 +241,7 @@ class MainActivity : ComponentActivity() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .navigationBarsPadding()
                         .padding(horizontal = 18.dp, vertical = if (compact) 10.dp else 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -248,18 +250,6 @@ class MainActivity : ComponentActivity() {
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(if (busy || listening) Cyan else Color(0xFF52677B))
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            if (listening) "LISTENING" else "JARVIS SYSTEM",
-                            color = Muted,
-                            style = MaterialTheme.typography.labelSmall
-                        )
                         IconButton(onClick = { openSettings() }) {
                             Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Muted)
                         }
