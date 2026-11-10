@@ -23,8 +23,13 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
         renderer.listening = listening
     }
 
+    fun setSpeaking(speaking: Boolean) {
+        renderer.speaking = speaking
+    }
+
     private class JarvisSphereRenderer : Renderer {
         var listening = false
+        var speaking = false
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             nativeCreate()
         }
@@ -32,7 +37,7 @@ class AlphaVideoSurfaceView @JvmOverloads constructor(
             nativeResize(width, height)
         }
         override fun onDrawFrame(gl: GL10?) {
-            nativeDraw(if (listening) 1 else 0, 0)
+            nativeDraw(if (listening) 1 else if (speaking) 2 else 0, 0)
         }
 
         private external fun nativeCreate(): Long
