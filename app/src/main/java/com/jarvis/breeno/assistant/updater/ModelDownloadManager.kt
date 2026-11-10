@@ -59,21 +59,35 @@ class ModelDownloadManager(private val context: Context) {
         val tmp = File(destination.parentFile, destination.name + ".part")
         var lastError: Throwable? = null
 
-        // Hugging Face may redirect to Xet/CDN storage. Allow slower mobile links
-        // and retry transient disconnects without ever promoting a partial file.
+        // Keep a .part file across transient disconnects and resume with HTTP Range.
+        // Some Hugging Face/CDN mirrors ignore Range and return 200; in that case
+        // restart from byte zero rather than appending a duplicate response body.
         for (attempt in 1..3) {
             coroutineContext.ensureActive()
+            val offset = tmp.takeIf { it.isFile }?.length() ?: 0L
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 30_000
-                readTimeout = 30_000
+                readTimeout = 60_000
                 instanceFollowRedirects = true
                 requestMethod = "GET"
                 setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+                if (offset > 0L) setRequestProperty("Range", "bytes=$offset-")
             }
             try {
-                check(connection.responseCode in 200..299) { "HTTP ${connection.responseCode} for $url" }
+                val code = connection.responseCode
+                check(code == HttpURLConnection.HTTP_OK || code == HttpURLConnection.HTTP_PARTIAL) {
+                    "HTTP $code for $url"
+                }
+                val append = code == HttpURLConnection.HTTP_PARTIAL
+                if (append) {
+                    val contentRange = connection.getHeaderField("Content-Range")
+                    check(contentRange?.startsWith("bytes $offset-") == true) {
+                        "Server returned an invalid Content-Range while resuming ${destination.name}"
+                    }
+                }
                 connection.inputStream.use { input ->
-                    tmp.outputStream().use { output ->
+                    tmp.outputStream().use { raw ->
+                        val output = if (append) raw.apply { channel.position(offset) } else raw
                         val buffer = ByteArray(64 * 1024)
                         while (true) {
                             coroutineContext.ensureActive()
@@ -91,10 +105,9 @@ class ModelDownloadManager(private val context: Context) {
                 return
             } catch (error: Throwable) {
                 coroutineContext.ensureActive()
-                tmp.delete()
                 lastError = error
                 if (attempt == 3) throw error
-                delay(500L * attempt)
+                delay(750L * attempt)
             } finally {
                 connection.disconnect()
             }
