@@ -6,6 +6,8 @@
     <application
         android:name=".JarvisApp"
         android:label="Джарвис"
+        android:icon="@drawable/jarvis_launcher_icon"
+        android:roundIcon="@drawable/jarvis_launcher_icon"
         android:theme="@style/Theme.Material3.DayNight.NoActionBar">
         <activity
             android:name=".ui.MainActivity"
