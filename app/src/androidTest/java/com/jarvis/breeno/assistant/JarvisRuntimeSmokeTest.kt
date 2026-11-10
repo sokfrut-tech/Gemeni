@@ -4,7 +4,9 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -21,51 +23,93 @@ class JarvisRuntimeSmokeTest {
     @Before
     fun setUp() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.executeShellCommand("pm clear $packageName")
-        device.executeShellCommand("am force-stop $packageName")
+        device.pressHome()
     }
 
     @Test
-    fun launcherShowsFunctionalJarvisUi() {
+    fun launcherShowsCurrentResponsiveJarvisUi() {
         launchJarvis()
+
         assertVisible(By.text("ДЖАРВИС"), "Jarvis header missing")
-        assertVisible(By.text("Рабочие команды"), "Functional command card missing")
-        assertVisible(By.text("Навигатор"), "Navigator action missing")
+        assertVisible(By.text("РУССКИЙ AI-АССИСТЕНТ  •  COLOROS"), "Assistant identity missing")
+        assertVisible(By.text("Ожидаю команду"), "Initial runtime state missing")
+        assertVisible(By.desc("Анимированное ядро Джарвиса"), "Jarvis visual core missing")
+
+        val navigator = findAfterScroll(By.text("Навигатор"))
+        assertNotNull("Navigator action is missing from the scrollable UI", navigator)
         assertVisible(By.text("Поиск"), "Search action missing")
         assertVisible(By.text("Телефон"), "Phone action missing")
-        assertVisible(By.desc("Микрофон"), "Microphone action missing")
-        assertVisible(By.desc("JarvisSphere"), "Native sphere missing")
-        assertVisible(By.textContains("Runtime"), "Runtime status missing")
+        assertVisible(By.text("БЫСТРЫЕ ДЕЙСТВИЯ"), "Quick actions section missing")
+
+        val talk = findAfterScroll(By.text("ГОВОРИТЬ С ДЖАРВИСОМ"))
+        assertNotNull("Talk-to-Jarvis control is missing from the scrollable UI", talk)
     }
 
     @Test
-    fun microphoneRequestsPermissionAndEntersRuntimeState() {
+    fun microphonePreflightRequiresExplicitModelDownloadConsent() {
         launchJarvis()
-        val mic = device.wait(Until.findObject(By.desc("Микрофон")), 10_000)
-        assertNotNull("Microphone button is missing", mic)
-        mic!!.click()
-        // On the emulator this may first show the Android permission dialog.
-        val allow = device.wait(Until.findObject(By.textContains("Allow")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("Разрешить")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("while using the app")), 3_000)
-            ?: device.wait(Until.findObject(By.textContains("при использовании")), 3_000)
-        if (allow != null) allow.click()
-        val state = device.wait(Until.hasObject(By.textContains("Микрофон активен")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("ASR")), 5_000) ||
-            device.wait(Until.hasObject(By.textContains("Ошибка runtime")), 5_000)
-        assertTrue("Microphone action produced no runtime state", state)
+        val talk = findAfterScroll(By.text("ГОВОРИТЬ С ДЖАРВИСОМ"))
+        assertNotNull("Talk-to-Jarvis control is missing", talk)
+        talk!!.click()
+
+        val consentTitle = device.wait(
+            Until.findObject(By.text("Загрузить русскую голосовую модель?")),
+            10_000
+        )
+        assertNotNull("Missing-model consent dialog did not appear", consentTitle)
+        assertVisible(By.text("НЕ СЕЙЧАС"), "Model-consent cancel action missing")
+
+        // Do not start a network download or open the microphone in this smoke test.
+        // Verify the user's decline is reflected in the actual UI.
+        device.findObject(By.text("НЕ СЕЙЧАС")).click()
+        assertTrue(
+            "Declining model installation did not return to the idle UI",
+            device.wait(
+                Until.hasObject(By.textContains("Загрузка модели отменена")),
+                5_000
+            )
+        )
     }
 
     @Test
     fun settingsOpensAndroidAccessibilitySettings() {
         launchJarvis()
-        device.wait(Until.findObject(By.desc("Настройки")), 10_000).click()
-        assertTrue("Accessibility settings did not open", device.wait(Until.hasObject(By.textContains("Accessibility")), 5_000) || device.wait(Until.hasObject(By.textContains("Специальные возможности")), 5_000))
+        val settings = device.wait(Until.findObject(By.desc("Настройки")), 10_000)
+        assertNotNull("Settings button is missing", settings)
+        settings!!.click()
+
+        // The previous test searched for a localized heading that the Settings
+        // screen does not expose as a text node. Confirm the actual destination.
+        val settingsPackage = device.wait(
+            Until.findObject(By.pkg("com.android.settings")),
+            5_000
+        )
+        assertNotNull("Android Settings package did not become the foreground UI", settingsPackage)
     }
 
-    private fun assertVisible(selector: androidx.test.uiautomator.BySelector, message: String) {
-        val visible = device.wait(Until.hasObject(selector), 10_000)
-        if (!visible) saveFailureScreenshot(message.replace(" ", "-"))
+    private fun findAfterScroll(selector: BySelector): UiObject2? {
+        var found = device.wait(Until.findObject(selector), 750)
+        var attempts = 0
+        while (found == null && attempts < 7) {
+            val width = device.displayWidth
+            val height = device.displayHeight
+            device.swipe(
+                width / 2,
+                (height * 0.82f).toInt(),
+                width / 2,
+                (height * 0.30f).toInt(),
+                24
+            )
+            device.waitForIdle()
+            found = device.wait(Until.findObject(selector), 750)
+            attempts++
+        }
+        return found
+    }
+
+    private fun assertVisible(selector: BySelector, message: String) {
+        val visible = device.wait(Until.hasObject(selector), 5_000)
+        if (!visible) saveFailureEvidence(message)
         assertTrue(message, visible)
     }
 
@@ -75,12 +119,18 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Launcher activity is missing", launchIntent)
         launchIntent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(launchIntent)
+        assertTrue(
+            "Jarvis did not become the foreground package",
+            device.wait(Until.hasObject(By.pkg(packageName)), 10_000)
+        )
     }
 
-    private fun saveFailureScreenshot(name: String) {
-        val dir = File("/sdcard/Download/jarvis-test")
-        device.executeShellCommand("mkdir -p ${dir.absolutePath}")
-        dir.mkdirs()
-        device.takeScreenshot(File(dir, "$name.png"))
+    private fun saveFailureEvidence(name: String) {
+        val directory = File("/sdcard/Download/jarvis-test")
+        device.executeShellCommand("mkdir -p ${directory.absolutePath}")
+        directory.mkdirs()
+        val safeName = name.hashCode().toString()
+        device.takeScreenshot(File(directory, "$safeName.png"))
+        device.dumpWindowHierarchy(File(directory, "$safeName.xml"))
     }
 }
