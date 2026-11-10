@@ -127,3 +127,44 @@ Inspection of the exact #201 APK found 8 desktop-only Sherpa files under `sherpa
 4. Confirm updated emulator UI smoke suite passes and inspect uploaded XML/logcat/screenshot/UI hierarchy artifacts.
 5. Keep PR #133 Draft until exact-head CI is green. Do not merge, publish or promote the debug APK to release-ready.
 6. Physical OPPO Find X6 Pro/ColorOS validation remains separate and mandatory for real microphone capture, model load, voice lifecycle, call interruption, KWS acoustic quality, TTS, thermal/battery behavior and system integration.
+
+## 2026-11-10 — PR #133 UI smoke results and CI evidence fix
+
+Active scope: **Jarvis Android Assistant only**. The owner has paused the separate Jarvis AI Core direction pending future briefs. Do not start AI Core implementation in this continuation.
+
+### Integration PR and exact source
+- Repository: `sokfrut-tech/Gemeni`
+- Draft integration PR: [#133](https://github.com/sokfrut-tech/Gemeni/pull/133)
+- Branch: `integration/jarvis-assistant-ci-smoke-repair-2026-11-10`
+- Current branch head: `ae5038e17f4335fad0693203f69580433da0af52`
+- Consolidates the PR #123 responsive Compose UI, #124 serialized single-owner audio coordinator, #126 testable KWS/VAD/ASR lifecycle and the #125 Android build/emulator workflow.
+
+### Exact-head CI evidence before the latest diagnostic fix
+- Build Jarvis run [#42869150657](https://github.com/sokfrut-tech/Gemeni/actions/runs/42869150657), PR head `0210b2ec3675640b0f6dc08a946af3a27be4ba2e`:
+  - Debug APK build passed.
+  - JVM unit tests passed.
+  - Native ABI, APK manifest, zip integrity and alignment checks passed.
+  - Gradle Android instrumentation reported `BUILD SUCCESSFUL`; XML test result: 3 tests, 0 failures, 0 errors, 0 skipped.
+  - All three UI test methods passed: responsive launcher, explicit model-download consent/decline, and Android Accessibility Settings launch.
+  - The GitHub Actions job was nevertheless marked failed because the post-test wrapper ran `adb pull /sdcard/Download/jarvis-test` when that directory did not exist. The directory was absent because no test failed and the old test code only captured screenshots on failures. This is a CI diagnostic collection bug, not a failing UI assertion.
+- Factory Security Baseline run [#42869150448](https://github.com/sokfrut-tech/Gemeni/actions/runs/42869150448), same PR head `0210b2...`: secret scan and CodeQL both passed.
+
+### Corrective change in current head
+- `JarvisRuntimeSmokeTest.kt` now captures screenshot + window hierarchy on successful launcher, model-consent and settings states as well as on failures. This also supplies visual evidence to inspect the previous black-screen regression.
+- `.github/workflows/build.yml` now checks whether the remote evidence folder exists before pulling it. A missing optional evidence folder is recorded and does not override the actual Gradle test exit code. Real failed Gradle tests still keep the job red.
+- Relevant commits immediately before this checkpoint: test evidence capture `2bf654bcad23b53496ad7aa04083d9a43882cc15`; robust optional evidence pull `ae5038e17f4335fad0693203f69580433da0af52`.
+- Exact-head CI was triggered again by the latest change. Refresh Actions on the current SHA before declaring the workflow green.
+
+### New integrated debug APK candidate
+- Downloaded from CodeQL artifact for PR #133 head `0210b2...` (merge-ref artifact name differs from PR head SHA).
+- Size: 110,451,439 bytes.
+- SHA-256: `895a09c70ed6f7915e7ef167972b1217de45fbe2738d02f7ca8e1dfa546cf605`.
+- Verified ZIP integrity, four Android ABI native library sets, and absence of `sherpa-onnx/native/` desktop-only payload.
+- Compared with the earlier #201 APK (146,859,069 bytes), reduction: 36,407,630 bytes (34.72 MiB; 24.79%). The old uncompressed desktop payload was 114,746,624 bytes (109.4 MiB); do not confuse uncompressed resource size with actual APK-size reduction.
+- Candidate APK and info are available in the assistant's current session artifacts. It is an experimental DEBUG APK, not a signed release or physical-OPPO-qualified release.
+
+### Remaining verification / risk
+- Review the new successful-state emulator screenshots and UI hierarchy to confirm the native orbital surface is actually visible/non-black. The prior emulator logs include graphics errors (`Failed to find ColorBuffer`, invalid texture binding, GLES `0x502`), so merely seeing the Compose AndroidView node is not sufficient visual-rendering proof.
+- Full KWS/VAD pipeline contracts are present but a continuous Russian wake-word → VAD → ASR → tool → TTS session is not yet proven end-to-end. Push-to-talk and consent flows still need actual device testing.
+- Physical OPPO Find X6 Pro / Chinese ColorOS validation remains mandatory for real audio capture, acoustic «Джарвис» recognition, call/system-audio interruption, TTS, thermal/battery behavior, native rendering and VoiceInteraction routing.
+- Keep PR #133 Draft. Do not merge or label the APK release-ready until current exact-head CI is green and the physical-device gates are documented.
