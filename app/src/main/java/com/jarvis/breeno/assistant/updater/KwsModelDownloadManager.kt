@@ -57,12 +57,13 @@ class KwsModelDownloadManager(private val context: Context) {
         while (true) {
             coroutineContext.ensureActive()
             check(++segmentCount <= MAX_SEGMENTS) { "Too many partial responses for ${destination.name}" }
-            val offset = tmp.takeIf { it.isFile }?.length() ?: 0L
             var lastError: Throwable? = null
             var completedSegment = false
 
             for (attempt in 1..3) {
                 coroutineContext.ensureActive()
+                // Recompute after every failed response: bytes already received are retained.
+                val offset = tmp.takeIf { it.isFile }?.length() ?: 0L
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 20_000
                     readTimeout = 60_000
