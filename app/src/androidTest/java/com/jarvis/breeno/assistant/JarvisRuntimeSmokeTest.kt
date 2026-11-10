@@ -27,49 +27,40 @@ class JarvisRuntimeSmokeTest {
     }
 
     @Test
-    fun launcherShowsCurrentResponsiveJarvisUi() {
+    fun launcherShowsCoreFirstJarvisUi() {
         launchJarvis()
         saveUiEvidence("launcher-home")
 
-        assertVisible(By.text("ДЖАРВИС"), "Jarvis header missing")
-        assertVisible(By.text("РУССКИЙ AI-АССИСТЕНТ  •  COLOROS"), "Assistant identity missing")
-        assertVisible(By.text("Ожидаю команду"), "Initial runtime state missing")
-        assertVisible(By.desc("Анимированное ядро Джарвиса"), "Jarvis visual core missing")
-
-        val navigator = findAfterScroll(By.text("Навигатор"))
-        assertNotNull("Navigator action is missing from the scrollable UI", navigator)
-        assertVisible(By.text("Поиск"), "Search action missing")
-        assertVisible(By.text("Телефон"), "Phone action missing")
-        assertVisible(By.text("БЫСТРЫЕ ДЕЙСТВИЯ"), "Quick actions section missing")
-
-        val talk = findAfterScroll(By.text("ГОВОРИТЬ С ДЖАРВИСОМ"))
-        assertNotNull("Talk-to-Jarvis control is missing from the scrollable UI", talk)
+        assertVisible(By.desc("Интерактивное энергетическое ядро Джарвиса"), "Interactive Jarvis core missing")
+        assertVisible(By.text("Я РЯДОМ"), "Idle assistant state missing")
+        assertVisible(By.text("КОСНИТЕСЬ ЯДРА, ЧТОБЫ ГОВОРИТЬ"), "Core activation hint missing")
+        assertTrue("Legacy oversized quick-action section should be removed",
+            device.wait(Until.hasObject(By.text("БЫСТРЫЕ ДЕЙСТВИЯ")), 500).not())
     }
 
     @Test
-    fun microphonePreflightRequiresExplicitModelDownloadConsent() {
+    fun tappingCoreShowsExplicitModelDownloadConsent() {
         launchJarvis()
-        val talk = findAfterScroll(By.text("ГОВОРИТЬ С ДЖАРВИСОМ"))
-        assertNotNull("Talk-to-Jarvis control is missing", talk)
-        talk!!.click()
+        val core = device.wait(
+            Until.findObject(By.desc("Интерактивное энергетическое ядро Джарвиса")),
+            10_000
+        )
+        assertNotNull("Interactive Jarvis core is missing", core)
+        core!!.click()
 
         val consentTitle = device.wait(
             Until.findObject(By.text("Загрузить русскую голосовую модель?")),
             10_000
         )
-        assertNotNull("Missing-model consent dialog did not appear", consentTitle)
+        assertNotNull("Missing-model consent dialog did not appear after tapping the core", consentTitle)
         saveUiEvidence("model-consent")
         assertVisible(By.text("НЕ СЕЙЧАС"), "Model-consent cancel action missing")
 
-        // Do not start a network download or open the microphone in this smoke test.
-        // Verify the user's decline is reflected in the actual UI.
+        // Do not download weights or open the microphone in the smoke test.
         device.findObject(By.text("НЕ СЕЙЧАС")).click()
         assertTrue(
             "Declining model installation did not return to the idle UI",
-            device.wait(
-                Until.hasObject(By.textContains("Загрузка модели отменена")),
-                5_000
-            )
+            device.wait(Until.hasObject(By.textContains("ЗАГРУЗКА МОДЕЛИ ОТМЕНЕНА")), 5_000)
         )
     }
 
