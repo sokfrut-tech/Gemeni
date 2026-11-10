@@ -6,7 +6,7 @@ import org.junit.Test
 
 class JarvisFoldedRuntimePolicyTest {
     @Test
-    fun coolDeviceCanUseBoundedLocalModelWhenMemoryAllows() {
+    fun coolDeviceCanUseBoundedLocalModelWhenMemoryAllows(): Unit {
         val plan = JarvisFoldedRuntimePolicy().plan(
             RuntimeSignals(availableMemoryMb = 3_500, thermalHeadroom = 0.2f,
                 thermalStatus = 0, batterySaver = false, charging = false, foreground = true)
@@ -18,7 +18,7 @@ class JarvisFoldedRuntimePolicyTest {
     }
 
     @Test
-    fun hotDeviceSuspendsLlm() {
+    fun hotDeviceSuspendsLlm(): Unit {
         val plan = JarvisFoldedRuntimePolicy().plan(
             RuntimeSignals(4_000, 0.86f, 3, false, true, true)
         )
@@ -28,7 +28,7 @@ class JarvisFoldedRuntimePolicyTest {
     }
 
     @Test
-    fun criticalDeviceReleasesNeuralResources() {
+    fun criticalDeviceReleasesNeuralResources(): Unit {
         val plan = JarvisFoldedRuntimePolicy().plan(
             RuntimeSignals(4_000, 0.97f, 5, false, true, true)
         )
@@ -38,7 +38,7 @@ class JarvisFoldedRuntimePolicyTest {
     }
 
     @Test
-    fun batterySaverDisablesLlmEvenWhenCool() {
+    fun batterySaverDisablesLlmEvenWhenCool(): Unit {
         val plan = JarvisFoldedRuntimePolicy().plan(
             RuntimeSignals(4_000, 0.1f, 0, true, false, true)
         )
@@ -47,7 +47,7 @@ class JarvisFoldedRuntimePolicyTest {
     }
 
     @Test
-    fun contextFolderKeepsRecentTurnsAndRequiresNonEmptyCapsule() = runBlocking {
+    fun contextFolderKeepsRecentTurnsAndRequiresNonEmptyCapsule(): Unit { runBlocking {
         val folder = JarvisContextFolder(ContextCompressor { older, max ->
             older.joinToString(" | ") { it.text }.take(max)
         })
@@ -59,7 +59,7 @@ class JarvisFoldedRuntimePolicyTest {
     }
 
     @Test
-    fun contextFolderRejectsEmptyCompression() = runBlocking {
+    fun contextFolderRejectsEmptyCompression(): Unit { runBlocking {
         val folder = JarvisContextFolder(ContextCompressor { _, _ -> "" })
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking { folder.fold(listOf(
@@ -68,5 +68,6 @@ class JarvisFoldedRuntimePolicyTest {
             ), keepRecentTurns = 1) }
         }
         Unit // JUnit 4 requires every @Test method to return void, not the Throwable from assertThrows.
+    }
     }
 }
