@@ -17,14 +17,14 @@ class ModelDownloadManager(private val context: Context) {
     companion object {
         const val RUSSIAN_MODEL = "sherpa-onnx-streaming-zipformer-small-ru-vosk-int8-2025-08-16"
         private const val BASE = "https://huggingface.co/csukuangfj/$RUSSIAN_MODEL/resolve/main/"
-
+        private const val MAX_SEGMENTS = 256
+        private val CONTENT_RANGE = Regex("bytes (\\d+)-(\\d+)/(\\d+)")
         private val FILES = listOf(
             ModelFile("encoder.int8.onnx", "e0db705e94ec35d803b1df4f40cda23d064e1142977c80ab288430b109777a9d"),
             ModelFile("decoder.onnx", "89b3088a9e20e1ef7f2e85ce1a3478afe6a9c4ac57369cabcc4beb8e95328ea0"),
             ModelFile("joiner.int8.onnx", "b55784b071ab7512eab4c7c44e4f5478284ef33c83562cc6a249b972515a31e5"),
             ModelFile("tokens.txt", null),
         )
-
         private data class ModelFile(val name: String, val sha256: String?)
     }
 
@@ -40,7 +40,6 @@ class ModelDownloadManager(private val context: Context) {
         FILES.forEachIndexed { index, item ->
             val target = dir.resolve(item.name)
             if (!target.isFile || target.length() == 0L || (item.sha256 != null && sha256(target) != item.sha256)) {
-                // Never leave an invalid old or newly downloaded model looking usable.
                 target.delete()
                 download(URL(BASE + item.name), target)
                 item.sha256?.let { expected ->
@@ -58,61 +57,106 @@ class ModelDownloadManager(private val context: Context) {
     private suspend fun download(url: URL, destination: File) {
         val coroutineContext = currentCoroutineContext()
         val tmp = File(destination.parentFile, destination.name + ".part")
-        var lastError: Throwable? = null
-
-        // Keep a .part file across transient disconnects and resume with HTTP Range.
-        // Some Hugging Face/CDN mirrors ignore Range and return 200; in that case
-        // restart from byte zero rather than appending a duplicate response body.
-        for (attempt in 1..3) {
+        var segmentCount = 0
+        while (true) {
             coroutineContext.ensureActive()
+            check(++segmentCount <= MAX_SEGMENTS) { "Too many partial responses for ${destination.name}" }
             val offset = tmp.takeIf { it.isFile }?.length() ?: 0L
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 30_000
-                readTimeout = 60_000
-                instanceFollowRedirects = true
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
-                if (offset > 0L) setRequestProperty("Range", "bytes=$offset-")
-            }
-            try {
-                val code = connection.responseCode
-                check(code == HttpURLConnection.HTTP_OK || code == HttpURLConnection.HTTP_PARTIAL) {
-                    "HTTP $code for $url"
+            var lastError: Throwable? = null
+            var completedSegment = false
+
+            for (attempt in 1..3) {
+                coroutineContext.ensureActive()
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 30_000
+                    readTimeout = 60_000
+                    instanceFollowRedirects = true
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+                    if (offset > 0L) setRequestProperty("Range", "bytes=$offset-")
                 }
-                val append = code == HttpURLConnection.HTTP_PARTIAL
-                if (append) {
-                    val contentRange = connection.getHeaderField("Content-Range")
-                    check(contentRange?.startsWith("bytes $offset-") == true) {
-                        "Server returned an invalid Content-Range while resuming ${destination.name}"
+                try {
+                    val code = connection.responseCode
+                    check(code == HttpURLConnection.HTTP_OK || code == HttpURLConnection.HTTP_PARTIAL) {
+                        "HTTP $code for $url"
                     }
-                }
-                connection.inputStream.use { input ->
-                    FileOutputStream(tmp, append).use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            coroutineContext.ensureActive()
-                            val count = input.read(buffer)
-                            coroutineContext.ensureActive()
-                            if (count < 0) break
-                            if (count > 0) output.write(buffer, 0, count)
+
+                    val append: Boolean
+                    val expectedEnd: Long?
+                    val totalLength: Long?
+                    if (code == HttpURLConnection.HTTP_PARTIAL) {
+                        val header = connection.getHeaderField("Content-Range")
+                        val match = header?.let(CONTENT_RANGE::matchEntire)
+                            ?: error("Missing or invalid Content-Range for ${destination.name}: $header")
+                        val start = match.groupValues[1].toLong()
+                        val end = match.groupValues[2].toLong()
+                        totalLength = match.groupValues[3].toLong()
+                        check(start == offset && end >= start && end < totalLength) {
+                            "Unexpected Content-Range '$header' at offset $offset"
                         }
-                        output.fd.sync()
+                        append = offset > 0L
+                        expectedEnd = end
+                    } else {
+                        // A server that ignores Range sends the complete representation.
+                        append = false
+                        expectedEnd = null
+                        totalLength = connection.contentLengthLong.takeIf { it >= 0L }
                     }
+
+                    var received = 0L
+                    connection.inputStream.use { input ->
+                        FileOutputStream(tmp, append).use { output ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                coroutineContext.ensureActive()
+                                val count = input.read(buffer)
+                                coroutineContext.ensureActive()
+                                if (count < 0) break
+                                if (count > 0) {
+                                    output.write(buffer, 0, count)
+                                    received += count
+                                }
+                            }
+                            output.fd.sync()
+                        }
+                    }
+
+                    if (expectedEnd != null) {
+                        val expectedBytes = expectedEnd - offset + 1L
+                        check(received == expectedBytes) {
+                            "Short partial response for ${destination.name}: received $received of $expectedBytes bytes"
+                        }
+                        check(tmp.length() == expectedEnd + 1L) {
+                            "Partial file length does not match Content-Range for ${destination.name}"
+                        }
+                        check(totalLength != null && totalLength > 0L)
+                        if (tmp.length() < totalLength) {
+                            completedSegment = true
+                        } else {
+                            check(tmp.length() == totalLength) { "Downloaded more bytes than advertised for ${destination.name}" }
+                            check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
+                            return
+                        }
+                    } else {
+                        check(received > 0L) { "Empty model file: ${destination.name}" }
+                        if (totalLength != null) check(tmp.length() == totalLength) {
+                            "Incomplete response for ${destination.name}: ${tmp.length()} of $totalLength bytes"
+                        }
+                        check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
+                        return
+                    }
+                    if (completedSegment) break
+                } catch (error: Throwable) {
+                    coroutineContext.ensureActive()
+                    lastError = error
+                    if (attempt == 3) throw error
+                    delay(750L * attempt)
+                } finally {
+                    connection.disconnect()
                 }
-                coroutineContext.ensureActive()
-                check(tmp.length() > 0L) { "Empty model file: ${destination.name}" }
-                check(tmp.renameTo(destination)) { "Cannot commit ${destination.name}" }
-                return
-            } catch (error: Throwable) {
-                coroutineContext.ensureActive()
-                lastError = error
-                if (attempt == 3) throw error
-                delay(750L * attempt)
-            } finally {
-                connection.disconnect()
             }
+            if (!completedSegment && lastError != null) throw lastError
         }
-        throw lastError ?: IllegalStateException("Model download failed: ${destination.name}")
     }
 
     private fun sha256(file: File): String {
