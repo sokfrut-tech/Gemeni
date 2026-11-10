@@ -75,8 +75,8 @@ class JarvisRuntimeController(context: Context) {
                 "Открываю поиск: $query"
             }
             command.startsWith("OPEN:") && text.contains("навига", true) -> {
-                launch(Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map")))
-                "Открываю Яндекс Навигатор"
+                openNavigator()
+                "Открываю навигацию"
             }
             command.startsWith("OPEN:") -> "Пытаюсь открыть: $text"
             text.contains("позвони", true) || text.contains("телефон", true) -> {
@@ -90,9 +90,24 @@ class JarvisRuntimeController(context: Context) {
         return text
     }
 
+    private fun openNavigator() {
+        val yandex = Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://build_route_on_map"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val fallback = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q="))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val target = if (yandex.resolveActivity(appContext.packageManager) != null) yandex else fallback
+        check(target.resolveActivity(appContext.packageManager) != null) {
+            "Не найдено приложение навигации. Установите Яндекс Навигатор или карты."
+        }
+        appContext.startActivity(target)
+    }
+
     private fun launch(intent: Intent) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { appContext.startActivity(intent) }
+        check(intent.resolveActivity(appContext.packageManager) != null) {
+            "Не найдено приложение для выполнения команды"
+        }
+        appContext.startActivity(intent)
     }
 
     fun close() { asr.close() }
