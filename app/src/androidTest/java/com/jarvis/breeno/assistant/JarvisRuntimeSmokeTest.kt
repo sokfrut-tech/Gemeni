@@ -29,6 +29,7 @@ class JarvisRuntimeSmokeTest {
     @Test
     fun launcherShowsCurrentResponsiveJarvisUi() {
         launchJarvis()
+        saveUiEvidence("launcher-home")
 
         assertVisible(By.text("ДЖАРВИС"), "Jarvis header missing")
         assertVisible(By.text("РУССКИЙ AI-АССИСТЕНТ  •  COLOROS"), "Assistant identity missing")
@@ -57,6 +58,7 @@ class JarvisRuntimeSmokeTest {
             10_000
         )
         assertNotNull("Missing-model consent dialog did not appear", consentTitle)
+        saveUiEvidence("model-consent")
         assertVisible(By.text("НЕ СЕЙЧАС"), "Model-consent cancel action missing")
 
         // Do not start a network download or open the microphone in this smoke test.
@@ -85,6 +87,7 @@ class JarvisRuntimeSmokeTest {
             5_000
         )
         assertNotNull("Android Settings package did not become the foreground UI", settingsPackage)
+        saveUiEvidence("accessibility-settings")
     }
 
     private fun findAfterScroll(selector: BySelector): UiObject2? {
@@ -109,7 +112,7 @@ class JarvisRuntimeSmokeTest {
 
     private fun assertVisible(selector: BySelector, message: String) {
         val visible = device.wait(Until.hasObject(selector), 5_000)
-        if (!visible) saveFailureEvidence(message)
+        if (!visible) saveUiEvidence(message)
         assertTrue(message, visible)
     }
 
@@ -125,11 +128,12 @@ class JarvisRuntimeSmokeTest {
         )
     }
 
-    private fun saveFailureEvidence(name: String) {
+    private fun saveUiEvidence(name: String) {
+        device.waitForIdle()
         val directory = File("/sdcard/Download/jarvis-test")
         device.executeShellCommand("mkdir -p ${directory.absolutePath}")
         directory.mkdirs()
-        val safeName = name.hashCode().toString()
+        val safeName = name.replace(Regex("[^A-Za-z0-9_-]"), "-")
         device.takeScreenshot(File(directory, "$safeName.png"))
         device.dumpWindowHierarchy(File(directory, "$safeName.xml"))
     }
