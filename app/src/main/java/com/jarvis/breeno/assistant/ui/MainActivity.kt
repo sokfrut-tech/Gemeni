@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -187,13 +188,13 @@ class MainActivity : ComponentActivity() {
         var listening by remember { mutableStateOf(false) }
         var busy by remember { mutableStateOf(false) }
         var showModelConsent by remember { mutableStateOf(false) }
-        var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
-        var status by remember { mutableStateOf("Ожидаю команду") }
+        var transcript by remember { mutableStateOf("Готов к работе. Коснитесь ядра и скажите команду.") }
+        var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
 
         DisposableEffect(Unit) {
             modelConsentSink = { showModelConsent = true }
             statusSink = { value ->
-                status = value
+                status = value.uppercase()
                 listening = value.contains("Микрофон активен") || value.contains("говорите")
                 busy = !(
                     value == "Ожидаю команду" ||
@@ -225,7 +226,7 @@ class MainActivity : ComponentActivity() {
                 dismissButton = {
                     TextButton(onClick = {
                         showModelConsent = false
-                        status = "Загрузка модели отменена — ничего не скачано"
+                        status = "ЗАГРУЗКА МОДЕЛИ ОТМЕНЕНА — НИЧЕГО НЕ СКАЧАНО"
                     }) { Text("НЕ СЕЙЧАС") }
                 }
             )
@@ -237,155 +238,88 @@ class MainActivity : ComponentActivity() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp)
+                        .padding(horizontal = 18.dp, vertical = if (compact) 10.dp else 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("ДЖАРВИС", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            Text("РУССКИЙ AI-АССИСТЕНТ  •  COLOROS", color = Muted, style = MaterialTheme.typography.labelSmall)
-                        }
-                        Text("v${BuildConfig.VERSION_NAME}", color = Color(0xFF68788C), style = MaterialTheme.typography.labelSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (busy || listening) Cyan else Color(0xFF52677B))
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            if (listening) "LISTENING" else "JARVIS SYSTEM",
+                            color = Muted,
+                            style = MaterialTheme.typography.labelSmall
+                        )
                         IconButton(onClick = { openSettings() }) {
                             Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Muted)
                         }
                     }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
-                        shape = RoundedCornerShape(30.dp),
-                        colors = CardDefaults.cardColors(containerColor = Panel)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clickable(
+                                onClickLabel = if (busy || listening) "Остановить Джарвиса" else "Активировать Джарвиса",
+                                onClick = { if (busy || listening) stopListening() else requestAndListen() }
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().height(if (compact) 205.dp else 255.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                AndroidView(
-                                    modifier = Modifier.size(if (compact) 230.dp else 285.dp),
-                                    factory = { context -> AlphaVideoSurfaceView(context).apply { contentDescription = "Анимированное ядро Джарвиса" } },
-                                    update = { it.setListening(listening) }
-                                )
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                                Box(
-                                    modifier = Modifier.size(8.dp).clip(CircleShape)
-                                        .background(if (listening) Cyan else Color(0xFF60758B))
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    if (listening) "СЛУШАЮ ВАС" else "ДЖАРВИС РЯДОМ",
-                                    color = if (listening) Cyan else Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-                            Text(
-                                status,
-                                color = Muted,
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp)
-                            )
-                        }
+                        AndroidView(
+                            modifier = Modifier
+                                .size(if (compact) 286.dp else 340.dp)
+                                .widthIn(max = maxWidth),
+                            factory = { context ->
+                                AlphaVideoSurfaceView(context).apply {
+                                    contentDescription = "Интерактивное энергетическое ядро Джарвиса"
+                                }
+                            },
+                            update = { it.setListening(listening) }
+                        )
                     }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(containerColor = Panel)
-                    ) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text("ПОСЛЕДНИЙ ДИАЛОГ", color = Cyan, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.Top) {
-                                Image(
-                                    painter = painterResource(R.drawable.assistant_mascot),
-                                    contentDescription = "Аватар Джарвиса",
-                                    modifier = Modifier.size(48.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(transcript, color = Color(0xFFE4EDF7), style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-
-                    Column(modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp)) {
-                        Text("БЫСТРЫЕ ДЕЙСТВИЯ", color = Muted, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QuickAction("Навигатор", Icons.Default.Map, Modifier.weight(1f)) {
-                                runQuickCommand("Навигатор")
-                                transcript = "Запускаю навигацию"
-                            }
-                            QuickAction("Поиск", Icons.Default.Search, Modifier.weight(1f)) {
-                                runQuickCommand("Поиск")
-                                transcript = "Открываю поиск"
-                            }
-                            QuickAction("Телефон", Icons.Default.Call, Modifier.weight(1f)) {
-                                runQuickCommand("Телефон")
-                                transcript = "Открываю телефон"
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (busy || listening) {
-                            OutlinedButton(
-                                onClick = { stopListening() },
-                                shape = RoundedCornerShape(18.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFA6A6))
-                            ) {
-                                Icon(Icons.Default.Stop, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (listening) "ОСТАНОВИТЬ" else "ОТМЕНИТЬ")
-                            }
-                        } else {
-                            Button(
-                                onClick = { requestAndListen() },
-                                shape = RoundedCornerShape(18.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Cyan, contentColor = Color(0xFF04111A))
-                            ) {
-                                Icon(Icons.Default.Mic, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("ГОВОРИТЬ С ДЖАРВИСОМ", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
                     Text(
-                        "Микрофон включается только после вашего нажатия",
-                        color = Color(0xFF65758A),
+                        when {
+                            listening -> "Я СЛУШАЮ"
+                            busy -> "Я ДУМАЮ"
+                            else -> "Я РЯДОМ"
+                        },
+                        color = if (listening) Cyan else Color(0xFFE5F3FF),
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        status,
+                        color = if (status.startsWith("ОШИБКА")) Color(0xFFFF9C9C) else Cyan,
                         style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    Text(
+                        transcript,
+                        color = Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp)
+                    )
+                    Text(
+                        if (busy || listening) "КОСНИТЕСЬ ЯДРА, ЧТОБЫ ОСТАНОВИТЬ" else "КОСНИТЕСЬ ЯДРА, ЧТОБЫ ГОВОРИТЬ",
+                        color = Color(0xFF71879B),
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
             }
         }
     }
 
-    @Composable
-    private fun QuickAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
-        Surface(
-            onClick = onClick,
-            modifier = modifier.height(72.dp).border(1.dp, Color(0xFF25394D), RoundedCornerShape(18.dp)),
-            shape = RoundedCornerShape(18.dp),
-            color = Color(0xFF101B28)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(icon, contentDescription = null, tint = Cyan, modifier = Modifier.size(21.dp))
-                Spacer(Modifier.height(5.dp))
-                Text(label, color = Color(0xFFE0EBF5), style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
 }
