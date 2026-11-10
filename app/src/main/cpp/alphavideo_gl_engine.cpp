@@ -151,7 +151,10 @@ static void ensureProgram() {
 
             vec3 color = inner * interior + glow;
             float mood = uListening;
-            color = mix(color, color * vec3(0.62, 1.12, 1.25), mood * 0.48);
+            vec3 listeningTint = color * vec3(0.62, 1.12, 1.25);
+            vec3 speakingTint = color * vec3(1.18, 0.78, 0.48);
+            vec3 stateTint = mix(listeningTint, speakingTint, step(1.5, mood));
+            color = mix(color, stateTint, clamp(mood * 0.34, 0.0, 0.68));
             float alpha = max(interior * 0.98, clamp(halo * 0.50 + outerHalo * 0.22 + rim * 0.55 + orbit * 0.25, 0.0, 0.9));
             gl_FragColor = vec4(color, alpha);
         }
@@ -229,7 +232,7 @@ Java_com_jarvis_breeno_assistant_ui_render_AlphaVideoSurfaceView_00024JarvisSphe
     gT += 0.016f;
     if (gTime >= 0) glUniform1f(gTime, gT);
     if (gResolution >= 0) glUniform2f(gResolution, gWidth, gHeight);
-    if (gListening >= 0) glUniform1f(gListening, listening ? 1.0f : 0.0f);
+    if (gListening >= 0) glUniform1f(gListening, static_cast<GLfloat>(listening));
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisableVertexAttribArray(0);
 }
