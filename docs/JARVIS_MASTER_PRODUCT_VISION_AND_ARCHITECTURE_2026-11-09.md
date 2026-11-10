@@ -238,3 +238,7 @@ Do not expand into dozens of new features yet. First close the critical gap betw
 7. Only after this vertical slice is green, connect KWS/VAD and expose optional wake-word mode.
 
 Do not merge, publish or mark an APK release-ready without explicit authorization and exact-head evidence.
+
+## 15. Dual-track continuation
+
+The product is now explicitly organized into two cooperating development tracks: Jarvis Android Assistant and the reusable Jarvis AI Core. See [JARVIS_DUAL_TRACK_PRODUCT_AND_AI_CORE_ARCHITECTURE_2026-11-10.md](JARVIS_DUAL_TRACK_PRODUCT_AND_AI_CORE_ARCHITECTURE_2026-11-10.md) for the ownership boundary, pure-JVM core design, memory and model strategy, repository comparison, integration rules and next implementation slice. The Android app consumes the AI Core through stable contracts; the core does not depend on Android APIs.
