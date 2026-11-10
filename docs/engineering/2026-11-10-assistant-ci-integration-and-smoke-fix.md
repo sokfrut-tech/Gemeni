@@ -26,7 +26,7 @@ The exact failures were:
 2. The old settings test searched for localized screen-title text. The captured ActivityTaskManager log proves Android opened `com.android.settings/.Settings$AccessibilitySettingsActivity`; the assertion was a false negative. The updated test checks the foreground Android Settings package.
 3. The old microphone test searched for a legacy content description. The current PR #123 UI presents an explicit `ГОВОРИТЬ С ДЖАРВИСОМ` button. The updated test finds and clicks the actual user-facing control, then verifies the missing-model consent dialog.
 
-This is not an emulator boot failure. Instrumentation executed all three tests. The APK is a valid debug build artifact, but runtime smoke was red and the APK was not release-qualified.
+This is not an emulator boot failure. Instrumentation executed all three tests. The APK is a valid debug build artifact, but runtime smoke was red and the APK was not release-qualified. The extracted APK also contains desktop-only files under `sherpa-onnx/native/`; those are not used by Android and unnecessarily inflate the package. The integrated branch now excludes that resource path and adds a CI assertion that fails if any such payload remains.
 
 ## Test correction principles
 
