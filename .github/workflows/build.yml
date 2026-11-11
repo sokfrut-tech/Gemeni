@@ -24,11 +24,18 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-      - name: Install pinned Android NDK r26b
-        uses: android-actions/setup-ndk@v3
+      - name: Install pinned Android NDK r26d
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
         with:
-          ndk-version: 26.3.11579264
+          ndk-version: r26d
           link-to-sdk: true
+      - name: Verify pinned Android NDK
+        run: |
+          set -euo pipefail
+          test -x "${{ steps.setup-ndk.outputs.ndk-path }}/ndk-build"
+          "${{ steps.setup-ndk.outputs.ndk-path }}/ndk-build" --version
+          test -d "$ANDROID_HOME/ndk/26.3.11579264"
       - name: Install pinned Sherpa-ONNX Android runtime
         run: bash scripts/setup_sherpa_onnx.sh
       - uses: gradle/actions/setup-gradle@v4
