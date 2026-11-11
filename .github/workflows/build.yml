@@ -23,11 +23,12 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools'
-      - name: Install SDK and NDK r26b
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;26.3.11579264"
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - name: Install pinned Android NDK r26b
+        uses: android-actions/setup-ndk@v3
+        with:
+          ndk-version: 26.3.11579264
+          link-to-sdk: true
       - name: Install pinned Sherpa-ONNX Android runtime
         run: bash scripts/setup_sherpa_onnx.sh
       - uses: gradle/actions/setup-gradle@v4
