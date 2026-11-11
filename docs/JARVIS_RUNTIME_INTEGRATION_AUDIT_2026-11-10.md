@@ -33,3 +33,11 @@ Inspection of the current source shows:
 ## Release gate
 
 No merge, public release or claim of a functional offline conversational LLM until exact-head CI is fully green, a real inference runtime is present, and physical-device qualification has evidence.
+
+## Addendum — 2026-11-11
+
+The earlier audit above is a historical snapshot and its commit/run references are not the latest state. The latest baseline checked on 2026-11-11 was commit `d0f98a2cf66b444c3b4958a248c324fd681b7feb`, with Build Jarvis run #42977903093 reported completed/success. That run covered APK build, JVM tests, security/native compatibility checks, APK inspection and emulator smoke tests. It still does not prove physical OPPO behavior or real LLM inference.
+
+A follow-on architecture decision is recorded in [JARVIS_LOCAL_INFERENCE_DECISION_2026-11-11.md](JARVIS_LOCAL_INFERENCE_DECISION_2026-11-11.md). It selects llama.cpp as the first Android local-inference backend candidate and identifies Qwen2.5-0.5B-Instruct Q4_K_M only as a profiling candidate. Neither runtime nor model has yet been integrated; the existing echo-only `LocalLlmEngine` remains a known blocker.
+
+The PR remains draft and must not be merged until the decision record's implementation and release gates are met.
