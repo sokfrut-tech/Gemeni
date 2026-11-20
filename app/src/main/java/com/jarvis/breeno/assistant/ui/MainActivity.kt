@@ -10,6 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -111,67 +115,31 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    // Экран по решению владельца: только светящийся шар по центру, без текста и кнопок.
+    // Нажатие на шар запускает запись голоса.
     @Composable
     private fun JarvisHome() {
         var listening by remember { mutableStateOf(false) }
-        var transcript by remember { mutableStateOf("Готов. Нажмите микрофон и скажите команду") }
-        var status by remember { mutableStateOf("Runtime не запускался") }
-        var sphere by remember { mutableStateOf<AlphaVideoSurfaceView?>(null) }
 
         DisposableEffect(Unit) {
-            statusSink = { value -> status = value; listening = value.contains("Микрофон активен") || value.contains("говорите") }
+            statusSink = { value -> listening = value.contains("Микрофон активен") || value.contains("говорите") }
             onDispose { statusSink = null }
         }
 
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF070A10)) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AndroidView(
-                    modifier = Modifier.size(330.dp).align(Alignment.TopCenter).padding(top = 112.dp),
-                    factory = { context -> AlphaVideoSurfaceView(context).also { it.contentDescription = "JarvisSphere"; sphere = it } },
+                    modifier = Modifier.size(300.dp),
+                    factory = { context ->
+                        AlphaVideoSurfaceView(context).also {
+                            it.contentDescription = "JarvisSphere"
+                            it.setOnClickListener { requestAndListen() }
+                        }
+                    },
                     update = { it.setListening(listening) }
                 )
-                Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("ДЖАРВИС", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                            Text("Русский ассистент • ColorOS", color = Color(0xFF9CA8B8), style = MaterialTheme.typography.bodySmall)
-                            Text("BUILD ${BuildConfig.VERSION_CODE}", color = Color(0xFF566274), style = MaterialTheme.typography.labelSmall)
-                        }
-                        IconButton(onClick = { openSettings() }) { Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Color(0xFFB8C5D6)) }
-                    }
-                    Spacer(modifier = Modifier.height(330.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(painter = painterResource(R.drawable.assistant_mascot), contentDescription = "Джарвис", modifier = Modifier.size(92.dp), contentScale = ContentScale.Fit)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(if (listening) "Слушаю…" else "Я рядом", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                            Text(transcript, color = Color(0xFF9AA7B8), textAlign = TextAlign.Start)
-                            Text(status, color = Color(0xFF6ED8F5), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xCC111824))) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Рабочие команды", color = Color(0xFFB8C5D6), style = MaterialTheme.typography.labelLarge)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                QuickCommand("Навигатор") { runQuickCommand("Навигатор"); transcript = "Запускаю навигацию" }
-                                QuickCommand("Поиск") { runQuickCommand("Поиск"); transcript = "Открываю поиск" }
-                                QuickCommand("Телефон") { runQuickCommand("Телефон"); transcript = "Открываю телефон" }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    FloatingActionButton(onClick = { requestAndListen() }, containerColor = if (listening) Color(0xFF4FD9FF) else Color(0xFF162536), contentColor = if (listening) Color(0xFF041017) else Color(0xFFBDEFFF)) {
-                        Icon(Icons.Default.Mic, contentDescription = "Микрофон", modifier = Modifier.size(28.dp))
-                    }
-                }
             }
         }
     }
 
-    @Composable
-    private fun QuickCommand(label: String, onClick: () -> Unit) {
-        androidx.compose.material3.TextButton(onClick = onClick) { Text(label, color = Color(0xFF8DEBFF)) }
-    }
 }

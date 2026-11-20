@@ -1,6 +1,8 @@
 name: Build Jarvis
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -45,18 +47,31 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$APK"
       - name: Inspect APK manifest, services and native ABIs
         run: bash scripts/inspect_apk.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Runtime smoke tests on Android emulator
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
-          # Omit profile so avdmanager uses the runner's default hardware profile.
+          # Телефонный профиль (≈411x914 dp). На дефолтном 320x640 dp нижняя часть экрана не видна тестам.
+          profile: pixel_6
           target: default
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -no-boot-anim
-          script: gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            mkdir -p app/build/jarvis-logs
+            gradle :app:connectedDebugAndroidTest --no-daemon --stacktrace; echo $? > app/build/jarvis-logs/gradle-rc.txt
+            timeout 60 adb logcat -d -v time > app/build/jarvis-logs/logcat-full.txt 2>&1 || true
+            grep -iE 'FATAL|AndroidRuntime|com.jarvis|JarvisTest|Process .* has died|GLThread|EGL|UnsatisfiedLink|lowmemorykiller' app/build/jarvis-logs/logcat-full.txt | tail -300 > app/build/jarvis-logs/crash-lines.txt || true
+            echo '=== CRASH LINES ==='
+            cat app/build/jarvis-logs/crash-lines.txt || true
+            echo "=== GRADLE EXIT: $(cat app/build/jarvis-logs/gradle-rc.txt) ==="
       - name: Upload runtime test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,7 +80,11 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/
             app/build/outputs/connected_android_test_additional_output/
+            app/build/jarvis-logs/
           if-no-files-found: ignore
+      - name: Fail the job if runtime smoke tests failed
+        if: always()
+        run: test "$(cat app/build/jarvis-logs/gradle-rc.txt 2>/dev/null || echo 1)" = "0"
       - uses: actions/upload-artifact@v4
         if: always() && steps.build-apk.outcome == 'success'
         with:
