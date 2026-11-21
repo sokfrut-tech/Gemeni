@@ -80,11 +80,13 @@ class LocalLlmModelManager(private val context: Context) {
             } else {
                 target.delete()
                 marker.delete()
+                val mirrorUrl = URL(pack.downloadUrl.replace("https://huggingface.co/", "https://hf-mirror.com/"))
                 ResumableModelDownloader.downloadVerified(
                     url = URL(pack.downloadUrl),
                     destination = target,
                     expectedBytes = pack.sizeBytes,
                     expectedSha256 = pack.sha256,
+                    fallbackUrls = listOf(mirrorUrl),
                     onProgress = onProgress,
                 )
                 writeVerifiedMarker(pack, marker)
@@ -131,6 +133,7 @@ class LocalLlmModelManager(private val context: Context) {
     companion object {
         const val PACK_QWEN_05B = "qwen2.5-0.5b-q4_k_m"
         const val PACK_QWEN_15B = "qwen2.5-1.5b-q4_k_m"
+        const val PACK_QWEN_3B = "qwen2.5-3b-q4_k_m"
         private const val KEY_SELECTED_PACK = "selected_llm_pack_id"
 
         val CATALOG: List<LocalLlmPack> = listOf(
@@ -159,8 +162,8 @@ class LocalLlmModelManager(private val context: Context) {
             ),
             LocalLlmPack(
                 id = PACK_QWEN_15B,
-                title = "Qwen 2.5 1.5B Instruct (Умная для OPPO)",
-                description = "Более умная русская модель для 12/16 ГБ RAM OPPO Find X6 Pro (~1.04 ГБ).",
+                title = "Qwen 2.5 1.5B Instruct (Баланс для OPPO)",
+                description = "Сбалансированная русская модель для 12/16 ГБ RAM (~1.04 ГБ).",
                 downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf",
                 descriptor = ModelPackDescriptor(
                     packId = PACK_QWEN_15B,
@@ -176,6 +179,29 @@ class LocalLlmModelManager(private val context: Context) {
                             fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
                             sizeBytes = 1_117_320_736L,
                             sha256 = "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+                        )
+                    ),
+                ),
+            ),
+            LocalLlmPack(
+                id = PACK_QWEN_3B,
+                title = "Qwen 2.5 3B Instruct (Флагман для OPPO)",
+                description = "Максимально умная русская офлайн-модель для Snapdragon 8 Gen 2 (~1.96 ГБ).",
+                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/7dabda4d13d513e3e842b20f0d435c732f172cbe/qwen2.5-3b-instruct-q4_k_m.gguf",
+                descriptor = ModelPackDescriptor(
+                    packId = PACK_QWEN_3B,
+                    version = "2.5-3B-Q4_K_M",
+                    runtime = "llama.cpp",
+                    architecture = "qwen2",
+                    quantization = "Q4_K_M",
+                    licenseId = "Apache-2.0",
+                    sourceRevision = "7dabda4d13d513e3e842b20f0d435c732f172cbe",
+                    shards = listOf(
+                        ModelShard(
+                            index = 0,
+                            fileName = "qwen2.5-3b-instruct-q4_k_m.gguf",
+                            sizeBytes = 2_104_932_768L,
+                            sha256 = "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
                         )
                     ),
                 ),

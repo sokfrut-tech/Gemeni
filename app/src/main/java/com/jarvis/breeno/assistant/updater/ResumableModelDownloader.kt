@@ -10,19 +10,48 @@ import java.net.URL
 import java.security.MessageDigest
 
 /**
- * Shared resumable HTTP downloader with SHA-256 verification and atomic commit.
- * Reused across GGUF LLM weights and Russian Piper TTS voice archives.
+ * Shared resumable HTTP downloader with explicit 301/302/303/307/308 redirect handling,
+ * mirror fallback support (e.g. hf-mirror.com), SHA-256 verification, and atomic commit.
  */
 object ResumableModelDownloader {
     private const val MAX_SEGMENTS = 512
+    private const val MAX_REDIRECTS = 6
     private val CONTENT_RANGE = Regex("""bytes (\d+)-(\d+)/(\d+)""")
 
     suspend fun downloadVerified(
         url: URL,
         destination: File,
         expectedBytes: Long?,
-        expectedSha256: String,
+        expectedSha256: String?,
+        fallbackUrls: List<URL> = emptyList(),
         onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+    ) {
+        val candidates = listOf(url) + fallbackUrls
+        var lastError: Throwable? = null
+        for (candidate in candidates) {
+            try {
+                downloadSingleUrl(
+                    url = candidate,
+                    destination = destination,
+                    expectedBytes = expectedBytes,
+                    expectedSha256 = expectedSha256,
+                    onProgress = onProgress,
+                )
+                return
+            } catch (error: Throwable) {
+                currentCoroutineContext().ensureActive()
+                lastError = error
+            }
+        }
+        throw lastError ?: IllegalStateException("Не удалось скачать ${destination.name}")
+    }
+
+    private suspend fun downloadSingleUrl(
+        url: URL,
+        destination: File,
+        expectedBytes: Long?,
+        expectedSha256: String?,
+        onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit,
     ) {
         val ctx = currentCoroutineContext()
         destination.parentFile?.mkdirs()
@@ -48,16 +77,7 @@ object ResumableModelDownloader {
                 }
 
                 val resumeOffset = tmp.takeIf { it.isFile }?.length() ?: 0L
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 30_000
-                    readTimeout = 60_000
-                    instanceFollowRedirects = true
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "Jarvis-Android/1.0")
-                    if (resumeOffset > 0L) {
-                        setRequestProperty("Range", "bytes=$resumeOffset-")
-                    }
-                }
+                val connection = openFollowingRedirects(url, resumeOffset)
 
                 try {
                     val code = connection.responseCode
@@ -161,11 +181,37 @@ object ResumableModelDownloader {
         }
     }
 
+    private fun openFollowingRedirects(initialUrl: URL, resumeOffset: Long): HttpURLConnection {
+        var current = initialUrl
+        for (hop in 0..MAX_REDIRECTS) {
+            val conn = (current.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 30_000
+                readTimeout = 60_000
+                instanceFollowRedirects = false
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+                if (resumeOffset > 0L) {
+                    setRequestProperty("Range", "bytes=$resumeOffset-")
+                }
+            }
+            val code = conn.responseCode
+            if (code in setOf(301, 302, 303, 307, 308)) {
+                val location = conn.getHeaderField("Location")
+                conn.disconnect()
+                check(!location.isNullOrBlank()) { "Пустой Redirect Location (HTTP $code)" }
+                current = URL(current, location)
+                continue
+            }
+            return conn
+        }
+        error("Слишком много редиректов при загрузке $initialUrl")
+    }
+
     private fun verifyAndCommit(
         tmp: File,
         destination: File,
         expectedBytes: Long?,
-        expectedSha256: String,
+        expectedSha256: String?,
     ) {
         if (expectedBytes != null && expectedBytes > 0L) {
             if (tmp.length() != expectedBytes) {
@@ -174,10 +220,12 @@ object ResumableModelDownloader {
                 error("Размер ${destination.name} не совпал ($actualLen вместо $expectedBytes Б)")
             }
         }
-        val actualHash = sha256(tmp)
-        if (!actualHash.equals(expectedSha256, ignoreCase = true)) {
-            tmp.delete()
-            error("SHA-256 не совпал для ${destination.name}; повреждённый файл удалён")
+        if (!expectedSha256.isNullOrBlank()) {
+            val actualHash = sha256(tmp)
+            if (!actualHash.equals(expectedSha256, ignoreCase = true)) {
+                tmp.delete()
+                error("SHA-256 не совпал для ${destination.name}; повреждённый файл удалён")
+            }
         }
         if (destination.exists()) {
             destination.delete()

@@ -41,6 +41,7 @@ class JarvisSpeaker(
     @Volatile private var systemTtsInitialized = false
     @Volatile private var pendingSystemText: String? = null
     @Volatile var onSpeakingChanged: ((Boolean) -> Unit)? = null
+    @Volatile var onError: ((String) -> Unit)? = null
     @Volatile var isMuted: Boolean = false
     @Volatile private var systemEngine: TextToSpeech? = null
     @Volatile private var activeSpeakJob: Job? = null
@@ -79,8 +80,10 @@ class JarvisSpeaker(
         val piperDir = runCatching { piperModelDirProvider() }.getOrNull()
         if (piperDir != null) {
             speakWithPiper(piperDir, text)
-        } else {
+        } else if (systemTtsInitialized) {
             speakWithSystemTts(text)
+        } else {
+            onError?.invoke("Русский голос не установлен: откройте вкладку «Модели» и скачайте «Дмитрий» (20 МБ)")
         }
     }
 
@@ -151,8 +154,9 @@ class JarvisSpeaker(
                 }
             } catch (_: CancellationException) {
                 // Barge-in or user stop requested.
-            } catch (_: Throwable) {
-                // Fallback to system TTS if Piper fails unexpectedly at runtime.
+            } catch (err: Throwable) {
+                onError?.invoke("Ошибка Piper TTS: ${err.message ?: err.javaClass.simpleName}")
+                // Fallback to system TTS only if Russian Android TTS is actually available.
                 if (systemTtsInitialized) {
                     speakWithSystemTts(text)
                 }

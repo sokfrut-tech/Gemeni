@@ -1,7 +1,9 @@
 package com.jarvis.breeno.assistant.voice
 
 import com.k2fsa.sherpa.onnx.OfflineTts
-import com.k2fsa.sherpa.onnx.getOfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
 
 /** Local VITS/Piper-compatible TTS through the actual Sherpa-ONNX Kotlin API. */
@@ -22,20 +24,23 @@ class PiperTtsEngine {
         require(data.isDirectory) { "espeak-ng-data is missing: ${data.absolutePath}" }
 
         tts?.release()
-        val config = getOfflineTtsConfig(
-            modelDir = modelDir.absolutePath,
-            modelName = model.name,
-            acousticModelName = "",
-            vocoder = "",
-            voices = "",
-            lexicon = "",
-            dataDir = data.absolutePath,
-            dictDir = "",
-            ruleFsts = "",
-            ruleFars = "",
-            numThreads = 2,
+        // Construct OfflineTtsConfig directly: getOfflineTtsConfig() in v1.13.8 turns an
+        // empty lexicon string into "$modelDir/", which breaks Piper VITS loading.
+        val config = OfflineTtsConfig(
+            model = OfflineTtsModelConfig(
+                vits = OfflineTtsVitsModelConfig(
+                    model = model.absolutePath,
+                    lexicon = "",
+                    tokens = tokens.absolutePath,
+                    dataDir = data.absolutePath,
+                ),
+                numThreads = 2,
+                debug = false,
+                provider = "cpu",
+            ),
+            maxNumSentences = 1,
         )
-        tts = OfflineTts(config = config)
+        tts = OfflineTts(assetManager = null, config = config)
         loadedDirPath = modelDir.absolutePath
     }
 

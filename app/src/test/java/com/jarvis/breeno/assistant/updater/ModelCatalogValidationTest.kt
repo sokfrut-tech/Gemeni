@@ -8,7 +8,7 @@ import org.junit.Test
 class ModelCatalogValidationTest {
     @Test
     fun qwenModelCatalogDescriptorsAreValidAndPinned() {
-        assertEquals(2, LocalLlmModelManager.CATALOG.size)
+        assertEquals(3, LocalLlmModelManager.CATALOG.size)
         LocalLlmModelManager.CATALOG.forEach { pack ->
             pack.descriptor.validate()
             assertTrue(pack.downloadUrl.contains(pack.descriptor.sourceRevision))

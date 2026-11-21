@@ -171,8 +171,8 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeLoadModel(
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = static_cast<uint32_t>(safe_ctx);
-    ctx_params.n_batch = 256;
-    ctx_params.n_ubatch = 256;
+    ctx_params.n_batch = 512;
+    ctx_params.n_ubatch = 512;
     ctx_params.n_threads = safe_threads;
     ctx_params.n_threads_batch = safe_threads;
 
@@ -256,7 +256,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
         LOGW("Prompt truncated to %d tokens for context budget", max_prompt);
     }
 
-    const int32_t batch_cap = 256;
+    const int32_t batch_cap = 512;
     for (size_t pos = 0; pos < prompt_tokens.size(); pos += static_cast<size_t>(batch_cap)) {
         if (session->cancel_requested.load()) {
             return utf8_to_jstring(env, "");

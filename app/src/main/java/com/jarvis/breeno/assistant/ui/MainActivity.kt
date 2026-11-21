@@ -27,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Grain
@@ -62,12 +63,18 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.jarvis.breeno.assistant.control.JarvisControlCenterStore
 import com.jarvis.breeno.assistant.control.JarvisEventLevel
 import com.jarvis.breeno.assistant.core.AndroidRuntimeSignalsSource
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
+import com.jarvis.breeno.assistant.media.GeneratedMediaItem
+import com.jarvis.breeno.assistant.media.GeneratedMediaType
+import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
+import com.jarvis.breeno.assistant.media.MediaGenConfigStore
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
 import kotlinx.coroutines.CancellationException
@@ -86,7 +93,8 @@ private val Muted = Color(0xFF9AAABD)
 private enum class JarvisTab(val title: String) {
     CORE("Ядро"),
     MODELS("Модели"),
-    SAVEVIDEO("SaveVideo"),
+    STUDIO("Студия"),
+    SAVEVIDEO("Видео"),
     CONTROL("Центр"),
 }
 
@@ -95,6 +103,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var signalsSource: AndroidRuntimeSignalsSource
     private lateinit var controlCenter: JarvisControlCenterStore
     private lateinit var saveVideoManager: SaveVideoManager
+    private lateinit var mediaGenerator: JarvisMediaGenerator
 
     private var pendingListen = false
     private var pendingModelDownloadConsent = false
@@ -106,6 +115,7 @@ class MainActivity : ComponentActivity() {
     private var orbModeSink: ((JarvisOrbMode) -> Unit)? = null
     private var tabSink: ((JarvisTab) -> Unit)? = null
     private var stackStatusSink: ((AiStackStatus) -> Unit)? = null
+    private var pendingStudioSink: ((Pair<GeneratedMediaType, String>) -> Unit)? = null
     private var listeningJob: Job? = null
     private var modelCheckJob: Job? = null
 
@@ -134,6 +144,20 @@ class MainActivity : ComponentActivity() {
             onEvent = { title, detail, isError ->
                 controlCenter.logEvent(
                     category = "SAVEVIDEO",
+                    title = title,
+                    detail = detail,
+                    level = if (isError) JarvisEventLevel.ERROR else JarvisEventLevel.INFO,
+                )
+            },
+        )
+
+        mediaGenerator = JarvisMediaGenerator(
+            studioDir = File(filesDir, "studio"),
+            historyFile = File(filesDir, "studio_history.json"),
+            configStore = MediaGenConfigStore(this),
+            onEvent = { title, detail, isError ->
+                controlCenter.logEvent(
+                    category = "СТУДИЯ",
                     title = title,
                     detail = detail,
                     level = if (isError) JarvisEventLevel.ERROR else JarvisEventLevel.INFO,
@@ -269,6 +293,22 @@ class MainActivity : ComponentActivity() {
         statusSink?.invoke("Прослушивание остановлено")
     }
 
+    private fun openGeneratedMedia(item: GeneratedMediaItem) {
+        val file = File(item.filePath)
+        if (!file.isFile) return
+        runCatching {
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            val mime = if (item.type == GeneratedMediaType.VIDEO) "video/mp4" else "image/jpeg"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Открыть файл"))
+        }.onFailure { err ->
+            statusSink?.invoke("Ошибка открытия: ${err.message ?: err.javaClass.simpleName}")
+        }
+    }
+
     private fun openSettings() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
     override fun onDestroy() {
@@ -279,6 +319,7 @@ class MainActivity : ComponentActivity() {
         orbModeSink = null
         tabSink = null
         stackStatusSink = null
+        pendingStudioSink = null
         modelCheckJob?.cancel()
         modelCheckJob = null
         listeningJob?.cancel()
@@ -301,8 +342,10 @@ class MainActivity : ComponentActivity() {
         var transcript by remember { mutableStateOf("Готов к работе. Коснитесь ядра или напишите запрос.") }
         var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
         var stackStatus by remember { mutableStateOf(runtime.currentStackStatus()) }
+        var pendingStudioRequest by remember { mutableStateOf<Pair<GeneratedMediaType, String>?>(null) }
 
         val saveVideoTasks by saveVideoManager.tasks.collectAsState()
+        val studioItems by mediaGenerator.items.collectAsState()
         val controlSnapshot by controlCenter.snapshot.collectAsState()
 
         DisposableEffect(Unit) {
@@ -313,16 +356,29 @@ class MainActivity : ComponentActivity() {
             stackStatusSink = { next -> stackStatus = next }
             busySink = { isBusy -> busy = isBusy }
             replySink = { text -> transcript = text }
+            pendingStudioSink = { req -> pendingStudioRequest = req }
 
             runtime.onAudioLevelChanged = { rms -> runOnUiThread { audioRmsSink?.invoke(rms) } }
             runtime.onOrbModeChanged = { mode -> runOnUiThread { orbModeSink?.invoke(mode) } }
             runtime.onStackStatusChanged = { refreshTelemetry() }
+            runtime.onSpeakerError = { errMsg ->
+                controlCenter.logEvent("ГОЛОС", "Ошибка озвучки", errMsg, JarvisEventLevel.ERROR)
+                runOnUiThread { statusSink?.invoke(errMsg) }
+            }
+            runtime.onRequestMediaGeneration = { type, prompt ->
+                runOnUiThread {
+                    val mediaType = if (type == "VIDEO") GeneratedMediaType.VIDEO else GeneratedMediaType.IMAGE
+                    pendingStudioSink?.invoke(mediaType to prompt)
+                    tabSink?.invoke(JarvisTab.STUDIO)
+                }
+            }
             runtime.onNavigateTab = { target ->
                 runOnUiThread {
                     when (target) {
                         "SAVEVIDEO" -> tabSink?.invoke(JarvisTab.SAVEVIDEO)
                         "CONTROL" -> tabSink?.invoke(JarvisTab.CONTROL)
                         "MODELS" -> tabSink?.invoke(JarvisTab.MODELS)
+                        "STUDIO" -> tabSink?.invoke(JarvisTab.STUDIO)
                         else -> tabSink?.invoke(JarvisTab.CORE)
                     }
                 }
@@ -339,6 +395,7 @@ class MainActivity : ComponentActivity() {
                         value == "Прослушивание остановлено" ||
                         value == "Речь не распознана" ||
                         value.startsWith("Ошибка") ||
+                        value.startsWith("Русский голос") ||
                         value.startsWith("Нет разрешения") ||
                         value.startsWith("Нужна модель") ||
                         value.startsWith("Ответ готов") ||
@@ -361,9 +418,12 @@ class MainActivity : ComponentActivity() {
                 orbModeSink = null
                 tabSink = null
                 stackStatusSink = null
+                pendingStudioSink = null
                 runtime.onAudioLevelChanged = null
                 runtime.onOrbModeChanged = null
                 runtime.onStackStatusChanged = null
+                runtime.onSpeakerError = null
+                runtime.onRequestMediaGeneration = null
                 runtime.onNavigateTab = null
                 runtime.onCommandCompleted = null
                 runtime.setSpeechStateListener(null)
@@ -399,7 +459,7 @@ class MainActivity : ComponentActivity() {
                         selected = activeTab == JarvisTab.CORE,
                         onClick = { activeTab = JarvisTab.CORE },
                         icon = { Icon(Icons.Default.Grain, contentDescription = JarvisTab.CORE.title) },
-                        label = { Text(JarvisTab.CORE.title, maxLines = 1) },
+                        label = { Text(JarvisTab.CORE.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
                     )
                     NavigationBarItem(
                         selected = activeTab == JarvisTab.MODELS,
@@ -408,15 +468,21 @@ class MainActivity : ComponentActivity() {
                             refreshTelemetry()
                         },
                         icon = { Icon(Icons.Default.Memory, contentDescription = JarvisTab.MODELS.title) },
-                        label = { Text(JarvisTab.MODELS.title, maxLines = 1) },
+                        label = { Text(JarvisTab.MODELS.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == JarvisTab.STUDIO,
+                        onClick = { activeTab = JarvisTab.STUDIO },
+                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = JarvisTab.STUDIO.title) },
+                        label = { Text(JarvisTab.STUDIO.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
                     )
                     NavigationBarItem(
                         selected = activeTab == JarvisTab.SAVEVIDEO,
                         onClick = { activeTab = JarvisTab.SAVEVIDEO },
                         icon = { Icon(Icons.Default.Download, contentDescription = JarvisTab.SAVEVIDEO.title) },
                         label = {
-                            val badge = if (controlSnapshot.videosInQueue > 0) " (${controlSnapshot.videosInQueue})" else ""
-                            Text("${JarvisTab.SAVEVIDEO.title}$badge", maxLines = 1)
+                            val badge = if (controlSnapshot.videosInQueue > 0) "(${controlSnapshot.videosInQueue})" else ""
+                            Text("${JarvisTab.SAVEVIDEO.title}$badge", fontSize = 11.sp, maxLines = 1, softWrap = false)
                         },
                     )
                     NavigationBarItem(
@@ -426,7 +492,7 @@ class MainActivity : ComponentActivity() {
                             refreshTelemetry()
                         },
                         icon = { Icon(Icons.Default.Dashboard, contentDescription = JarvisTab.CONTROL.title) },
-                        label = { Text(JarvisTab.CONTROL.title, maxLines = 1) },
+                        label = { Text(JarvisTab.CONTROL.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
                     )
                 }
             },
@@ -477,6 +543,18 @@ class MainActivity : ComponentActivity() {
                         onSelectLlm = { id -> runtime.selectLlmPack(id) },
                         onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
                         onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
+                    )
+
+                    JarvisTab.STUDIO -> MediaStudioScreen(
+                        items = studioItems,
+                        initialConfig = mediaGenerator.currentConfig(),
+                        pendingPromptRequest = pendingStudioRequest,
+                        onClearPendingRequest = { pendingStudioRequest = null },
+                        onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
+                        onGenerateVideo = { p, s, w, h, cb -> mediaGenerator.generateVideo(p, s, w, h, cb) },
+                        onOpenItem = { item -> openGeneratedMedia(item) },
+                        onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
+                        onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
                     )
 
                     JarvisTab.SAVEVIDEO -> SaveVideoScreen(
@@ -601,7 +679,7 @@ class MainActivity : ComponentActivity() {
                 )
                 Text(
                     text = status,
-                    color = if (status.startsWith("ОШИБКА")) Color(0xFFFF9C9C) else Cyan,
+                    color = if (status.startsWith("ОШИБКА") || status.startsWith("РУССКИЙ ГОЛОС")) Color(0xFFFF9C9C) else Cyan,
                     style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
                     maxLines = 2,

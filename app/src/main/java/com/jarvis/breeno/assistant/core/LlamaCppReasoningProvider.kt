@@ -58,7 +58,7 @@ class LlamaCppReasoningProvider(
                         loadedHandle = 0L
                         loadedPackId = null
                     }
-                    val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+                    val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
                     val handle = LlamaNativeBridge.nativeLoadModel(
                         modelPath = verifiedFile.absolutePath,
                         nCtx = requestedCtx,

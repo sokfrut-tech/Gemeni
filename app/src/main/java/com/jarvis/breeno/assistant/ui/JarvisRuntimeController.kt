@@ -94,8 +94,16 @@ class JarvisRuntimeController(context: Context) {
     var onAudioLevelChanged: ((Float) -> Unit)? = null
     var onOrbModeChanged: ((JarvisOrbMode) -> Unit)? = null
     var onNavigateTab: ((String) -> Unit)? = null
+    var onRequestMediaGeneration: ((type: String, prompt: String) -> Unit)? = null
+    var onSpeakerError: ((String) -> Unit)? = null
     var onCommandCompleted: ((spoken: String, response: String) -> Unit)? = null
     var onStackStatusChanged: (() -> Unit)? = null
+
+    init {
+        speaker.onError = { message ->
+            onSpeakerError?.invoke(message)
+        }
+    }
 
     fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
 
@@ -453,7 +461,36 @@ class JarvisRuntimeController(context: Context) {
                 "Голос: ${status.speakerLabel}. Мозг: $llmState."
         }
 
+        // Image & Video Generation Studio Voice Triggers
+        val drawMatch = Regex(
+            """^(?:джарвис[,\s]*)?(?:нарисуй|сгенерируй картинку|создай картинку|сделай картинку)\s+(.+)$""",
+            RegexOption.IGNORE_CASE,
+        ).find(text.trim())
+        if (drawMatch != null) {
+            val mediaPrompt = drawMatch.groupValues[1].trim()
+            if (mediaPrompt.isNotEmpty()) {
+                onRequestMediaGeneration?.invoke("IMAGE", mediaPrompt)
+                return "Открываю Студию и рисую: $mediaPrompt"
+            }
+        }
+
+        val videoMatch = Regex(
+            """^(?:джарвис[,\s]*)?(?:создай видео|сгенерируй видео|сделай видео)\s+(.+)$""",
+            RegexOption.IGNORE_CASE,
+        ).find(text.trim())
+        if (videoMatch != null) {
+            val mediaPrompt = videoMatch.groupValues[1].trim()
+            if (mediaPrompt.isNotEmpty()) {
+                onRequestMediaGeneration?.invoke("VIDEO", mediaPrompt)
+                return "Открываю Студию и создаю видео: $mediaPrompt"
+            }
+        }
+
         // App Tab Navigation
+        if (lower.contains("студи") && (lower.contains("открой") || lower.contains("покажи"))) {
+            onNavigateTab?.invoke("STUDIO")
+            return "Открываю Студию ИИ."
+        }
         if (lower.contains("сохрани видео") || lower.contains("очередь видео") || lower.contains("скачай видео")) {
             onNavigateTab?.invoke("SAVEVIDEO")
             return "Открываю SaveVideo."
