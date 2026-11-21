@@ -14,6 +14,20 @@ class AuthorizedCloudProviderTest {
     }
 
     @Test
+    fun zeroKeyPollinationsFreeModeReportsReadyWhenEnabledWithoutApiKey() = runBlocking {
+        val provider = AuthorizedCloudReasoningProvider(
+            configProvider = {
+                ExternalAiConfig(
+                    enabled = true,
+                    mode = ExternalAiMode.POLLINATIONS_FREE,
+                    apiKey = "",
+                )
+            }
+        )
+        assertEquals(ProviderAvailability.Ready, provider.availability())
+    }
+
+    @Test
     fun buildsAndParsesOpenAiCompatibleJson() {
         val req = GeminiCloudClient.buildOpenAiRequestJson(
             model = "qwen2.5:7b",

@@ -7,18 +7,28 @@ import org.junit.Test
 
 class JarvisMediaGeneratorTest {
     @Test
-    fun buildsEncodedPollinationsUrlWithStyleAndDimensions() {
-        val url = JarvisMediaGenerator.buildPollinationsImageUrl(
+    fun buildsEncodedPollinationsUrlWithStyleAndDimensionsWithoutPaidModelByDefault() {
+        val defaultUrl = JarvisMediaGenerator.buildPollinationsImageUrl(
             prompt = "Красный дракон над горами",
             style = "Киберпанк",
             width = 768,
             height = 432,
             seed = 777,
-            model = "flux",
         )
-        assertTrue(url.startsWith("https://image.pollinations.ai/prompt/"))
-        assertTrue(url.contains("width=768&height=432&seed=777&model=flux&nologo=true"))
-        assertTrue(!url.contains(" "))
+        assertTrue(defaultUrl.startsWith("https://image.pollinations.ai/prompt/"))
+        assertTrue(defaultUrl.contains("width=768&height=432&seed=777&nologo=true"))
+        assertTrue(!defaultUrl.contains("&model="))
+        assertTrue(!defaultUrl.contains(" "))
+
+        val customModelUrl = JarvisMediaGenerator.buildPollinationsImageUrl(
+            prompt = "Космос",
+            style = "Фото",
+            width = 512,
+            height = 512,
+            seed = 1,
+            model = "turbo",
+        )
+        assertTrue(customModelUrl.contains("&model=turbo"))
     }
 
     @Test

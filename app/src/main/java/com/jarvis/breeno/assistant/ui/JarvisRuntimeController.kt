@@ -5,9 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import com.jarvis.breeno.assistant.core.AndroidRuntimeSignalsSource
 import com.jarvis.breeno.assistant.core.AuthorizedCloudReasoningProvider
+import com.jarvis.breeno.assistant.core.DeviceHeatState
 import com.jarvis.breeno.assistant.core.ExternalAiConfig
 import com.jarvis.breeno.assistant.core.ExternalAiConfigStore
 import com.jarvis.breeno.assistant.core.JarvisCognitiveKernel
+import com.jarvis.breeno.assistant.core.JarvisFoldedRuntimePolicy
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.core.KernelBudget
 import com.jarvis.breeno.assistant.core.KernelTurn
@@ -16,6 +18,7 @@ import com.jarvis.breeno.assistant.core.LlamaNativeBridge
 import com.jarvis.breeno.assistant.core.ResourceGuardedLocalProvider
 import com.jarvis.breeno.assistant.core.RuntimeSignals
 import com.jarvis.breeno.assistant.core.computeAudioRms
+import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
@@ -90,12 +93,15 @@ class JarvisRuntimeController(context: Context) {
     private val cognitiveKernel = JarvisCognitiveKernel(listOf(guardedLocalProvider, cloudProvider))
 
     @Volatile private var vadLoaded = false
+    @Volatile private var lastSpeakingState = false
+    @Volatile private var userCancelledSpeech = false
 
     var onAudioLevelChanged: ((Float) -> Unit)? = null
     var onOrbModeChanged: ((JarvisOrbMode) -> Unit)? = null
     var onNavigateTab: ((String) -> Unit)? = null
     var onRequestMediaGeneration: ((type: String, prompt: String) -> Unit)? = null
     var onSpeakerError: ((String) -> Unit)? = null
+    var onSpeakingFinished: (() -> Unit)? = null
     var onCommandCompleted: ((spoken: String, response: String) -> Unit)? = null
     var onStackStatusChanged: (() -> Unit)? = null
 
@@ -136,10 +142,17 @@ class JarvisRuntimeController(context: Context) {
 
     fun setSpeechStateListener(listener: ((Boolean) -> Unit)?) {
         speaker.onSpeakingChanged = { speaking ->
+            val finishedNormally = lastSpeakingState && !speaking && !userCancelledSpeech
+            lastSpeakingState = speaking
             onOrbModeChanged?.invoke(if (speaking) JarvisOrbMode.SPEAKING else JarvisOrbMode.IDLE)
             listener?.invoke(speaking)
+            if (finishedNormally) {
+                onSpeakingFinished?.invoke()
+            }
         }
     }
+
+    fun recentDialogue(limit: Int = 12): List<DialogueMessage> = memory.recentMessages(limit)
 
     fun testRussianVoice() {
         speaker.speak("Привет! Я Джарвис. Локальный русский голосовой движок работает отлично.")
@@ -334,7 +347,9 @@ class JarvisRuntimeController(context: Context) {
         onProgress: (String) -> Unit,
         onTokenStream: (String) -> Unit = {},
     ): String = withContext(Dispatchers.IO) {
-        // 1. Instant deterministic commands (time, date, memory, status, tabs, system intents)
+        userCancelledSpeech = false
+
+        // 1. Instant deterministic commands (time, date, memory, status, tabs, media gen, system intents)
         val deterministic = tryDeterministicCommand(text)
         if (deterministic != null) {
             onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
@@ -347,6 +362,23 @@ class JarvisRuntimeController(context: Context) {
             return@withContext deterministic
         }
 
+        val hasLocalLlm = llmModels.activeReadyPack() != null
+        val extCfg = externalAiStore.load()
+
+        // Only show setup hint when BOTH local Qwen AND external AI are unconfigured/disabled.
+        if (!hasLocalLlm && !extCfg.enabled) {
+            val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни онлайн-мозг. " +
+                "Откройте вкладку «Модели»: там можно за 1 нажатие включить бесплатный онлайн-ИИ или скачать офлайн-модель Qwen 2.5 и голос Дмитрий."
+            memory.saveMessage("user", text, "user")
+            memory.saveMessage("assistant", guidance, "setup-hint")
+            onTokenStream(guidance)
+            onCommandCompleted?.invoke(text, guidance)
+            speaker.speak(guidance)
+            onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            onProgress("Нужна модель ИИ — откройте вкладку «Модели»")
+            return@withContext guidance
+        }
+
         // 2. Real Cognitive Kernel (Local Qwen via llama.cpp -> Optional Opt-in Cloud/PC)
         onOrbModeChanged?.invoke(JarvisOrbMode.THINKING)
         onProgress("Джарвис думает…")
@@ -355,7 +387,6 @@ class JarvisRuntimeController(context: Context) {
             onTokenStream(partial)
         }
 
-        val extCfg = externalAiStore.load()
         val turn = KernelTurn(
             taskId = "turn-${System.currentTimeMillis()}",
             userText = text,
@@ -365,7 +396,33 @@ class JarvisRuntimeController(context: Context) {
         )
 
         return@withContext try {
-            val result = cognitiveKernel.process(turn)
+            val result = try {
+                cognitiveKernel.process(turn)
+            } catch (policyOrAvailErr: IllegalStateException) {
+                // If user already downloaded local Qwen and device is NOT critically overheating,
+                // do not block inference on soft RAM/battery-saver hints (fall through with bounded budget).
+                val heatState = JarvisFoldedRuntimePolicy().plan(signalsSource.snapshot()).heatState
+                val msg = policyOrAvailErr.message.orEmpty()
+                val deniedBySoftGuard = hasLocalLlm &&
+                    heatState != DeviceHeatState.CRITICAL &&
+                    LlamaNativeBridge.isNativeLibraryLoaded &&
+                    (msg.contains("policy denied", ignoreCase = true) || msg.contains("No reasoning provider", ignoreCase = true))
+                if (deniedBySoftGuard) {
+                    val direct = llamaProvider.reason(
+                        turn.copy(budget = turn.budget.copy(maxOutputTokens = 256))
+                    )
+                    com.jarvis.breeno.assistant.core.KernelTurnResult(
+                        answer = direct.answer,
+                        acceptedToolProposals = emptyList(),
+                        rejectedToolProposalCount = 0,
+                        providerId = llamaProvider.id,
+                        modelId = direct.modelId,
+                    )
+                } else {
+                    throw policyOrAvailErr
+                }
+            }
+
             memory.saveMessage("user", text, "user")
             memory.saveMessage("assistant", result.answer, result.modelId)
             onTokenStream(result.answer)
@@ -376,36 +433,14 @@ class JarvisRuntimeController(context: Context) {
         } catch (cancelled: CancellationException) {
             llamaProvider.cancelActiveGeneration()
             throw cancelled
-        } catch (err: IllegalStateException) {
-            val msg = err.message.orEmpty()
-            val noAiConfigured = msg.contains("не загружена", ignoreCase = true) ||
-                msg.contains("недоступен", ignoreCase = true) ||
-                msg.contains("отключён", ignoreCase = true) ||
-                msg.contains("Jarvis reasoning unavailable", ignoreCase = true)
-
-            if (noAiConfigured) {
-                val guidance = "Я вас услышал: «$text». Чтобы я полноценно отвечал на любые вопросы офлайн, " +
-                    "откройте вкладку «Модели» и скачайте Qwen 2.5 (469 МБ) и русский голос Дмитрий (20 МБ) — " +
-                    "или подключите свой ПК/облако."
-                memory.saveMessage("user", text, "user")
-                memory.saveMessage("assistant", guidance, "setup-hint")
-                onTokenStream(guidance)
-                onCommandCompleted?.invoke(text, guidance)
-                speaker.speak(guidance)
-                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
-                onProgress("Нужна модель ИИ — откройте вкладку «Модели»")
-                guidance
-            } else {
-                onOrbModeChanged?.invoke(JarvisOrbMode.ERROR)
-                val failText = "Ошибка ИИ: $msg"
-                onTokenStream(failText)
-                onProgress(failText)
-                failText
-            }
         } catch (error: Throwable) {
+            val realMsg = error.message ?: error.javaClass.simpleName
             onOrbModeChanged?.invoke(JarvisOrbMode.ERROR)
-            val failText = "Ошибка генерации: ${error.message ?: error.javaClass.simpleName}"
+            val failText = "Ошибка ИИ: $realMsg"
+            memory.saveMessage("user", text, "user")
+            memory.saveMessage("assistant", failText, "error")
             onTokenStream(failText)
+            onCommandCompleted?.invoke(text, failText)
             onProgress(failText)
             failText
         } finally {
@@ -463,7 +498,7 @@ class JarvisRuntimeController(context: Context) {
 
         // Image & Video Generation Studio Voice Triggers
         val drawMatch = Regex(
-            """^(?:джарвис[,\s]*)?(?:нарисуй|сгенерируй картинку|создай картинку|сделай картинку)\s+(.+)$""",
+            """^(?:(?:джарвис|пожалуйста|можешь|сделай|мне)[,\s]*)*(?:нарисуй|нарисовать|сгенерируй картинку|сгенерируй изображение|создай картинку|создай изображение|сделай картинку)\s+(.+)$""",
             RegexOption.IGNORE_CASE,
         ).find(text.trim())
         if (drawMatch != null) {
@@ -475,7 +510,7 @@ class JarvisRuntimeController(context: Context) {
         }
 
         val videoMatch = Regex(
-            """^(?:джарвис[,\s]*)?(?:создай видео|сгенерируй видео|сделай видео)\s+(.+)$""",
+            """^(?:(?:джарвис|пожалуйста|можешь)[,\s]*)*(?:создай видео|сгенерируй видео|сделай видео|сними видео)\s+(.+)$""",
             RegexOption.IGNORE_CASE,
         ).find(text.trim())
         if (videoMatch != null) {
@@ -541,6 +576,7 @@ class JarvisRuntimeController(context: Context) {
     }
 
     fun cancelActiveWork() {
+        userCancelledSpeech = true
         speaker.stop()
         llamaProvider.cancelActiveGeneration()
     }

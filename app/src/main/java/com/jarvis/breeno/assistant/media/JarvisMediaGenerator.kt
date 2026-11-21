@@ -32,7 +32,7 @@ data class MediaGenConfig(
     val customImageUrl: String = "",
     val customVideoUrl: String = "",
     val apiKey: String = "",
-    val modelName: String = "flux",
+    val modelName: String = "",
 )
 
 class MediaGenConfigStore(context: Context) {
@@ -42,12 +42,19 @@ class MediaGenConfigStore(context: Context) {
         val rawBackend = prefs.getString(KEY_BACKEND, MediaGenBackend.POLLINATIONS_ONLINE.name)
         val backend = runCatching { MediaGenBackend.valueOf(rawBackend ?: "") }
             .getOrDefault(MediaGenBackend.POLLINATIONS_ONLINE)
+        val storedModel = prefs.getString(KEY_MODEL, "") ?: ""
+        // Migrate old default "flux" that triggered HTTP 402 on Pollinations free tier.
+        val resolvedModel = if (backend == MediaGenBackend.POLLINATIONS_ONLINE && storedModel.equals("flux", ignoreCase = true)) {
+            ""
+        } else {
+            storedModel
+        }
         return MediaGenConfig(
             backend = backend,
             customImageUrl = prefs.getString(KEY_IMG_URL, "") ?: "",
             customVideoUrl = prefs.getString(KEY_VID_URL, "") ?: "",
             apiKey = prefs.getString(KEY_API_KEY, "") ?: "",
-            modelName = prefs.getString(KEY_MODEL, "flux") ?: "flux",
+            modelName = resolvedModel,
         )
     }
 
@@ -287,21 +294,28 @@ class JarvisMediaGenerator(
         if (apiKey.isBlank()) emptyMap() else mapOf("Authorization" to "Bearer ${apiKey.trim()}")
 
     private fun getBytes(urlStr: String, headers: Map<String, String>, readTimeoutMs: Int): ByteArray {
-        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            instanceFollowRedirects = true
-            connectTimeout = 15_000
-            readTimeout = readTimeoutMs
-            setRequestProperty("User-Agent", "Jarvis-Android/1.0")
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
+        var lastErr: Throwable? = null
+        for (attempt in 1..2) {
+            val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                instanceFollowRedirects = true
+                connectTimeout = 15_000
+                readTimeout = readTimeoutMs
+                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+                headers.forEach { (k, v) -> setRequestProperty(k, v) }
+            }
+            try {
+                val code = conn.responseCode
+                check(code in 200..299) { "Сервер генерации вернул HTTP $code" }
+                return conn.inputStream.use { it.readBytes() }
+            } catch (err: Throwable) {
+                lastErr = err
+                if (attempt == 2) throw err
+            } finally {
+                conn.disconnect()
+            }
         }
-        try {
-            val code = conn.responseCode
-            check(code in 200..299) { "Сервер генерации вернул HTTP $code" }
-            return conn.inputStream.use { it.readBytes() }
-        } finally {
-            conn.disconnect()
-        }
+        throw lastErr ?: IllegalStateException("Ошибка загрузки изображения")
     }
 
     private fun postBytes(
@@ -369,12 +383,14 @@ class JarvisMediaGenerator(
             width: Int = 768,
             height: Int = 768,
             seed: Int = 42,
-            model: String = "flux",
+            model: String = "",
         ): String {
             val fullPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
             val encoded = URLEncoder.encode(fullPrompt, "UTF-8").replace("+", "%20")
-            val safeModel = URLEncoder.encode(model.ifBlank { "flux" }, "UTF-8")
-            return "https://image.pollinations.ai/prompt/$encoded?width=$width&height=$height&seed=$seed&model=$safeModel&nologo=true"
+            val modelParam = model.trim().takeIf { it.isNotEmpty() }
+                ?.let { "&model=${URLEncoder.encode(it, "UTF-8")}" }
+                .orEmpty()
+            return "https://image.pollinations.ai/prompt/$encoded?width=$width&height=$height&seed=$seed&nologo=true$modelParam"
         }
 
         fun buildStoryboardPrompts(videoPrompt: String, style: String): List<String> {

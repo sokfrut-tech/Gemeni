@@ -12,6 +12,7 @@ import java.net.URL
 enum class ExternalAiMode {
     OPENAI_COMPATIBLE,
     GEMINI,
+    POLLINATIONS_FREE,
 }
 
 data class ExternalAiConfig(
@@ -26,6 +27,7 @@ data class ExternalAiConfig(
  * Real opt-in external LLM client supporting:
  * 1) OpenAI-compatible endpoints (PC Ollama/LM Studio, OpenRouter, OpenAI, DeepSeek)
  * 2) Google Gemini REST API (generativelanguage.googleapis.com)
+ * 3) Zero-key smart online AI via Pollinations OpenAI-compatible endpoint
  * Disabled by default; never silently sends user prompts off-device.
  */
 class GeminiCloudClient(
@@ -43,7 +45,25 @@ class GeminiCloudClient(
         when (cfg.mode) {
             ExternalAiMode.OPENAI_COMPATIBLE -> callOpenAiCompatible(cfg, prompt, recentTurns, recalledFacts, maxOutputTokens)
             ExternalAiMode.GEMINI -> callGeminiApi(cfg, prompt, recentTurns, recalledFacts, maxOutputTokens)
+            ExternalAiMode.POLLINATIONS_FREE -> callPollinationsFree(prompt, recentTurns, recalledFacts, maxOutputTokens)
         }
+    }
+
+    private fun callPollinationsFree(
+        prompt: String,
+        recentTurns: List<ChatTurn>,
+        recalledFacts: List<String>,
+        maxOutputTokens: Int,
+    ): String {
+        val bodyJson = buildOpenAiRequestJson(
+            model = "openai",
+            userText = prompt,
+            recentTurns = recentTurns,
+            recalledFacts = recalledFacts,
+            maxTokens = maxOutputTokens,
+        )
+        val responseBody = postJson(POLLINATIONS_TEXT_ENDPOINT, bodyJson, emptyMap())
+        return parseOpenAiResponseJson(responseBody)
     }
 
     private fun callOpenAiCompatible(
@@ -118,12 +138,13 @@ class GeminiCloudClient(
     }
 
     companion object {
+        const val POLLINATIONS_TEXT_ENDPOINT = "https://text.pollinations.ai/openai"
         private val gson = Gson()
 
         fun buildSystemInstruction(recalledFacts: List<String>): String {
             val sb = StringBuilder(
-                "Ты Джарвис — умный, лаконичный и дружелюбный персональный ИИ-помощник на русском языке. " +
-                    "Отвечай чётко, естественно и по делу на русском языке."
+                "Ты — Джарвис (J.A.R.V.I.S.), персональный интеллектуальный ИИ-помощник в стиле помощника Тони Старка. " +
+                    "Общайся живо, умно, естественно и уважительно на грамотном русском языке, давая содержательные и полезные ответы."
             )
             if (recalledFacts.isNotEmpty()) {
                 sb.append("\n\nФакты из памяти пользователя:")

@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -31,7 +32,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,72 +42,47 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.jarvis.breeno.assistant.DownloadTaskState
 import com.jarvis.breeno.assistant.core.ExternalAiConfig
 import com.jarvis.breeno.assistant.core.ExternalAiMode
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.PiperVoicePack
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-private val CardBg = Color(0xCC111C2A)
-private val CyanAccent = Color(0xFF75E5FF)
+private val CardBg = Color(0xCC0C1628)
+private val CyanAccent = Color(0xFF00E5FF)
+private val GoldAccent = Color(0xFFFFB300)
 private val GreenReady = Color(0xFF34D399)
 private val MutedText = Color(0xFF9AAABD)
 
 @Composable
 fun AiModelsScreen(
     status: AiStackStatus,
+    downloadState: DownloadTaskState,
     llmCatalog: List<LocalLlmPack>,
     voiceCatalog: List<PiperVoicePack>,
-    onDownloadStarterBundle: suspend (onProgress: (String, Int) -> Unit) -> Unit,
-    onDownloadAsr: suspend (onProgress: (Int) -> Unit) -> Unit,
-    onDownloadVad: suspend (onProgress: (Int) -> Unit) -> Unit,
-    onDownloadVoice: suspend (String, (Int) -> Unit) -> Unit,
+    onDownloadStarterBundle: () -> Unit,
+    onDownloadAsr: () -> Unit,
+    onDownloadVad: () -> Unit,
+    onDownloadVoice: (String) -> Unit,
+    onCancelDownload: () -> Unit,
     onSelectVoice: (String) -> Unit,
     onDeleteVoice: (String) -> Unit,
     onTestVoice: () -> Unit,
-    onDownloadLlm: suspend (String, (Int, Long, Long) -> Unit) -> Unit,
+    onDownloadLlm: (String) -> Unit,
     onSelectLlm: (String) -> Unit,
     onDeleteLlm: suspend (String) -> Unit,
     onSaveExternalAi: (ExternalAiConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
-    var activeDownloadJob by remember { mutableStateOf<Job?>(null) }
-    var downloadLabel by remember { mutableStateOf<String?>(null) }
-    var downloadPercent by remember { mutableIntStateOf(0) }
-    var feedback by remember { mutableStateOf<String?>(null) }
+    var localFeedback by remember { mutableStateOf<String?>(null) }
 
     var extEnabled by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.enabled) }
     var extMode by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.mode) }
     var extUrl by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.baseUrl) }
     var extModel by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.modelName) }
     var extKey by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.apiKey) }
-
-    fun launchDownload(initialLabel: String, block: suspend () -> Unit) {
-        if (activeDownloadJob?.isActive == true) {
-            feedback = "Дождитесь завершения или отмените текущую загрузку"
-            return
-        }
-        downloadLabel = initialLabel
-        downloadPercent = 0
-        feedback = null
-        activeDownloadJob = scope.launch {
-            try {
-                block()
-                feedback = "Готово: $initialLabel"
-            } catch (_: CancellationException) {
-                feedback = "Загрузка отменена"
-            } catch (err: Throwable) {
-                feedback = "Ошибка загрузки: ${err.message ?: err.javaClass.simpleName}"
-            } finally {
-                downloadLabel = null
-                downloadPercent = 0
-            }
-        }
-    }
 
     Column(
         modifier = modifier
@@ -123,12 +98,12 @@ fun AiModelsScreen(
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "Настоящий офлайн-ИИ (llama.cpp + Qwen 2.5) и русский голос (Piper TTS) прямо на телефоне.",
+            text = "Загрузки продолжаются в фоне при сворачивании или переключении вкладок.",
             color = MutedText,
             style = MaterialTheme.typography.bodySmall,
         )
 
-        if (downloadLabel != null) {
+        if (downloadState.active) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xCC162436)),
                 shape = RoundedCornerShape(12.dp),
@@ -140,31 +115,74 @@ fun AiModelsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(downloadLabel!!, color = CyanAccent, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { activeDownloadJob?.cancel() }) {
+                        Text(
+                            text = downloadState.label,
+                            color = CyanAccent,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onCancelDownload) {
                             Icon(Icons.Default.Close, contentDescription = "Отменить загрузку", tint = Color(0xFFFF8A8A))
                         }
                     }
                     LinearProgressIndicator(
-                        progress = { (downloadPercent / 100f).coerceIn(0f, 1f) },
+                        progress = { (downloadState.percent / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         }
 
-        if (!feedback.isNullOrBlank()) {
+        val shownMsg = localFeedback ?: downloadState.message
+        if (!shownMsg.isNullOrBlank()) {
+            val isErr = localFeedback == null && downloadState.isError
             Text(
-                text = feedback!!,
-                color = if (feedback!!.startsWith("Ошибка")) Color(0xFFFF8A8A) else GreenReady,
+                text = shownMsg,
+                color = if (isErr) Color(0xFFFF8A8A) else GreenReady,
                 style = MaterialTheme.typography.labelMedium,
             )
         }
 
-        fun updateProgressOnMain(label: String? = null, percent: Int) {
-            scope.launch(Dispatchers.Main.immediate) {
-                if (label != null) downloadLabel = label
-                downloadPercent = percent
+        // 0. Instant 1-tap Smart Online AI (works immediately without waiting for 1-2 GB GGUF download)
+        val onlineFreeActive = status.externalAiConfig.enabled &&
+            status.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardBg),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Мгновенный умный онлайн-ИИ (без ключа)", color = GoldAccent, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (onlineFreeActive) {
+                        "✓ Включён: Джарвис отвечает с высокой скоростью и интеллектом через сеть."
+                    } else {
+                        "Работает сразу без API-ключей и гигабайтных загрузок (используется при выключенном/недоступном офлайн-мозге)."
+                    },
+                    color = if (onlineFreeActive) GreenReady else MutedText,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Button(
+                    onClick = {
+                        val next = ExternalAiConfig(
+                            enabled = !onlineFreeActive,
+                            mode = ExternalAiMode.POLLINATIONS_FREE,
+                            baseUrl = status.externalAiConfig.baseUrl,
+                            modelName = "openai",
+                            apiKey = status.externalAiConfig.apiKey,
+                        )
+                        onSaveExternalAi(next)
+                        localFeedback = if (!onlineFreeActive) "Онлайн-мозг Джарвиса включён" else "Онлайн-мозг отключён"
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (onlineFreeActive) Color(0xFF1F2937) else Color(0xFFB45309),
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null)
+                    Spacer(Modifier.padding(horizontal = 4.dp))
+                    Text(if (onlineFreeActive) "Отключить онлайн-мозг" else "Включить умный онлайн-ИИ сейчас")
+                }
             }
         }
 
@@ -176,7 +194,7 @@ fun AiModelsScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Быстрый старт: Полный офлайн Джарвис", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Полный офлайн Джарвис (без интернета)", color = Color.White, fontWeight = FontWeight.Bold)
                 Text(
                     text = "Слух: ${if (status.asrReady) "✓" else "✗"}  •  Голос: ${if (status.ttsVoiceReady) "✓" else "✗"}  •  VAD: ${if (status.vadReady) "✓" else "✗"}  •  Мозг: ${if (status.activeLlmId != null) "✓" else "✗"}",
                     color = if (starterComplete) GreenReady else MutedText,
@@ -184,19 +202,14 @@ fun AiModelsScreen(
                 )
                 if (!starterComplete) {
                     Button(
-                        onClick = {
-                            launchDownload("Полный офлайн-набор") {
-                                onDownloadStarterBundle { stage, pct ->
-                                    updateProgressOnMain(stage, pct)
-                                }
-                            }
-                        },
+                        onClick = onDownloadStarterBundle,
+                        enabled = !downloadState.active,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D4ED8)),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 4.dp))
-                        Text("Скачать всё для офлайн-работы (~520 МБ)")
+                        Text("Скачать базовый офлайн-набор (~520 МБ)")
                     }
                 }
             }
@@ -216,7 +229,11 @@ fun AiModelsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Русский голос Джарвиса (Piper TTS)", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("Сейчас: ${status.speakerLabel}", color = if (status.ttsVoiceReady) GreenReady else Color(0xFFFBBF24), style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            text = "Сейчас: ${status.speakerLabel}",
+                            color = if (status.ttsVoiceReady) GreenReady else Color(0xFFFBBF24),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                     OutlinedButton(onClick = onTestVoice) {
                         Icon(Icons.Default.VolumeUp, contentDescription = null)
@@ -235,7 +252,11 @@ fun AiModelsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(voice.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(voice.description, color = MutedText, style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                text = if (isInstalled) "✓ Проверен и готов" else voice.description,
+                                color = if (isInstalled) GreenReady else MutedText,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                         if (isInstalled) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -249,11 +270,10 @@ fun AiModelsScreen(
                                 }
                             }
                         } else {
-                            OutlinedButton(onClick = {
-                                launchDownload(voice.title) {
-                                    onDownloadVoice(voice.id) { pct -> updateProgressOnMain(percent = pct) }
-                                }
-                            }) {
+                            OutlinedButton(
+                                onClick = { onDownloadVoice(voice.id) },
+                                enabled = !downloadState.active,
+                            ) {
                                 Text("Скачать")
                             }
                         }
@@ -272,7 +292,7 @@ fun AiModelsScreen(
                 Text("Локальный ИИ-мозг (llama.cpp + Qwen 2.5)", color = Color.White, fontWeight = FontWeight.Bold)
                 Text(
                     text = if (status.nativeLlamaLoaded) {
-                        "Движок libjarvis_llama.so: готов к работе"
+                        "Движок libjarvis_llama.so (ARM64 dotprod+fp16): готов"
                     } else {
                         "Движок llama.cpp недоступен: ${status.nativeLlamaError ?: "ABI не поддерживается"}"
                     },
@@ -290,7 +310,11 @@ fun AiModelsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(pack.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(pack.description, color = MutedText, style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                text = if (isInstalled) "✓ Скачана и проверена SHA-256" else pack.description,
+                                color = if (isInstalled) GreenReady else MutedText,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                         if (isInstalled) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -304,15 +328,10 @@ fun AiModelsScreen(
                                 }
                             }
                         } else {
-                            OutlinedButton(onClick = {
-                                launchDownload(pack.title) {
-                                    onDownloadLlm(pack.id) { pct, dl, total ->
-                                        val dlMb = dl / (1024 * 1024)
-                                        val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
-                                        updateProgressOnMain("${pack.title}: $dlMb/$totalMb МБ ($pct%)", pct)
-                                    }
-                                }
-                            }) {
+                            OutlinedButton(
+                                onClick = { onDownloadLlm(pack.id) },
+                                enabled = !downloadState.active,
+                            ) {
                                 Text("Скачать")
                             }
                         }
@@ -336,12 +355,10 @@ fun AiModelsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Sherpa-ONNX Русский ASR", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text(if (status.asrReady) "Установлена (офлайн)" else "Не скачана", color = if (status.asrReady) GreenReady else MutedText, style = MaterialTheme.typography.labelSmall)
+                        Text(if (status.asrReady) "✓ Установлена (офлайн)" else "Не скачана", color = if (status.asrReady) GreenReady else MutedText, style = MaterialTheme.typography.labelSmall)
                     }
                     if (!status.asrReady) {
-                        OutlinedButton(onClick = {
-                            launchDownload("Русский ASR") { onDownloadAsr { pct -> updateProgressOnMain(percent = pct) } }
-                        }) { Text("Скачать") }
+                        OutlinedButton(onClick = onDownloadAsr, enabled = !downloadState.active) { Text("Скачать") }
                     }
                 }
 
@@ -352,18 +369,16 @@ fun AiModelsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Silero VAD (датчик окончания фразы, 2 МБ)", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text(if (status.vadReady) "Установлена (умный микрофон)" else "Не скачана (фикс. 5 сек)", color = if (status.vadReady) GreenReady else MutedText, style = MaterialTheme.typography.labelSmall)
+                        Text(if (status.vadReady) "✓ Установлена (умный микрофон)" else "Не скачана (фикс. 5 сек)", color = if (status.vadReady) GreenReady else MutedText, style = MaterialTheme.typography.labelSmall)
                     }
                     if (!status.vadReady) {
-                        OutlinedButton(onClick = {
-                            launchDownload("Silero VAD") { onDownloadVad { pct -> updateProgressOnMain(percent = pct) } }
-                        }) { Text("Скачать") }
+                        OutlinedButton(onClick = onDownloadVad, enabled = !downloadState.active) { Text("Скачать") }
                     }
                 }
             }
         }
 
-        // 5. Optional External AI / PC Bridge
+        // 5. Optional Custom External AI / PC Bridge
         Card(
             colors = CardDefaults.cardColors(containerColor = CardBg),
             shape = RoundedCornerShape(12.dp),
@@ -376,22 +391,27 @@ fun AiModelsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Внешний ИИ / Облако (опционально)", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("Запасной вариант при наличии сети (выкл. по умолчанию)", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                        Text("Свой сервер / Gemini API (опционально)", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Если хотите подключить свой ПК или личный ключ Gemini", color = MutedText, style = MaterialTheme.typography.labelSmall)
                     }
                     Switch(checked = extEnabled, onCheckedChange = { extEnabled = it })
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = extMode == ExternalAiMode.POLLINATIONS_FREE,
+                        onClick = { extMode = ExternalAiMode.POLLINATIONS_FREE },
+                        label = { Text("Без ключа") },
+                    )
                     FilterChip(
                         selected = extMode == ExternalAiMode.OPENAI_COMPATIBLE,
                         onClick = { extMode = ExternalAiMode.OPENAI_COMPATIBLE },
-                        label = { Text("OpenAI / Сервер") },
+                        label = { Text("OpenAI/ПК") },
                     )
                     FilterChip(
                         selected = extMode == ExternalAiMode.GEMINI,
                         onClick = { extMode = ExternalAiMode.GEMINI },
-                        label = { Text("Google Gemini") },
+                        label = { Text("Gemini") },
                     )
                 }
 
@@ -405,22 +425,24 @@ fun AiModelsScreen(
                     )
                 }
 
-                OutlinedTextField(
-                    value = extModel,
-                    onValueChange = { extModel = it },
-                    label = { Text(if (extMode == ExternalAiMode.GEMINI) "Модель (напр. gemini-2.0-flash)" else "Модель (напр. gpt-4o-mini)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (extMode != ExternalAiMode.POLLINATIONS_FREE) {
+                    OutlinedTextField(
+                        value = extModel,
+                        onValueChange = { extModel = it },
+                        label = { Text(if (extMode == ExternalAiMode.GEMINI) "Модель (напр. gemini-2.0-flash)" else "Модель (напр. gpt-4o-mini)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
-                OutlinedTextField(
-                    value = extKey,
-                    onValueChange = { extKey = it },
-                    label = { Text("API-ключ (хранится только локально на телефоне)") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                    OutlinedTextField(
+                        value = extKey,
+                        onValueChange = { extKey = it },
+                        label = { Text("API-ключ (хранится только локально)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
 
                 Button(
                     onClick = {
@@ -433,7 +455,7 @@ fun AiModelsScreen(
                                 apiKey = extKey,
                             )
                         )
-                        feedback = "Настройки внешнего ИИ сохранены"
+                        localFeedback = "Настройки внешнего ИИ сохранены"
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {

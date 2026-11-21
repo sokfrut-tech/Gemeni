@@ -8,6 +8,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.Process
+import com.jarvis.breeno.assistant.JarvisApp
 
 /**
  * Live Android/ColorOS runtime telemetry source.
@@ -23,10 +24,11 @@ class AndroidRuntimeSignalsSource(context: Context) : RuntimeSignalsSource {
     override fun snapshot(): RuntimeSignals {
         val memory = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memory)
-        val foreground = (activityManager.runningAppProcesses ?: emptyList()).any {
+        val processForeground = (activityManager.runningAppProcesses ?: emptyList()).any {
             it.pid == Process.myPid() &&
                 it.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
         }
+        val foreground = JarvisApp.isInForeground || processForeground
         val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching { powerManager.currentThermalStatus }.getOrDefault(Int.MAX_VALUE)
         } else Int.MAX_VALUE

@@ -63,6 +63,7 @@ class AuthorizedCloudReasoningProvider(
         if (cfg.mode == ExternalAiMode.OPENAI_COMPATIBLE && cfg.baseUrl.isBlank()) {
             return ProviderAvailability.Unavailable("Не задан URL сервера ИИ")
         }
+        // POLLINATIONS_FREE requires no API key or custom URL once enabled.
         return ProviderAvailability.Ready
     }
 

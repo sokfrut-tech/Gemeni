@@ -8,6 +8,7 @@ import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import com.jarvis.breeno.assistant.core.LlamaNativeBridge
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -79,6 +80,74 @@ class JarvisRuntimeSmokeTest {
         )
         assertNotNull("Android Settings package did not become the foreground UI", settingsPackage)
         saveUiEvidence("accessibility-settings")
+    }
+
+    @Test
+    fun nativeLlamaLibraryLoadsAndInitializesCleanly() {
+        assertTrue(
+            "libjarvis_llama.so failed to load on device/emulator: ${LlamaNativeBridge.loadError}",
+            LlamaNativeBridge.isNativeLibraryLoaded
+        )
+        LlamaNativeBridge.nativeBackendInit()
+    }
+
+    @Test
+    fun minimizeAndResumeDoesNotFreezeOnWhiteScreen() {
+        launchJarvis()
+        assertVisible(By.desc("Интерактивное энергетическое ядро Джарвиса"), "Orb missing before minimize")
+        assertVisible(By.text("Я РЯДОМ"), "Idle state missing before minimize")
+
+        device.pressHome()
+        device.wait(Until.gone(By.pkg(packageName)), 5_000)
+
+        // Relaunch WITHOUT CLEAR_TASK to simulate resuming the minimized app.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val resumeIntent = context.packageManager.getLaunchIntentForPackage(packageName)!!
+        resumeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        context.startActivity(resumeIntent)
+        assertTrue("Jarvis did not resume to foreground", device.wait(Until.hasObject(By.pkg(packageName)), 10_000))
+
+        assertVisible(By.desc("Интерактивное энергетическое ядро Джарвиса"), "Orb missing after resume (white screen regression)")
+        assertVisible(By.text("Я РЯДОМ"), "Idle state missing after resume")
+        saveUiEvidence("resumed-home")
+    }
+
+    @Test
+    fun textInputAnswersDeterministicQueryLive() {
+        launchJarvis()
+        val input = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5_000)
+        assertNotNull("Text query input field missing on Core tab", input)
+        input!!.text = "Сколько времени"
+
+        val sendBtn = device.wait(Until.findObject(By.desc("Отправить")), 5_000)
+        assertNotNull("Send button missing", sendBtn)
+        sendBtn!!.click()
+
+        assertTrue(
+            "Jarvis did not answer time query in the dialogue feed",
+            device.wait(Until.hasObject(By.textContains("Сейчас ")), 8_000)
+        )
+        saveUiEvidence("text-query-answer")
+    }
+
+    @Test
+    fun modelsAndStudioTabsSwitchCleanly() {
+        launchJarvis()
+
+        val modelsTab = device.wait(Until.findObject(By.text("Модели")), 5_000)
+        assertNotNull("Модели tab missing", modelsTab)
+        modelsTab!!.click()
+        assertVisible(By.text("МОДЕЛИ И ГОЛОС ДЖАРВИСА"), "Models screen did not open")
+
+        val studioTab = device.wait(Until.findObject(By.text("Студия")), 5_000)
+        assertNotNull("Студия tab missing", studioTab)
+        studioTab!!.click()
+        assertVisible(By.text("СТУДИЯ ИИ — КАРТИНКИ И ВИДЕО"), "Studio screen did not open")
+
+        val coreTab = device.wait(Until.findObject(By.text("Ядро")), 5_000)
+        assertNotNull("Ядро tab missing", coreTab)
+        coreTab!!.click()
+        assertVisible(By.text("Я РЯДОМ"), "Did not return cleanly to Core tab")
     }
 
     private fun findAfterScroll(selector: BySelector): UiObject2? {

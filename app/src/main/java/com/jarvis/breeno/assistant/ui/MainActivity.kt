@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Grain
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -40,6 +42,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -50,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,23 +62,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.jarvis.breeno.assistant.JarvisApp
 import com.jarvis.breeno.assistant.control.JarvisControlCenterStore
 import com.jarvis.breeno.assistant.control.JarvisEventLevel
 import com.jarvis.breeno.assistant.core.AndroidRuntimeSignalsSource
+import com.jarvis.breeno.assistant.core.ExternalAiMode
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenConfigStore
+import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
 import kotlinx.coroutines.CancellationException
@@ -84,10 +94,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Background = Color(0xFF070B12)
-private val NavBarBg = Color(0xFF0C1420)
-private val PanelCard = Color(0xCC111C2A)
-private val Cyan = Color(0xFF75E5FF)
+private val Background = Color(0xFF04070F)
+private val NavBarBg = Color(0xFF080E1A)
+private val PanelCard = Color(0xCC0C1628)
+private val Cyan = Color(0xFF00E5FF)
+private val Gold = Color(0xFFFFB300)
 private val Muted = Color(0xFF9AAABD)
 
 private enum class JarvisTab(val title: String) {
@@ -99,6 +110,7 @@ private enum class JarvisTab(val title: String) {
 }
 
 class MainActivity : ComponentActivity() {
+    private lateinit var jarvisApp: JarvisApp
     private lateinit var runtime: JarvisRuntimeController
     private lateinit var signalsSource: AndroidRuntimeSignalsSource
     private lateinit var controlCenter: JarvisControlCenterStore
@@ -110,12 +122,14 @@ class MainActivity : ComponentActivity() {
     private var modelConsentSink: (() -> Unit)? = null
     private var statusSink: ((String) -> Unit)? = null
     private var busySink: ((Boolean) -> Unit)? = null
-    private var replySink: ((String) -> Unit)? = null
+    private var replySink: ((String?) -> Unit)? = null
+    private var dialogueSink: ((List<DialogueMessage>) -> Unit)? = null
     private var audioRmsSink: ((Float) -> Unit)? = null
     private var orbModeSink: ((JarvisOrbMode) -> Unit)? = null
     private var tabSink: ((JarvisTab) -> Unit)? = null
     private var stackStatusSink: ((AiStackStatus) -> Unit)? = null
     private var pendingStudioSink: ((Pair<GeneratedMediaType, String>) -> Unit)? = null
+    private var autoResumeCheck: (() -> Boolean)? = null
     private var listeningJob: Job? = null
     private var modelCheckJob: Job? = null
 
@@ -133,9 +147,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        jarvisApp = application as JarvisApp
         runtime = JarvisRuntimeController(this)
         signalsSource = AndroidRuntimeSignalsSource(this)
         controlCenter = JarvisControlCenterStore()
+
+        jarvisApp.onDownloadStateUpdated = { refreshTelemetry() }
 
         val moviesBase = getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir
         saveVideoManager = SaveVideoManager(
@@ -171,8 +188,15 @@ class MainActivity : ComponentActivity() {
             }
         }
         refreshTelemetry()
+        refreshDialogueFeed()
 
         setContent { JarvisTheme { JarvisAppRoot() } }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshTelemetry()
+        refreshDialogueFeed()
     }
 
     private fun refreshTelemetry() {
@@ -182,6 +206,13 @@ class MainActivity : ComponentActivity() {
             controlCenter.updateDeviceSignals(signals, localAsrReady = asrReady)
             val stack = runtime.currentStackStatus()
             runOnUiThread { stackStatusSink?.invoke(stack) }
+        }
+    }
+
+    private fun refreshDialogueFeed() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val recent = runCatching { runtime.recentDialogue(10) }.getOrDefault(emptyList())
+            runOnUiThread { dialogueSink?.invoke(recent) }
         }
     }
 
@@ -240,8 +271,8 @@ class MainActivity : ComponentActivity() {
                         onTokenStream = { partial -> runOnUiThread { replySink?.invoke(partial) } },
                     )
                 }
-                if (text.isNotBlank() && replySink == null) {
-                    statusSink?.invoke("Распознано: $text")
+                if (text.isNotBlank()) {
+                    refreshDialogueFeed()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -253,6 +284,7 @@ class MainActivity : ComponentActivity() {
             } finally {
                 audioRmsSink?.invoke(0f)
                 busySink?.invoke(false)
+                replySink?.invoke(null)
                 listeningJob = null
             }
         }
@@ -270,6 +302,7 @@ class MainActivity : ComponentActivity() {
                     onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
                     onTokenStream = { partial -> runOnUiThread { replySink?.invoke(partial) } },
                 )
+                refreshDialogueFeed()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
@@ -278,6 +311,7 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Ошибка: $msg")
             } finally {
                 busySink?.invoke(false)
+                replySink?.invoke(null)
                 listeningJob = null
             }
         }
@@ -289,6 +323,7 @@ class MainActivity : ComponentActivity() {
         listeningJob?.cancel()
         runtime.cancelActiveWork()
         audioRmsSink?.invoke(0f)
+        replySink?.invoke(null)
         orbModeSink?.invoke(JarvisOrbMode.IDLE)
         statusSink?.invoke("Прослушивание остановлено")
     }
@@ -312,14 +347,18 @@ class MainActivity : ComponentActivity() {
     private fun openSettings() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
 
     override fun onDestroy() {
+        jarvisApp.onDownloadStateUpdated = null
         statusSink = null
         busySink = null
         replySink = null
+        dialogueSink = null
+        modelConsentSink = null
         audioRmsSink = null
         orbModeSink = null
         tabSink = null
         stackStatusSink = null
         pendingStudioSink = null
+        autoResumeCheck = null
         modelCheckJob?.cancel()
         modelCheckJob = null
         listeningJob?.cancel()
@@ -338,8 +377,10 @@ class MainActivity : ComponentActivity() {
         var busy by remember { mutableStateOf(false) }
         var speaking by remember { mutableStateOf(false) }
         var muted by remember { mutableStateOf(runtime.isMuted()) }
+        var continuousDialogue by remember { mutableStateOf(false) }
         var showModelConsent by remember { mutableStateOf(false) }
-        var transcript by remember { mutableStateOf("Готов к работе. Коснитесь ядра или напишите запрос.") }
+        var streamingReply by remember { mutableStateOf<String?>(null) }
+        var dialogueFeed by remember { mutableStateOf(emptyList<DialogueMessage>()) }
         var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
         var stackStatus by remember { mutableStateOf(runtime.currentStackStatus()) }
         var pendingStudioRequest by remember { mutableStateOf<Pair<GeneratedMediaType, String>?>(null) }
@@ -347,6 +388,7 @@ class MainActivity : ComponentActivity() {
         val saveVideoTasks by saveVideoManager.tasks.collectAsState()
         val studioItems by mediaGenerator.items.collectAsState()
         val controlSnapshot by controlCenter.snapshot.collectAsState()
+        val downloadState by jarvisApp.downloads.state.collectAsState()
 
         DisposableEffect(Unit) {
             modelConsentSink = { showModelConsent = true }
@@ -355,8 +397,10 @@ class MainActivity : ComponentActivity() {
             tabSink = { tab -> activeTab = tab }
             stackStatusSink = { next -> stackStatus = next }
             busySink = { isBusy -> busy = isBusy }
-            replySink = { text -> transcript = text }
+            replySink = { text -> streamingReply = text }
+            dialogueSink = { list -> dialogueFeed = list }
             pendingStudioSink = { req -> pendingStudioRequest = req }
+            autoResumeCheck = { continuousDialogue && activeTab == JarvisTab.CORE }
 
             runtime.onAudioLevelChanged = { rms -> runOnUiThread { audioRmsSink?.invoke(rms) } }
             runtime.onOrbModeChanged = { mode -> runOnUiThread { orbModeSink?.invoke(mode) } }
@@ -364,6 +408,11 @@ class MainActivity : ComponentActivity() {
             runtime.onSpeakerError = { errMsg ->
                 controlCenter.logEvent("ГОЛОС", "Ошибка озвучки", errMsg, JarvisEventLevel.ERROR)
                 runOnUiThread { statusSink?.invoke(errMsg) }
+            }
+            runtime.onSpeakingFinished = {
+                if (autoResumeCheck?.invoke() == true && runtime.isRussianAsrReady()) {
+                    runOnUiThread { requestAndListen() }
+                }
             }
             runtime.onRequestMediaGeneration = { type, prompt ->
                 runOnUiThread {
@@ -385,6 +434,7 @@ class MainActivity : ComponentActivity() {
             }
             runtime.onCommandCompleted = { spoken, response ->
                 controlCenter.recordVoiceCommand(spoken, response)
+                refreshDialogueFeed()
             }
             runtime.setSpeechStateListener { active -> runOnUiThread { speaking = active } }
             statusSink = { value ->
@@ -413,16 +463,19 @@ class MainActivity : ComponentActivity() {
                 statusSink = null
                 busySink = null
                 replySink = null
+                dialogueSink = null
                 modelConsentSink = null
                 audioRmsSink = null
                 orbModeSink = null
                 tabSink = null
                 stackStatusSink = null
                 pendingStudioSink = null
+                autoResumeCheck = null
                 runtime.onAudioLevelChanged = null
                 runtime.onOrbModeChanged = null
                 runtime.onStackStatusChanged = null
                 runtime.onSpeakerError = null
+                runtime.onSpeakingFinished = null
                 runtime.onRequestMediaGeneration = null
                 runtime.onNavigateTab = null
                 runtime.onCommandCompleted = null
@@ -511,9 +564,12 @@ class MainActivity : ComponentActivity() {
                         speaking = speaking,
                         busy = busy,
                         muted = muted,
+                        continuousDialogue = continuousDialogue,
                         status = status,
-                        transcript = transcript,
+                        streamingReply = streamingReply,
+                        dialogueFeed = dialogueFeed,
                         stackStatus = stackStatus,
+                        downloadState = downloadState,
                         activeTasksCount = controlSnapshot.activeTasks,
                         onOrbClick = { if (busy || listening) stopListening() else requestAndListen() },
                         onSendText = { query -> submitTextQuery(query) },
@@ -521,6 +577,7 @@ class MainActivity : ComponentActivity() {
                             muted = !muted
                             runtime.setMuted(muted)
                         },
+                        onToggleContinuous = { continuousDialogue = !continuousDialogue },
                         onOpenModels = {
                             activeTab = JarvisTab.MODELS
                             refreshTelemetry()
@@ -530,16 +587,44 @@ class MainActivity : ComponentActivity() {
 
                     JarvisTab.MODELS -> AiModelsScreen(
                         status = stackStatus,
+                        downloadState = downloadState,
                         llmCatalog = runtime.llmModels.catalog(),
                         voiceCatalog = runtime.ttsModels.catalog(),
-                        onDownloadStarterBundle = { onProg -> runtime.downloadOfflineStarterBundle(onProg) },
-                        onDownloadAsr = { onProg -> runtime.downloadAsr(onProg) },
-                        onDownloadVad = { onProg -> runtime.downloadVad(onProg) },
-                        onDownloadVoice = { id, onProg -> runtime.downloadTtsVoice(id, onProg) },
+                        onDownloadStarterBundle = {
+                            jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
+                                runtime.downloadOfflineStarterBundle { stage, pct -> update(stage, pct) }
+                            }
+                        },
+                        onDownloadAsr = {
+                            jarvisApp.downloads.start("Русский слух (ASR)") { update ->
+                                runtime.downloadAsr { pct -> update(null, pct) }
+                            }
+                        },
+                        onDownloadVad = {
+                            jarvisApp.downloads.start("Silero VAD") { update ->
+                                runtime.downloadVad { pct -> update(null, pct) }
+                            }
+                        },
+                        onDownloadVoice = { id ->
+                            val title = runtime.ttsModels.findVoice(id)?.title ?: id
+                            jarvisApp.downloads.start(title) { update ->
+                                runtime.downloadTtsVoice(id) { pct -> update(null, pct) }
+                            }
+                        },
+                        onCancelDownload = { jarvisApp.downloads.cancel() },
                         onSelectVoice = { id -> runtime.selectTtsVoice(id) },
                         onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
                         onTestVoice = { runtime.testRussianVoice() },
-                        onDownloadLlm = { id, onProg -> runtime.downloadLlmPack(id, onProg) },
+                        onDownloadLlm = { id ->
+                            val title = runtime.llmModels.findPack(id)?.title ?: id
+                            jarvisApp.downloads.start(title) { update ->
+                                runtime.downloadLlmPack(id) { pct, dl, total ->
+                                    val dlMb = dl / (1024 * 1024)
+                                    val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
+                                    update("$title: $dlMb/$totalMb МБ ($pct%)", pct)
+                                }
+                            }
+                        },
                         onSelectLlm = { id -> runtime.selectLlmPack(id) },
                         onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
                         onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
@@ -584,22 +669,32 @@ class MainActivity : ComponentActivity() {
         speaking: Boolean,
         busy: Boolean,
         muted: Boolean,
+        continuousDialogue: Boolean,
         status: String,
-        transcript: String,
+        streamingReply: String?,
+        dialogueFeed: List<DialogueMessage>,
         stackStatus: AiStackStatus,
+        downloadState: com.jarvis.breeno.assistant.DownloadTaskState,
         activeTasksCount: Int,
         onOrbClick: () -> Unit,
         onSendText: (String) -> Unit,
         onToggleMute: () -> Unit,
+        onToggleContinuous: () -> Unit,
         onOpenModels: () -> Unit,
         onOpenSettings: () -> Unit,
     ) {
         var textQuery by remember { mutableStateOf("") }
+        val dialogueScroll = rememberScrollState()
+
+        LaunchedEffect(dialogueFeed.size, streamingReply) {
+            dialogueScroll.animateScrollTo(dialogueScroll.maxValue)
+        }
 
         val brainBadge = when {
             stackStatus.activeLlmId != null -> "QWEN ОФЛАЙН"
+            stackStatus.externalAiConfig.enabled && stackStatus.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE -> "ОНЛАЙН ИИ"
             stackStatus.externalAiConfig.enabled -> "ВНЕШНИЙ ИИ"
-            else -> "НУЖНЫ МОДЕЛИ"
+            else -> "НАСТРОИТЬ ИИ"
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -621,13 +716,20 @@ class MainActivity : ComponentActivity() {
                         color = if (stackStatus.activeLlmId != null || stackStatus.externalAiConfig.enabled) {
                             Color(0xFF34D399)
                         } else {
-                            Color(0xFFFBBF24)
+                            Gold
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clickable(onClick = onOpenModels),
                     )
                     Row {
+                        IconButton(onClick = onToggleContinuous) {
+                            Icon(
+                                imageVector = Icons.Default.RecordVoiceOver,
+                                contentDescription = if (continuousDialogue) "Выключить живой диалог" else "Включить живой диалог",
+                                tint = if (continuousDialogue) Gold else Muted,
+                            )
+                        }
                         IconButton(onClick = onToggleMute) {
                             Icon(
                                 imageVector = if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
@@ -638,6 +740,27 @@ class MainActivity : ComponentActivity() {
                         IconButton(onClick = onOpenSettings) {
                             Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Muted)
                         }
+                    }
+                }
+
+                if (downloadState.active) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenModels)
+                            .padding(bottom = 2.dp),
+                    ) {
+                        Text(
+                            text = "${downloadState.label} (${downloadState.percent}%)",
+                            color = Cyan,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        LinearProgressIndicator(
+                            progress = { (downloadState.percent / 100f).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
 
@@ -660,7 +783,7 @@ class MainActivity : ComponentActivity() {
                             else -> JarvisOrbMode.IDLE
                         },
                         audioRms = audioRms,
-                        orbSize = if (compact) 156.dp else 208.dp,
+                        orbSize = if (compact) 152.dp else 204.dp,
                     )
                 }
 
@@ -673,7 +796,7 @@ class MainActivity : ComponentActivity() {
                         busy -> "Я ДУМАЮ"
                         else -> "Я РЯДОМ"
                     },
-                    color = if (listening) Cyan else Color(0xFFE5F3FF),
+                    color = if (listening) Cyan else if (speaking) Gold else Color(0xFFE5F3FF),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleLarge,
                 )
@@ -686,7 +809,7 @@ class MainActivity : ComponentActivity() {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp),
+                        .padding(top = 2.dp),
                 )
 
                 Card(
@@ -695,18 +818,58 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 6.dp, bottom = 4.dp)
-                        .heightIn(max = if (compact) 68.dp else 110.dp),
+                        .heightIn(min = 44.dp, max = if (compact) 74.dp else 118.dp),
                 ) {
-                    Text(
-                        text = transcript,
-                        color = Color(0xFFDCE7F2),
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(dialogueScroll)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (dialogueFeed.isEmpty() && streamingReply.isNullOrBlank()) {
+                            Text(
+                                text = "J.A.R.V.I.S. готов. Коснитесь сферы или напишите запрос ниже.",
+                                color = Muted,
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            dialogueFeed.takeLast(4).forEach { msg ->
+                                val isUser = msg.role == "user"
+                                Text(
+                                    text = buildAnnotatedString {
+                                        withStyle(
+                                            SpanStyle(
+                                                color = if (isUser) Gold else Cyan,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        ) {
+                                            append(if (isUser) "Вы: " else "Джарвис: ")
+                                        }
+                                        withStyle(SpanStyle(color = Color(0xFFDCE7F2))) {
+                                            append(msg.content)
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            if (!streamingReply.isNullOrBlank()) {
+                                Text(
+                                    text = buildAnnotatedString {
+                                        withStyle(SpanStyle(color = Cyan, fontWeight = FontWeight.SemiBold)) {
+                                            append("Джарвис: ")
+                                        }
+                                        withStyle(SpanStyle(color = Color.White)) {
+                                            append(streamingReply)
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Text(
