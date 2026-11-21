@@ -67,9 +67,14 @@ object JarvisChatPromptBuilder {
     ): PromptTemplateFormat {
         if (selected != PromptTemplateFormat.AUTO) return selected
         val hint = "${packId.lowercase()} ${fileName.lowercase()} ${architecture.lowercase()}"
+        if (hint.contains("hermes") || hint.contains("dolphin") || hint.contains("qwen")) {
+            return PromptTemplateFormat.CHATML
+        }
         val looksLlama3 = hint.contains("stheno") ||
-            (hint.contains("llama-3") || hint.contains("llama3") || hint.contains("l3-")) ||
-            (hint.contains("llama") && !hint.contains("hermes") && !hint.contains("dolphin") && !hint.contains("3.2"))
+            hint.contains("llama-3") ||
+            hint.contains("llama3") ||
+            hint.contains("l3-") ||
+            architecture.equals("llama", ignoreCase = true)
         return if (looksLlama3) PromptTemplateFormat.LLAMA3 else PromptTemplateFormat.CHATML
     }
 
