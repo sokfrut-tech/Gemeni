@@ -18,7 +18,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStreamReader
+import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -27,6 +31,7 @@ import kotlin.random.Random
 
 enum class MediaGenBackend(val title: String) {
     POLLINATIONS_ONLINE("Встроенный онлайн-генератор (без ключа)"),
+    LOCAL_DREAM_NPU("Офлайн на телефоне (Local Dream NPU)"),
     CUSTOM_COMFYUI("Свой ПК (ComfyUI API)"),
     CUSTOM_A1111_SD("Свой ПК (Stable Diffusion / A1111 WebUI)"),
     CUSTOM_OPENAI_IMAGES("Свой сервер (OpenAI Images API)"),
@@ -50,6 +55,7 @@ data class MediaGenConfig(
     val comfyWanVae: String = JarvisMediaGenerator.DEFAULT_WAN_VAE,
     val comfyWanTurboLora: Boolean = true,
     val comfyVideoFrames: Int = 49,
+    val localDreamUrl: String = JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL,
 )
 
 data class ComfyImageRef(
@@ -95,6 +101,8 @@ class MediaGenConfigStore(context: Context) {
                 ?: JarvisMediaGenerator.DEFAULT_WAN_VAE,
             comfyWanTurboLora = prefs.getBoolean(KEY_COMFY_WAN_TURBO, true),
             comfyVideoFrames = prefs.getInt(KEY_COMFY_VIDEO_FRAMES, 49).coerceIn(17, 121),
+            localDreamUrl = prefs.getString(KEY_LOCAL_DREAM_URL, JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL)
+                ?: JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL,
         )
     }
 
@@ -117,6 +125,7 @@ class MediaGenConfigStore(context: Context) {
             .putString(KEY_COMFY_WAN_VAE, config.comfyWanVae.trim())
             .putBoolean(KEY_COMFY_WAN_TURBO, config.comfyWanTurboLora)
             .putInt(KEY_COMFY_VIDEO_FRAMES, config.comfyVideoFrames.coerceIn(17, 121))
+            .putString(KEY_LOCAL_DREAM_URL, config.localDreamUrl.trim().ifBlank { JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL })
             .apply()
     }
 
@@ -138,6 +147,7 @@ class MediaGenConfigStore(context: Context) {
         private const val KEY_COMFY_WAN_VAE = "media_comfy_wan_vae"
         private const val KEY_COMFY_WAN_TURBO = "media_comfy_wan_turbo"
         private const val KEY_COMFY_VIDEO_FRAMES = "media_comfy_video_frames"
+        private const val KEY_LOCAL_DREAM_URL = "media_local_dream_url"
     }
 }
 
@@ -161,8 +171,22 @@ sealed interface OpenAiImagePayload {
     data class RemoteUrl(val url: String) : OpenAiImagePayload
 }
 
+sealed interface LocalDreamSseEvent {
+    data class Progress(val step: Int, val totalSteps: Int) : LocalDreamSseEvent
+    data class Complete(
+        val base64Image: String,
+        val format: String,
+        val width: Int,
+        val height: Int,
+        val channels: Int,
+    ) : LocalDreamSseEvent
+    data class Error(val message: String) : LocalDreamSseEvent
+    data object Done : LocalDreamSseEvent
+}
+
 /**
  * Generates images and animated MP4 videos on the phone or via self-hosted PC ComfyUI:
+ * - On-device Qualcomm NPU image generation via Local Dream (http://127.0.0.1:8081/generate SSE).
  * - Single-window ComfyUI pipeline supports CyberRealistic Pony XL (Clip Skip 2) -> Wan 2.2 I2V-14B.
  * - Also supports Automatic1111/Forge WebUI, OpenAI Images, Pollinations images, and on-device MediaCodec MP4.
  */
@@ -171,6 +195,7 @@ class JarvisMediaGenerator(
     private val historyFile: File,
     private val configStore: MediaGenConfigStore,
     private val onEvent: ((title: String, detail: String, isError: Boolean) -> Unit)? = null,
+    private val beforeHeavyOnDeviceGen: (suspend () -> Unit)? = null,
 ) {
     private val gson = Gson()
     private val _items = MutableStateFlow(loadHistory())
@@ -345,6 +370,7 @@ class JarvisMediaGenerator(
                 val url = buildPollinationsImageUrl(prompt, style, width, height, seed, cfg.modelName)
                 getBytes(url, emptyMap(), readTimeoutMs = 45_000)
             }
+            MediaGenBackend.LOCAL_DREAM_NPU -> fetchFromLocalDreamNpu(cfg, prompt, style, width, height, seed, onProgress)
             MediaGenBackend.CUSTOM_COMFYUI -> fetchFromComfyUi(cfg, prompt, style, width, height, seed, onProgress)
             MediaGenBackend.CUSTOM_A1111_SD -> {
                 val rawUrl = cfg.customImageUrl.trim()
@@ -376,6 +402,108 @@ class JarvisMediaGenerator(
                     is OpenAiImagePayload.RemoteUrl -> getBytes(payload.url, emptyMap(), readTimeoutMs = 45_000)
                 }
             }
+        }
+    }
+
+    private suspend fun fetchFromLocalDreamNpu(
+        cfg: MediaGenConfig,
+        prompt: String,
+        style: String,
+        width: Int,
+        height: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+    ): ByteArray {
+        onProgress("Освобождаю память перед NPU рендером…")
+        runCatching { beforeHeavyOnDeviceGen?.invoke() }
+
+        val targetUrl = normalizeLocalDreamGenerateUrl(cfg.localDreamUrl)
+        val reqJson = buildLocalDreamRequestJson(
+            prompt = prompt,
+            negativePrompt = cfg.negativePrompt.ifBlank { DEFAULT_LOCAL_DREAM_NEGATIVE },
+            style = style,
+            width = width,
+            height = height,
+            steps = cfg.steps.coerceIn(8, 50),
+            cfgScale = cfg.cfgScale,
+            seed = seed,
+        )
+
+        onProgress("Подключаюсь к Local Dream NPU…")
+        val conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            instanceFollowRedirects = false
+            connectTimeout = 5_000
+            readTimeout = 180_000
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "text/event-stream, application/json")
+            setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+        }
+
+        try {
+            conn.outputStream.use { it.write(reqJson.toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                val errBody = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                error("Local Dream NPU вернул HTTP $code: ${errBody.take(140)}")
+            }
+
+            BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { reader ->
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val line = reader.readLine() ?: break
+                    when (val ev = parseLocalDreamSseEvent(line)) {
+                        is LocalDreamSseEvent.Progress ->
+                            onProgress("Local Dream NPU: шаг ${ev.step}/${ev.totalSteps}…")
+                        is LocalDreamSseEvent.Error ->
+                            error("Local Dream NPU: ${ev.message}")
+                        is LocalDreamSseEvent.Complete ->
+                            return decodeLocalDreamCompleteImage(ev)
+                        LocalDreamSseEvent.Done -> break
+                        null -> Unit
+                    }
+                }
+            }
+            error("Local Dream NPU завершил поток без изображения")
+        } catch (_: ConnectException) {
+            error("Local Dream NPU не запущен (127.0.0.1:8081). Откройте приложение Local Dream, загрузите SD 1.5 модель (Absolute Reality / DreamShaper / Anything V5) и оставьте его в фоне.")
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun decodeLocalDreamCompleteImage(event: LocalDreamSseEvent.Complete): ByteArray {
+        val cleanB64 = event.base64Image.substringAfter("base64,")
+        val rawBytes = Base64.decode(cleanB64, Base64.DEFAULT)
+        if (!event.format.equals("raw", ignoreCase = true)) {
+            return rawBytes
+        }
+        val channels = event.channels.coerceIn(3, 4)
+        val w = event.width.coerceAtLeast(1)
+        val h = event.height.coerceAtLeast(1)
+        val expectedBytes = w.toLong() * h * channels
+        check(expectedBytes > 0L && rawBytes.size >= expectedBytes) {
+            "Local Dream вернул неполный RAW-буфер (${rawBytes.size} из $expectedBytes Б)"
+        }
+        val pixels = IntArray(w * h)
+        var p = 0
+        for (i in pixels.indices) {
+            val r = rawBytes[p++].toInt() and 0xFF
+            val g = rawBytes[p++].toInt() and 0xFF
+            val b = rawBytes[p++].toInt() and 0xFF
+            val a = if (channels == 4) rawBytes[p++].toInt() and 0xFF else 0xFF
+            pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        }
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        return try {
+            bmp.setPixels(pixels, 0, w, 0, 0, w, h)
+            ByteArrayOutputStream().use { out ->
+                bmp.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                out.toByteArray()
+            }
+        } finally {
+            bmp.recycle()
         }
     }
 
@@ -616,6 +744,8 @@ class JarvisMediaGenerator(
     }
 
     companion object {
+        const val DEFAULT_LOCAL_DREAM_URL = "http://127.0.0.1:8081"
+        const val DEFAULT_LOCAL_DREAM_NEGATIVE = "bad anatomy, extra fingers, deformed, blurry, low quality, worst quality"
         const val DEFAULT_PONY_CHECKPOINT = "CyberRealisticPony_V18.0_F16.safetensors"
         const val DEFAULT_PONY_NEGATIVE = "score_6, score_5, score_4, worst quality, low quality, lowres, bad anatomy, bad hands, signature, watermark"
         const val DEFAULT_WAN_HIGH_MODEL = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
@@ -628,6 +758,75 @@ class JarvisMediaGenerator(
 
         private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mov", "mkv")
         private val gson = Gson()
+
+        fun normalizeLocalDreamGenerateUrl(rawUrl: String): String {
+            val clean = rawUrl.trim().ifBlank { DEFAULT_LOCAL_DREAM_URL }.trimEnd('/')
+            return if (clean.endsWith("/generate", ignoreCase = true)) {
+                clean
+            } else {
+                "$clean/generate"
+            }
+        }
+
+        fun buildLocalDreamRequestJson(
+            prompt: String,
+            negativePrompt: String = DEFAULT_LOCAL_DREAM_NEGATIVE,
+            style: String = "Фото",
+            width: Int = 512,
+            height: Int = 512,
+            steps: Int = 24,
+            cfgScale: Float = 7.0f,
+            seed: Int = 42,
+        ): String {
+            val safeW = ((width.coerceIn(384, 768) + 32) / 64) * 64
+            val safeH = ((height.coerceIn(384, 768) + 32) / 64) * 64
+            val root = JsonObject().apply {
+                addProperty("prompt", "${prompt.trim()}, ${styleSuffix(style)}")
+                addProperty("negative_prompt", negativePrompt.trim().ifBlank { DEFAULT_LOCAL_DREAM_NEGATIVE })
+                addProperty("steps", steps.coerceIn(4, 60))
+                addProperty("cfg", cfgScale.coerceIn(1.0f, 20.0f))
+                addProperty("width", safeW)
+                addProperty("height", safeH)
+                addProperty("seed", seed.coerceAtLeast(1))
+                addProperty("scheduler", "dpm")
+                addProperty("show_diffusion_process", false)
+                addProperty("output_format", "jpeg")
+            }
+            return gson.toJson(root)
+        }
+
+        fun parseLocalDreamSseEvent(line: String): LocalDreamSseEvent? {
+            val trimmed = line.trim()
+            if (!trimmed.startsWith("data:")) return null
+            val payload = trimmed.removePrefix("data:").trim()
+            if (payload.isEmpty()) return null
+            if (payload == "[DONE]") return LocalDreamSseEvent.Done
+
+            return runCatching {
+                val obj = JsonParser.parseString(payload).asJsonObject
+                when (obj.get("type")?.asString?.lowercase()) {
+                    "progress" -> LocalDreamSseEvent.Progress(
+                        step = obj.get("step")?.asInt ?: 0,
+                        totalSteps = (obj.get("total_steps")?.asInt ?: 1).coerceAtLeast(1),
+                    )
+                    "complete" -> {
+                        val b64 = obj.get("image")?.asString?.takeIf { it.isNotBlank() }
+                            ?: return@runCatching LocalDreamSseEvent.Error("Пустое изображение в ответе Local Dream")
+                        LocalDreamSseEvent.Complete(
+                            base64Image = b64,
+                            format = obj.get("format")?.asString ?: "raw",
+                            width = obj.get("width")?.asInt ?: 512,
+                            height = obj.get("height")?.asInt ?: 512,
+                            channels = obj.get("channels")?.asInt ?: 3,
+                        )
+                    }
+                    "error" -> LocalDreamSseEvent.Error(
+                        obj.get("message")?.asString ?: obj.get("error")?.asString ?: "Ошибка Local Dream"
+                    )
+                    else -> null
+                }
+            }.getOrNull()
+        }
 
         private fun styleSuffix(style: String): String = when (style.lowercase()) {
             "фото" -> "photorealistic, ultra detailed, 8k, natural lighting"

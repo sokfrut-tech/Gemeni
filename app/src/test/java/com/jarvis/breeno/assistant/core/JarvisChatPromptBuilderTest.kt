@@ -28,10 +28,10 @@ class JarvisChatPromptBuilderTest {
 
     @Test
     fun sanitizesStopTokensFromModelOutput() {
-        val dirty = "  Здравствуйте! Чем могу помочь?<|im_end|><|endoftext|><|eot_id|></s>  "
+        val dirty = "  Здравствуйте! Чем могу помочь?<|im_end|><|endoftext|><|eot_id|><|end_of_text|></s>  "
         assertEquals("Здравствуйте! Чем могу помочь?", JarvisChatPromptBuilder.sanitizeOutput(dirty))
         assertFalse(JarvisChatPromptBuilder.sanitizeOutput("Ответ<|im_start|>assistant").contains("<|im_start|>"))
-        assertFalse(JarvisChatPromptBuilder.sanitizeOutput("Ответ<|start_header_id|>user").contains("<|start_header_id|>"))
+        assertFalse(JarvisChatPromptBuilder.sanitizeOutput("Ответ<|start_header_id|>user<|end_header_id|>").contains("<|end_header_id|>"))
     }
 
     @Test
@@ -42,5 +42,50 @@ class JarvisChatPromptBuilderTest {
         )
         assertTrue(prompt.contains("Dolphin / Hermes") || prompt.contains("без нравоучений"))
         assertFalse(prompt.contains("Тони Старка"))
+    }
+
+    @Test
+    fun buildsLlama3PromptAndResolvesTemplateAutoDetection() {
+        assertEquals(
+            PromptTemplateFormat.LLAMA3,
+            JarvisChatPromptBuilder.resolveTemplate(
+                PromptTemplateFormat.AUTO,
+                "l3-8b-stheno-v3.2-q3_k_m",
+                "L3-8B-Stheno-v3.2-Q3_K_M.gguf",
+                "llama",
+            ),
+        )
+        assertEquals(
+            PromptTemplateFormat.CHATML,
+            JarvisChatPromptBuilder.resolveTemplate(
+                PromptTemplateFormat.AUTO,
+                "hermes-3-llama-3.2-3b-q4_k_m",
+                "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf",
+                "llama",
+            ),
+        )
+        assertEquals(
+            PromptTemplateFormat.CHATML,
+            JarvisChatPromptBuilder.resolveTemplate(
+                PromptTemplateFormat.AUTO,
+                "dolphin3.0-qwen2.5-3b-q4_k_m",
+                "Dolphin3.0-Qwen2.5-3b-Q4_K_M.gguf",
+                "qwen2",
+            ),
+        )
+
+        val llama3Prompt = JarvisChatPromptBuilder.buildPrompt(
+            format = PromptTemplateFormat.LLAMA3,
+            userText = "Привет!",
+            recentTurns = listOf(
+                ChatTurn("user", "Как дела?"),
+                ChatTurn("assistant", "Отлично!"),
+            ),
+            recalledFacts = listOf("OPPO Find X6 Pro 12 ГБ"),
+        )
+        assertTrue(llama3Prompt.startsWith("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n"))
+        assertTrue(llama3Prompt.contains("OPPO Find X6 Pro 12 ГБ"))
+        assertTrue(llama3Prompt.contains("<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nКак дела?<|eot_id|>"))
+        assertTrue(llama3Prompt.endsWith("<|start_header_id|>user<|end_header_id|>\n\nПривет!<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"))
     }
 }

@@ -16,6 +16,7 @@ import com.jarvis.breeno.assistant.core.KernelBudget
 import com.jarvis.breeno.assistant.core.KernelTurn
 import com.jarvis.breeno.assistant.core.LlamaCppReasoningProvider
 import com.jarvis.breeno.assistant.core.LlamaNativeBridge
+import com.jarvis.breeno.assistant.core.PromptTemplateFormat
 import com.jarvis.breeno.assistant.core.ResourceGuardedLocalProvider
 import com.jarvis.breeno.assistant.core.RuntimeSignals
 import com.jarvis.breeno.assistant.core.computeAudioRms
@@ -59,6 +60,7 @@ data class AiStackStatus(
     val externalAiConfig: ExternalAiConfig,
     val allLlmPacks: List<LocalLlmPack> = LocalLlmModelManager.CATALOG,
     val selectedPersona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+    val selectedPromptTemplate: PromptTemplateFormat = PromptTemplateFormat.AUTO,
     val speechSpeed: Float = PiperTtsModelDownloadManager.DEFAULT_SPEECH_SPEED,
 )
 
@@ -143,6 +145,7 @@ class JarvisRuntimeController(context: Context) {
             externalAiConfig = externalAiStore.load(),
             allLlmPacks = allPacks,
             selectedPersona = llmModels.selectedPersona(),
+            selectedPromptTemplate = llmModels.selectedPromptTemplate(),
             speechSpeed = ttsModels.speechSpeed(),
         )
     }
@@ -196,6 +199,15 @@ class JarvisRuntimeController(context: Context) {
     fun selectPersona(persona: JarvisPersona) {
         llmModels.selectPersona(persona)
         onStackStatusChanged?.invoke()
+    }
+
+    fun selectPromptTemplate(format: PromptTemplateFormat) {
+        llmModels.selectPromptTemplate(format)
+        onStackStatusChanged?.invoke()
+    }
+
+    suspend fun unloadLocalLlmForMemory() {
+        llamaProvider.unload()
     }
 
     suspend fun importCustomGguf(

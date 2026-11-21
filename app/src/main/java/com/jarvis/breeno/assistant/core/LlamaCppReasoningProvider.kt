@@ -49,7 +49,8 @@ class LlamaCppReasoningProvider(
         val pack = modelManager.activeReadyPack()
             ?: error("Нет готовой локальной модели GGUF")
         val verifiedFile = modelManager.verifyBeforeLoad(pack)
-        val requestedCtx = (turn.budget.maxOutputTokens * 2).coerceIn(1024, 2048)
+        val isLarge8B = pack.sizeBytes >= 3_500_000_000L
+        val requestedCtx = if (isLarge8B) 1024 else (turn.budget.maxOutputTokens * 2).coerceIn(1024, 2048)
 
         return withContext(inferenceDispatcher) {
             try {
@@ -59,7 +60,8 @@ class LlamaCppReasoningProvider(
                         loadedHandle = 0L
                         loadedPackId = null
                     }
-                    val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+                    val maxThreads = if (isLarge8B) 4 else 6
+                    val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, maxThreads)
                     onStatusUpdate?.invoke("Загружаю ${pack.title} в память…")
                     val handle = LlamaNativeBridge.nativeLoadModel(
                         modelPath = verifiedFile.absolutePath,
@@ -77,7 +79,14 @@ class LlamaCppReasoningProvider(
                 onStatusUpdate?.invoke("Джарвис генерирует ответ…")
                 val recentTurns = runCatching { historyProvider() }.getOrDefault(emptyList())
                 val recalledFacts = runCatching { memorySearchProvider(turn.userText) }.getOrDefault(emptyList())
-                val prompt = JarvisChatPromptBuilder.buildQwenChatMlPrompt(
+                val template = JarvisChatPromptBuilder.resolveTemplate(
+                    selected = modelManager.selectedPromptTemplate(),
+                    packId = pack.id,
+                    fileName = pack.fileName,
+                    architecture = pack.descriptor.architecture,
+                )
+                val prompt = JarvisChatPromptBuilder.buildPrompt(
+                    format = template,
                     userText = turn.userText,
                     recentTurns = recentTurns,
                     recalledFacts = recalledFacts,

@@ -107,15 +107,20 @@ fun MediaStudioScreen(
     var cfgWanVae by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanVae) }
     var cfgWanTurbo by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanTurboLora) }
     var cfgVideoFrames by remember(initialConfig) { mutableStateOf(initialConfig.comfyVideoFrames) }
+    var cfgLocalDreamUrl by remember(initialConfig) { mutableStateOf(initialConfig.localDreamUrl) }
 
-    fun imageDimensions(): Pair<Int, Int> = if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI && cfgPonyClipSkip2) {
-        when (selectedAspect) {
+    fun imageDimensions(): Pair<Int, Int> = when {
+        cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU -> when (selectedAspect) {
+            "16:9" -> 768 to 512
+            "9:16" -> 512 to 768
+            else -> 512 to 512
+        }
+        cfgBackend == MediaGenBackend.CUSTOM_COMFYUI && cfgPonyClipSkip2 -> when (selectedAspect) {
             "16:9" -> 1216 to 832
             "9:16" -> 832 to 1216
             else -> 1024 to 1024
         }
-    } else {
-        when (selectedAspect) {
+        else -> when (selectedAspect) {
             "16:9" -> 768 to 432
             "9:16" -> 432 to 768
             else -> 768 to 768
@@ -232,6 +237,11 @@ fun MediaStudioScreen(
                                 label = { Text("Встроенный") },
                             )
                             FilterChip(
+                                selected = cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU,
+                                onClick = { cfgBackend = MediaGenBackend.LOCAL_DREAM_NPU },
+                                label = { Text("Local Dream NPU") },
+                            )
+                            FilterChip(
                                 selected = cfgBackend == MediaGenBackend.CUSTOM_COMFYUI,
                                 onClick = { cfgBackend = MediaGenBackend.CUSTOM_COMFYUI },
                                 label = { Text("ComfyUI") },
@@ -247,7 +257,32 @@ fun MediaStudioScreen(
                                 label = { Text("OpenAI API") },
                             )
                         }
-                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE) {
+                        if (cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU) {
+                            Text(
+                                text = "Полностью офлайн на Snapdragon 8 Gen 2 NPU (512×512 за ~8–15 сек). Запустите приложение Local Dream с SD 1.5 моделью (Absolute Reality / DreamShaper / Anything V5) и оставьте его в фоне.",
+                                color = Color(0xFF34D399),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            OutlinedButton(
+                                onClick = {
+                                    cfgLocalDreamUrl = JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL
+                                    cfgSteps = "24"
+                                    cfgScale = "7.0"
+                                    cfgNegPrompt = JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_NEGATIVE
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Пресет: SD 1.5 NPU (512×512, 24 шага)")
+                            }
+                            OutlinedTextField(
+                                value = cfgLocalDreamUrl,
+                                onValueChange = { cfgLocalDreamUrl = it },
+                                label = { Text("URL Local Dream NPU (по умолчанию http://127.0.0.1:8081)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE && cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
                             OutlinedTextField(
                                 value = cfgImgUrl,
                                 onValueChange = { cfgImgUrl = it },
@@ -360,7 +395,10 @@ fun MediaStudioScreen(
                                 )
                             }
                         }
-                        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI || cfgBackend == MediaGenBackend.CUSTOM_A1111_SD) {
+                        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI ||
+                            cfgBackend == MediaGenBackend.CUSTOM_A1111_SD ||
+                            cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU
+                        ) {
                             OutlinedTextField(
                                 value = cfgNegPrompt,
                                 onValueChange = { cfgNegPrompt = it },
@@ -390,7 +428,7 @@ fun MediaStudioScreen(
                                 )
                             }
                         }
-                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE) {
+                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE && cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
                             OutlinedTextField(
                                 value = cfgKey,
                                 onValueChange = { cfgKey = it },
@@ -437,6 +475,7 @@ fun MediaStudioScreen(
                                         comfyWanVae = cfgWanVae,
                                         comfyWanTurboLora = cfgWanTurbo,
                                         comfyVideoFrames = cfgVideoFrames,
+                                        localDreamUrl = cfgLocalDreamUrl,
                                     )
                                 )
                                 showServerSettings = false

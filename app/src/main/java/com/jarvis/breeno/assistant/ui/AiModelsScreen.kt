@@ -47,6 +47,7 @@ import com.jarvis.breeno.assistant.DownloadTaskState
 import com.jarvis.breeno.assistant.core.ExternalAiConfig
 import com.jarvis.breeno.assistant.core.ExternalAiMode
 import com.jarvis.breeno.assistant.core.JarvisPersona
+import com.jarvis.breeno.assistant.core.PromptTemplateFormat
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.PiperVoicePack
@@ -78,6 +79,7 @@ fun AiModelsScreen(
     onDeleteLlm: suspend (String) -> Unit,
     onImportCustomGguf: () -> Unit,
     onSelectPersona: (JarvisPersona) -> Unit,
+    onSelectPromptTemplate: (PromptTemplateFormat) -> Unit,
     onSaveExternalAi: (ExternalAiConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -308,6 +310,22 @@ fun AiModelsScreen(
                     }
                 }
 
+                Text("Шаблон промпта (Prompt Format):", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    PromptTemplateFormat.entries.forEach { fmt ->
+                        FilterChip(
+                            selected = status.selectedPromptTemplate == fmt,
+                            onClick = { onSelectPromptTemplate(fmt) },
+                            label = { Text(fmt.title) },
+                        )
+                    }
+                }
+
                 val familyOrder = listOf(
                     LocalLlmModelManager.FAMILY_OPEN_COMMUNITY,
                     LocalLlmModelManager.FAMILY_QWEN,
@@ -463,6 +481,22 @@ fun AiModelsScreen(
                 ) {
                     Text("Сохранить настройки внешнего ИИ")
                 }
+            }
+        }
+
+        // 6. OPPO ColorOS 12 GB RAM tip
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CardBg),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Совет для OPPO ColorOS (12 ГБ ОЗУ)", color = CyanAccent, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Для 12 ГБ ОЗУ используйте модели 3B (Q4_K_M) или L3-8B Stheno Q3_K_M (~3.74 ГБ). Чтобы ColorOS не закрывал нейросеть или Local Dream NPU в фоне, откройте список недавних приложений, потяните карточку вниз -> «Заблокировать» (значок замка) и разрешите фоновую работу в настройках батареи.",
+                    color = MutedText,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
 

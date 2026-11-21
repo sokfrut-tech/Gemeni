@@ -177,4 +177,56 @@ class JarvisMediaGeneratorTest {
         assertEquals("JarvisWan22_00001.mp4", videoRef!!.filename)
         assertEquals("video", videoRef.subfolder)
     }
+
+    @Test
+    fun buildsLocalDreamRequestAndParsesSseEvents() {
+        assertEquals(
+            "http://127.0.0.1:8081/generate",
+            JarvisMediaGenerator.normalizeLocalDreamGenerateUrl(""),
+        )
+        assertEquals(
+            "http://127.0.0.1:8081/generate",
+            JarvisMediaGenerator.normalizeLocalDreamGenerateUrl("http://127.0.0.1:8081/"),
+        )
+        assertEquals(
+            "http://127.0.0.1:8081/generate",
+            JarvisMediaGenerator.normalizeLocalDreamGenerateUrl("http://127.0.0.1:8081/generate"),
+        )
+
+        val req = JarvisMediaGenerator.buildLocalDreamRequestJson(
+            prompt = "cyberpunk night street",
+            negativePrompt = "bad anatomy, extra fingers",
+            style = "Фото",
+            width = 512,
+            height = 768,
+            steps = 24,
+            cfgScale = 7.0f,
+            seed = 77,
+        )
+        assertTrue(req.contains("\"width\":512"))
+        assertTrue(req.contains("\"height\":768"))
+        assertTrue(req.contains("\"steps\":24"))
+        assertTrue(req.contains("\"scheduler\":\"dpm\""))
+        assertTrue(req.contains("\"output_format\":\"jpeg\""))
+        assertTrue(req.contains("\"negative_prompt\":\"bad anatomy, extra fingers\""))
+
+        val prog = JarvisMediaGenerator.parseLocalDreamSseEvent("""data: {"type":"progress","step":6,"total_steps":24}""")
+        assertEquals(LocalDreamSseEvent.Progress(6, 24), prog)
+
+        val completeJpeg = JarvisMediaGenerator.parseLocalDreamSseEvent(
+            """data: {"type":"complete","image":"AQIDBA==","format":"jpeg","width":512,"height":512}"""
+        )
+        assertEquals(LocalDreamSseEvent.Complete("AQIDBA==", "jpeg", 512, 512, 3), completeJpeg)
+
+        val completeRaw = JarvisMediaGenerator.parseLocalDreamSseEvent(
+            """data: {"type":"complete","image":"////","format":"raw","width":512,"height":512,"channels":4}"""
+        )
+        assertEquals(LocalDreamSseEvent.Complete("////", "raw", 512, 512, 4), completeRaw)
+
+        val err = JarvisMediaGenerator.parseLocalDreamSseEvent("""data: {"type":"error","message":"out of memory"}""")
+        assertEquals(LocalDreamSseEvent.Error("out of memory"), err)
+
+        assertEquals(LocalDreamSseEvent.Done, JarvisMediaGenerator.parseLocalDreamSseEvent("data: [DONE]"))
+        assertNull(JarvisMediaGenerator.parseLocalDreamSseEvent(": keepalive"))
+    }
 }

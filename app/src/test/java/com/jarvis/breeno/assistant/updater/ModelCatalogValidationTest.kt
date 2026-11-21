@@ -11,10 +11,12 @@ import java.nio.file.Files
 class ModelCatalogValidationTest {
     @Test
     fun qwenAndOpenCommunityModelCatalogDescriptorsAreValidAndPinned() {
-        assertEquals(7, LocalLlmModelManager.CATALOG.size)
+        assertEquals(9, LocalLlmModelManager.CATALOG.size)
         val ids = LocalLlmModelManager.CATALOG.map { it.id }.toSet()
         assertTrue(LocalLlmModelManager.PACK_DOLPHIN_QWEN_3B in ids)
         assertTrue(LocalLlmModelManager.PACK_HERMES3_LLAMA32_3B in ids)
+        assertTrue(LocalLlmModelManager.PACK_STHENO_8B_Q3KM in ids)
+        assertTrue(LocalLlmModelManager.PACK_STHENO_8B_Q4KM in ids)
         assertTrue(LocalLlmModelManager.PACK_QWEN_3B in ids)
         LocalLlmModelManager.CATALOG.forEach { pack ->
             pack.descriptor.validate()

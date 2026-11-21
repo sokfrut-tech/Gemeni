@@ -129,6 +129,7 @@ static bool contains_stop_marker(const std::string& text) {
     return ends_with(text, "<|im_end|>") ||
            ends_with(text, "<|endoftext|>") ||
            ends_with(text, "<|eot_id|>") ||
+           ends_with(text, "<|end_of_text|>") ||
            ends_with(text, "</s>");
 }
 
@@ -137,6 +138,7 @@ static void strip_all_stop_markers(std::string& text) {
         strip_trailing_marker(text, "<|im_end|>");
         strip_trailing_marker(text, "<|endoftext|>");
         strip_trailing_marker(text, "<|eot_id|>");
+        strip_trailing_marker(text, "<|end_of_text|>");
         strip_trailing_marker(text, "</s>");
     }
 }
@@ -231,13 +233,14 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
         return utf8_to_jstring(env, "");
     }
 
+    const bool add_bos = (prompt.rfind("<|begin_of_text|>", 0) != 0);
     int32_t required = -llama_tokenize(
         vocab,
         prompt.c_str(),
         static_cast<int32_t>(prompt.size()),
         nullptr,
         0,
-        true,
+        add_bos,
         true
     );
     if (required <= 0) {
@@ -251,7 +254,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
         static_cast<int32_t>(prompt.size()),
         prompt_tokens.data(),
         static_cast<int32_t>(prompt_tokens.size()),
-        true,
+        add_bos,
         true
     );
     if (n_prompt <= 0) {

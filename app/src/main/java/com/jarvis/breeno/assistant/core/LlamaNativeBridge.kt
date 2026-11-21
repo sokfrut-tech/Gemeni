@@ -33,26 +33,63 @@ enum class JarvisPersona(
     }
 }
 
+enum class PromptTemplateFormat(val id: String, val title: String) {
+    AUTO("auto", "Авто"),
+    CHATML("chatml", "ChatML (Dolphin / Qwen / Hermes)"),
+    LLAMA3("llama3", "Llama 3 (Stheno / Llama 3.x)");
+
+    companion object {
+        fun fromId(id: String?): PromptTemplateFormat = entries.firstOrNull { it.id == id } ?: AUTO
+    }
+}
+
 /**
- * Pure-Kotlin ChatML prompt formatter and output sanitizer for local Dolphin / Hermes / Qwen models.
+ * Pure-Kotlin prompt formatter (ChatML + Llama 3) and output sanitizer for local GGUF models.
  */
 object JarvisChatPromptBuilder {
     private val STOP_MARKERS = listOf(
         "<|im_end|>",
         "<|endoftext|>",
         "<|eot_id|>",
+        "<|end_of_text|>",
         "</s>",
+        "<|end_header_id|>",
         "<|start_header_id|>",
         "<|im_start|>assistant",
         "<|im_start|>",
     )
 
-    fun buildQwenChatMlPrompt(
+    fun resolveTemplate(
+        selected: PromptTemplateFormat,
+        packId: String,
+        fileName: String,
+        architecture: String,
+    ): PromptTemplateFormat {
+        if (selected != PromptTemplateFormat.AUTO) return selected
+        val hint = "${packId.lowercase()} ${fileName.lowercase()} ${architecture.lowercase()}"
+        val looksLlama3 = hint.contains("stheno") ||
+            (hint.contains("llama-3") || hint.contains("llama3") || hint.contains("l3-")) ||
+            (hint.contains("llama") && !hint.contains("hermes") && !hint.contains("dolphin") && !hint.contains("3.2"))
+        return if (looksLlama3) PromptTemplateFormat.LLAMA3 else PromptTemplateFormat.CHATML
+    }
+
+    fun buildPrompt(
+        format: PromptTemplateFormat,
         userText: String,
         recentTurns: List<ChatTurn> = emptyList(),
         recalledFacts: List<String> = emptyList(),
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+    ): String = when (format) {
+        PromptTemplateFormat.LLAMA3 -> buildLlama3Prompt(userText, recentTurns, recalledFacts, systemInfoNote, persona)
+        PromptTemplateFormat.AUTO, PromptTemplateFormat.CHATML ->
+            buildQwenChatMlPrompt(userText, recentTurns, recalledFacts, systemInfoNote, persona)
+    }
+
+    private fun buildSystemText(
+        recalledFacts: List<String>,
+        systemInfoNote: String,
+        persona: JarvisPersona,
     ): String {
         val systemBuilder = StringBuilder(persona.systemPrompt)
         if (recalledFacts.isNotEmpty()) {
@@ -67,18 +104,29 @@ object JarvisChatPromptBuilder {
         if (systemInfoNote.isNotBlank()) {
             systemBuilder.append("\n\nКонтекст устройства: ").append(systemInfoNote.trim())
         }
+        return systemBuilder.toString().trim()
+    }
 
+    private fun normalizeRole(rawRole: String): String = when (rawRole.lowercase()) {
+        "assistant", "model" -> "assistant"
+        "system" -> "system"
+        else -> "user"
+    }
+
+    fun buildQwenChatMlPrompt(
+        userText: String,
+        recentTurns: List<ChatTurn> = emptyList(),
+        recalledFacts: List<String> = emptyList(),
+        systemInfoNote: String = "",
+        persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+    ): String {
         val sb = StringBuilder()
         sb.append("<|im_start|>system\n")
-        sb.append(systemBuilder.toString().trim())
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona))
         sb.append("<|im_end|>\n")
 
         recentTurns.takeLast(6).forEach { turn ->
-            val role = when (turn.role.lowercase()) {
-                "assistant", "model" -> "assistant"
-                "system" -> "system"
-                else -> "user"
-            }
+            val role = normalizeRole(turn.role)
             val clean = turn.content.trim()
             if (clean.isNotEmpty()) {
                 sb.append("<|im_start|>").append(role).append('\n')
@@ -90,6 +138,35 @@ object JarvisChatPromptBuilder {
         sb.append(userText.trim())
         sb.append("<|im_end|>\n")
         sb.append("<|im_start|>assistant\n")
+        return sb.toString()
+    }
+
+    fun buildLlama3Prompt(
+        userText: String,
+        recentTurns: List<ChatTurn> = emptyList(),
+        recalledFacts: List<String> = emptyList(),
+        systemInfoNote: String = "",
+        persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+    ): String {
+        val sb = StringBuilder()
+        sb.append("<|begin_of_text|>")
+        sb.append("<|start_header_id|>system<|end_header_id|>\n\n")
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona))
+        sb.append("<|eot_id|>")
+
+        recentTurns.takeLast(6).forEach { turn ->
+            val role = normalizeRole(turn.role)
+            val clean = turn.content.trim()
+            if (clean.isNotEmpty()) {
+                sb.append("<|start_header_id|>").append(role).append("<|end_header_id|>\n\n")
+                    .append(clean).append("<|eot_id|>")
+            }
+        }
+
+        sb.append("<|start_header_id|>user<|end_header_id|>\n\n")
+        sb.append(userText.trim())
+        sb.append("<|eot_id|>")
+        sb.append("<|start_header_id|>assistant<|end_header_id|>\n\n")
         return sb.toString()
     }
 

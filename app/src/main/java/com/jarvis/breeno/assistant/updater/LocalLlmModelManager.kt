@@ -8,6 +8,7 @@ import com.google.gson.reflect.TypeToken
 import com.jarvis.breeno.assistant.core.JarvisPersona
 import com.jarvis.breeno.assistant.core.ModelPackDescriptor
 import com.jarvis.breeno.assistant.core.ModelShard
+import com.jarvis.breeno.assistant.core.PromptTemplateFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -120,6 +121,13 @@ class LocalLlmModelManager(private val context: Context) {
 
     fun selectPersona(persona: JarvisPersona) {
         prefs.edit().putString(KEY_SELECTED_PERSONA, persona.id).apply()
+    }
+
+    fun selectedPromptTemplate(): PromptTemplateFormat =
+        PromptTemplateFormat.fromId(prefs.getString(KEY_PROMPT_TEMPLATE, PromptTemplateFormat.AUTO.id))
+
+    fun selectPromptTemplate(format: PromptTemplateFormat) {
+        prefs.edit().putString(KEY_PROMPT_TEMPLATE, format.id).apply()
     }
 
     fun activeReadyPack(): LocalLlmPack? {
@@ -316,7 +324,7 @@ class LocalLlmModelManager(private val context: Context) {
     }
 
     companion object {
-        const val FAMILY_OPEN_COMMUNITY = "Dolphin 3.0 / Nous Hermes 3"
+        const val FAMILY_OPEN_COMMUNITY = "Dolphin 3.0 / Hermes 3 / Stheno 8B"
         const val FAMILY_QWEN = "Qwen 2.5 Instruct"
         const val FAMILY_CUSTOM = "Свои .gguf модели"
 
@@ -324,6 +332,8 @@ class LocalLlmModelManager(private val context: Context) {
         const val PACK_DOLPHIN_QWEN_15B = "dolphin3.0-qwen2.5-1.5b-q4_k_m"
         const val PACK_DOLPHIN_QWEN_3B = "dolphin3.0-qwen2.5-3b-q4_k_m"
         const val PACK_HERMES3_LLAMA32_3B = "hermes-3-llama-3.2-3b-q4_k_m"
+        const val PACK_STHENO_8B_Q3KM = "l3-8b-stheno-v3.2-q3_k_m"
+        const val PACK_STHENO_8B_Q4KM = "l3-8b-stheno-v3.2-q4_k_m"
 
         const val PACK_QWEN_05B = "qwen2.5-0.5b-q4_k_m"
         const val PACK_QWEN_15B = "qwen2.5-1.5b-q4_k_m"
@@ -331,6 +341,7 @@ class LocalLlmModelManager(private val context: Context) {
 
         private const val KEY_SELECTED_PACK = "selected_llm_pack_id"
         private const val KEY_SELECTED_PERSONA = "selected_jarvis_persona"
+        private const val KEY_PROMPT_TEMPLATE = "selected_prompt_template"
         private const val KEY_CUSTOM_PACKS = "custom_gguf_packs_json"
 
         fun isValidGgufMagic(header: ByteArray): Boolean =
@@ -446,6 +457,54 @@ class LocalLlmModelManager(private val context: Context) {
                             fileName = "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf",
                             sizeBytes = 2_019_373_888L,
                             sha256 = "91776fe0f6cd7483d9d5e06162fdd1f8f0262c15ced269791b4d96a655e8a5a2",
+                        )
+                    ),
+                ),
+            ),
+            LocalLlmPack(
+                id = PACK_STHENO_8B_Q3KM,
+                title = "L3-8B Stheno v3.2 (Q3_K_M — для 12 ГБ ОЗУ)",
+                description = "Сильная 8B Llama 3 модель для диалогов (рекомендуется для 12 ГБ ОЗУ, ~3.74 ГБ).",
+                downloadUrl = "https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF/resolve/dcf7446b0049ee524188ea0b15bd9a5e24cd889b/L3-8B-Stheno-v3.2-Q3_K_M.gguf",
+                family = FAMILY_OPEN_COMMUNITY,
+                descriptor = ModelPackDescriptor(
+                    packId = PACK_STHENO_8B_Q3KM,
+                    version = "L3-8B-Stheno-v3.2-Q3_K_M",
+                    runtime = "llama.cpp",
+                    architecture = "llama",
+                    quantization = "Q3_K_M",
+                    licenseId = "Llama-3",
+                    sourceRevision = "dcf7446b0049ee524188ea0b15bd9a5e24cd889b",
+                    shards = listOf(
+                        ModelShard(
+                            index = 0,
+                            fileName = "L3-8B-Stheno-v3.2-Q3_K_M.gguf",
+                            sizeBytes = 4_018_917_920L,
+                            sha256 = "d989e1d6d3ab0c448149126a287fa49d1cb5c011d91bbdbf7b97462b2575e97c",
+                        )
+                    ),
+                ),
+            ),
+            LocalLlmPack(
+                id = PACK_STHENO_8B_Q4KM,
+                title = "L3-8B Stheno v3.2 (Q4_K_M — для 16 ГБ ОЗУ)",
+                description = "Полная 8B Llama 3 модель повышенной точности (лучше для 16 ГБ ОЗУ, ~4.58 ГБ).",
+                downloadUrl = "https://huggingface.co/bartowski/L3-8B-Stheno-v3.2-GGUF/resolve/dcf7446b0049ee524188ea0b15bd9a5e24cd889b/L3-8B-Stheno-v3.2-Q4_K_M.gguf",
+                family = FAMILY_OPEN_COMMUNITY,
+                descriptor = ModelPackDescriptor(
+                    packId = PACK_STHENO_8B_Q4KM,
+                    version = "L3-8B-Stheno-v3.2-Q4_K_M",
+                    runtime = "llama.cpp",
+                    architecture = "llama",
+                    quantization = "Q4_K_M",
+                    licenseId = "Llama-3",
+                    sourceRevision = "dcf7446b0049ee524188ea0b15bd9a5e24cd889b",
+                    shards = listOf(
+                        ModelShard(
+                            index = 0,
+                            fileName = "L3-8B-Stheno-v3.2-Q4_K_M.gguf",
+                            sizeBytes = 4_920_734_240L,
+                            sha256 = "8e98c1953f9c04e060fd9640bbe866685c844363a2360f09099b79c6c9195fc4",
                         )
                     ),
                 ),

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Enforce HTTPS for all external traffic -->
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- Allow cleartext ONLY for on-device loopback services (e.g. Local Dream NPU on 127.0.0.1:8081) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

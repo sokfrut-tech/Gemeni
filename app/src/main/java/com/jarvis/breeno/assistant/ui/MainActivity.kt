@@ -205,6 +205,7 @@ class MainActivity : ComponentActivity() {
                     level = if (isError) JarvisEventLevel.ERROR else JarvisEventLevel.INFO,
                 )
             },
+            beforeHeavyOnDeviceGen = { runtime.unloadLocalLlmForMemory() },
         )
 
         lifecycleScope.launch {
@@ -669,6 +670,7 @@ class MainActivity : ComponentActivity() {
                         onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
                         onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
                         onSelectPersona = { persona -> runtime.selectPersona(persona) },
+                        onSelectPromptTemplate = { fmt -> runtime.selectPromptTemplate(fmt) },
                         onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
                     )
 
@@ -735,6 +737,7 @@ class MainActivity : ComponentActivity() {
 
         val activeLlm = stackStatus.activeLlmId
         val brainBadge = when {
+            activeLlm?.startsWith("l3-8b-stheno") == true -> "STHENO 8B"
             activeLlm?.startsWith("dolphin") == true -> "DOLPHIN ОФЛАЙН"
             activeLlm?.startsWith("hermes") == true -> "HERMES ОФЛАЙН"
             activeLlm?.startsWith("custom_") == true -> "СВОЙ GGUF"
