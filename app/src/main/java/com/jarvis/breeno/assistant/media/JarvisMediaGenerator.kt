@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -41,6 +42,14 @@ data class MediaGenConfig(
     val steps: Int = 24,
     val cfgScale: Float = 7.0f,
     val checkpointName: String = "",
+    val comfyPonyClipSkip2: Boolean = true,
+    val comfyWanI2vEnabled: Boolean = true,
+    val comfyWanHighNoiseModel: String = JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL,
+    val comfyWanLowNoiseModel: String = JarvisMediaGenerator.DEFAULT_WAN_LOW_MODEL,
+    val comfyWanTextEncoder: String = JarvisMediaGenerator.DEFAULT_WAN_TEXT_ENCODER,
+    val comfyWanVae: String = JarvisMediaGenerator.DEFAULT_WAN_VAE,
+    val comfyWanTurboLora: Boolean = true,
+    val comfyVideoFrames: Int = 49,
 )
 
 data class ComfyImageRef(
@@ -74,6 +83,18 @@ class MediaGenConfigStore(context: Context) {
             steps = prefs.getInt(KEY_STEPS, 24).coerceIn(1, 100),
             cfgScale = prefs.getFloat(KEY_CFG_SCALE, 7.0f).coerceIn(1.0f, 30.0f),
             checkpointName = prefs.getString(KEY_CHECKPOINT, "") ?: "",
+            comfyPonyClipSkip2 = prefs.getBoolean(KEY_COMFY_PONY_CLIP_SKIP2, true),
+            comfyWanI2vEnabled = prefs.getBoolean(KEY_COMFY_WAN_I2V_ENABLED, true),
+            comfyWanHighNoiseModel = prefs.getString(KEY_COMFY_WAN_HIGH, JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL)
+                ?: JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL,
+            comfyWanLowNoiseModel = prefs.getString(KEY_COMFY_WAN_LOW, JarvisMediaGenerator.DEFAULT_WAN_LOW_MODEL)
+                ?: JarvisMediaGenerator.DEFAULT_WAN_LOW_MODEL,
+            comfyWanTextEncoder = prefs.getString(KEY_COMFY_WAN_CLIP, JarvisMediaGenerator.DEFAULT_WAN_TEXT_ENCODER)
+                ?: JarvisMediaGenerator.DEFAULT_WAN_TEXT_ENCODER,
+            comfyWanVae = prefs.getString(KEY_COMFY_WAN_VAE, JarvisMediaGenerator.DEFAULT_WAN_VAE)
+                ?: JarvisMediaGenerator.DEFAULT_WAN_VAE,
+            comfyWanTurboLora = prefs.getBoolean(KEY_COMFY_WAN_TURBO, true),
+            comfyVideoFrames = prefs.getInt(KEY_COMFY_VIDEO_FRAMES, 49).coerceIn(17, 121),
         )
     }
 
@@ -88,6 +109,14 @@ class MediaGenConfigStore(context: Context) {
             .putInt(KEY_STEPS, config.steps.coerceIn(1, 100))
             .putFloat(KEY_CFG_SCALE, config.cfgScale.coerceIn(1.0f, 30.0f))
             .putString(KEY_CHECKPOINT, config.checkpointName.trim())
+            .putBoolean(KEY_COMFY_PONY_CLIP_SKIP2, config.comfyPonyClipSkip2)
+            .putBoolean(KEY_COMFY_WAN_I2V_ENABLED, config.comfyWanI2vEnabled)
+            .putString(KEY_COMFY_WAN_HIGH, config.comfyWanHighNoiseModel.trim())
+            .putString(KEY_COMFY_WAN_LOW, config.comfyWanLowNoiseModel.trim())
+            .putString(KEY_COMFY_WAN_CLIP, config.comfyWanTextEncoder.trim())
+            .putString(KEY_COMFY_WAN_VAE, config.comfyWanVae.trim())
+            .putBoolean(KEY_COMFY_WAN_TURBO, config.comfyWanTurboLora)
+            .putInt(KEY_COMFY_VIDEO_FRAMES, config.comfyVideoFrames.coerceIn(17, 121))
             .apply()
     }
 
@@ -101,6 +130,14 @@ class MediaGenConfigStore(context: Context) {
         private const val KEY_STEPS = "media_steps"
         private const val KEY_CFG_SCALE = "media_cfg_scale"
         private const val KEY_CHECKPOINT = "media_checkpoint"
+        private const val KEY_COMFY_PONY_CLIP_SKIP2 = "media_comfy_pony_clip_skip2"
+        private const val KEY_COMFY_WAN_I2V_ENABLED = "media_comfy_wan_i2v_enabled"
+        private const val KEY_COMFY_WAN_HIGH = "media_comfy_wan_high"
+        private const val KEY_COMFY_WAN_LOW = "media_comfy_wan_low"
+        private const val KEY_COMFY_WAN_CLIP = "media_comfy_wan_clip"
+        private const val KEY_COMFY_WAN_VAE = "media_comfy_wan_vae"
+        private const val KEY_COMFY_WAN_TURBO = "media_comfy_wan_turbo"
+        private const val KEY_COMFY_VIDEO_FRAMES = "media_comfy_video_frames"
     }
 }
 
@@ -125,9 +162,9 @@ sealed interface OpenAiImagePayload {
 }
 
 /**
- * Generates images and animated MP4 videos on the phone:
- * - Default mode works immediately without an API key via Pollinations + on-device MediaCodec MP4 synthesis.
- * - Self-hosted mode connects to user's own PC GPU ComfyUI, Automatic1111/Forge WebUI, OpenAI Images, or video API.
+ * Generates images and animated MP4 videos on the phone or via self-hosted PC ComfyUI:
+ * - Single-window ComfyUI pipeline supports CyberRealistic Pony XL (Clip Skip 2) -> Wan 2.2 I2V-14B.
+ * - Also supports Automatic1111/Forge WebUI, OpenAI Images, Pollinations images, and on-device MediaCodec MP4.
  */
 class JarvisMediaGenerator(
     private val studioDir: File,
@@ -197,6 +234,7 @@ class JarvisMediaGenerator(
         style: String = "Кино",
         width: Int = 512,
         height: Int = 512,
+        motionPrompt: String = "",
         onProgress: (String) -> Unit = {},
     ): Result<GeneratedMediaItem> = withContext(Dispatchers.IO) {
         val cleanPrompt = prompt.trim()
@@ -212,7 +250,7 @@ class JarvisMediaGenerator(
         runCatching {
             if (cfg.customVideoUrl.isNotBlank()) {
                 onProgress("Отправляю запрос на ваш видео-сервер…")
-                val reqJson = gson.toJson(mapOf("prompt" to cleanPrompt, "style" to style))
+                val reqJson = gson.toJson(mapOf("prompt" to cleanPrompt, "style" to style, "motion_prompt" to motionPrompt.trim()))
                 val headers = buildAuthHeaders(cfg.apiKey)
                 val bytes = postBytes(cfg.customVideoUrl, reqJson, headers, readTimeoutMs = 90_000)
                 // Support either raw MP4 bytes or JSON { "video_url": "..." }
@@ -226,6 +264,18 @@ class JarvisMediaGenerator(
                 } else {
                     outFile.writeBytes(bytes)
                 }
+            } else if (cfg.backend == MediaGenBackend.CUSTOM_COMFYUI && cfg.comfyWanI2vEnabled) {
+                val mp4Bytes = fetchVideoFromComfyUiWan22(
+                    cfg = cfg,
+                    imagePrompt = cleanPrompt,
+                    motionPrompt = motionPrompt,
+                    style = style,
+                    videoWidth = width,
+                    videoHeight = height,
+                    seed = Random.nextInt(1, 999_999),
+                    onProgress = onProgress,
+                )
+                outFile.writeBytes(mp4Bytes)
             } else {
                 val scenes = buildStoryboardPrompts(cleanPrompt, style)
                 val bitmaps = mutableListOf<Bitmap>()
@@ -299,7 +349,7 @@ class JarvisMediaGenerator(
             MediaGenBackend.CUSTOM_A1111_SD -> {
                 val rawUrl = cfg.customImageUrl.trim()
                 require(rawUrl.startsWith("http://", true) || rawUrl.startsWith("https://", true)) {
-                    "Укажите URL вашего Stable Diffusion (например, http://192.168.1.50:7860)"
+                    "Укажите URL вашего Stable Diffusion (например, https://.../sd или http://192.168.1.50:7860)"
                 }
                 val targetUrl = normalizeA1111Txt2ImgUrl(rawUrl)
                 val reqJson = buildA1111RequestJson(
@@ -329,6 +379,19 @@ class JarvisMediaGenerator(
         }
     }
 
+    private suspend fun resolveComfyCheckpoint(
+        baseUrl: String,
+        cfg: MediaGenConfig,
+        headers: Map<String, String>,
+        onProgress: (String) -> Unit,
+    ): String = cfg.checkpointName.trim().ifBlank {
+        onProgress("Определяю чекпоинт ComfyUI…")
+        val infoJson = getBytes("$baseUrl/object_info/CheckpointLoaderSimple", headers, readTimeoutMs = 15_000)
+            .toString(Charsets.UTF_8)
+        parseComfyFirstCheckpoint(infoJson)
+            ?: error("Не найден чекпоинт в ComfyUI: укажите имя .safetensors в настройках")
+    }
+
     private suspend fun fetchFromComfyUi(
         cfg: MediaGenConfig,
         prompt: String,
@@ -340,18 +403,14 @@ class JarvisMediaGenerator(
     ): ByteArray {
         val rawUrl = cfg.customImageUrl.trim()
         require(rawUrl.startsWith("http://", true) || rawUrl.startsWith("https://", true)) {
-            "Укажите URL вашего ComfyUI сервера (например, http://192.168.1.50:8188)"
+            "Укажите URL вашего ComfyUI сервера (например, https://.../comfy)"
         }
         val baseUrl = normalizeComfyBaseUrl(rawUrl)
         val headers = buildAuthHeaders(cfg.apiKey)
-
-        val ckpt = cfg.checkpointName.trim().ifBlank {
-            onProgress("Определяю чекпоинт ComfyUI…")
-            val infoJson = getBytes("$baseUrl/object_info/CheckpointLoaderSimple", headers, readTimeoutMs = 15_000)
-                .toString(Charsets.UTF_8)
-            parseComfyFirstCheckpoint(infoJson)
-                ?: error("Не найден чекпоинт в ComfyUI: укажите имя .safetensors в настройках")
-        }
+        val ckpt = resolveComfyCheckpoint(baseUrl, cfg, headers, onProgress)
+        val isPony = cfg.comfyPonyClipSkip2 ||
+            ckpt.contains("pony", ignoreCase = true) ||
+            ckpt.contains("cyberrealistic", ignoreCase = true)
 
         val workflowJson = buildComfyUiWorkflowJson(
             prompt = prompt,
@@ -363,6 +422,7 @@ class JarvisMediaGenerator(
             cfgScale = cfg.cfgScale,
             seed = seed,
             checkpointName = ckpt,
+            usePonyClipSkip2 = isPony,
         )
 
         onProgress("Отправляю задачу в ComfyUI ($ckpt)…")
@@ -373,7 +433,7 @@ class JarvisMediaGenerator(
         onProgress("ComfyUI рендерит изображение…")
         val pollStart = System.currentTimeMillis()
         var imageRef: ComfyImageRef? = null
-        while (System.currentTimeMillis() - pollStart < 90_000L) {
+        while (System.currentTimeMillis() - pollStart < 120_000L) {
             currentCoroutineContext().ensureActive()
             val histJson = getBytes("$baseUrl/history/$promptId", headers, readTimeoutMs = 15_000)
                 .toString(Charsets.UTF_8)
@@ -382,7 +442,7 @@ class JarvisMediaGenerator(
             delay(800)
         }
 
-        val ref = imageRef ?: error("ComfyUI не завершил генерацию за 90 секунд")
+        val ref = imageRef ?: error("ComfyUI не завершил генерацию за 120 секунд")
         val qFilename = URLEncoder.encode(ref.filename, "UTF-8")
         val qSubfolder = URLEncoder.encode(ref.subfolder, "UTF-8")
         val qType = URLEncoder.encode(ref.type, "UTF-8")
@@ -390,6 +450,93 @@ class JarvisMediaGenerator(
             "$baseUrl/view?filename=$qFilename&subfolder=$qSubfolder&type=$qType",
             headers,
             readTimeoutMs = 30_000,
+        )
+    }
+
+    private suspend fun fetchVideoFromComfyUiWan22(
+        cfg: MediaGenConfig,
+        imagePrompt: String,
+        motionPrompt: String,
+        style: String,
+        videoWidth: Int,
+        videoHeight: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+    ): ByteArray {
+        val rawUrl = cfg.customImageUrl.trim()
+        require(rawUrl.startsWith("http://", true) || rawUrl.startsWith("https://", true)) {
+            "Укажите URL вашего ComfyUI сервера в настройках Студии"
+        }
+        val baseUrl = normalizeComfyBaseUrl(rawUrl)
+        val headers = buildAuthHeaders(cfg.apiKey)
+        val ckpt = resolveComfyCheckpoint(baseUrl, cfg, headers, onProgress)
+        val isPony = cfg.comfyPonyClipSkip2 ||
+            ckpt.contains("pony", ignoreCase = true) ||
+            ckpt.contains("cyberrealistic", ignoreCase = true)
+
+        val (imgW, imgH) = if (isPony) {
+            when {
+                videoWidth > videoHeight -> 1216 to 832
+                videoHeight > videoWidth -> 832 to 1216
+                else -> 1024 to 1024
+            }
+        } else {
+            when {
+                videoWidth > videoHeight -> 768 to 432
+                videoHeight > videoWidth -> 432 to 768
+                else -> 768 to 768
+            }
+        }
+
+        val workflowJson = buildComfyUiPonyToWan22I2vWorkflowJson(
+            imagePrompt = imagePrompt,
+            motionPrompt = motionPrompt,
+            negativePrompt = cfg.negativePrompt,
+            style = style,
+            imageWidth = imgW,
+            imageHeight = imgH,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            frames = cfg.comfyVideoFrames,
+            imageSteps = cfg.steps,
+            imageCfg = cfg.cfgScale,
+            seed = seed,
+            checkpointName = ckpt,
+            ponyClipSkip2 = isPony,
+            wanHighNoiseModel = cfg.comfyWanHighNoiseModel,
+            wanLowNoiseModel = cfg.comfyWanLowNoiseModel,
+            wanTextEncoder = cfg.comfyWanTextEncoder,
+            wanVae = cfg.comfyWanVae,
+            turboLora = cfg.comfyWanTurboLora,
+        )
+
+        onProgress("Запускаю Pony XL -> Wan 2.2 I2V-14B в ComfyUI…")
+        val submitResp = postBytes("$baseUrl/prompt", workflowJson, headers, readTimeoutMs = 30_000)
+            .toString(Charsets.UTF_8)
+        val promptId = parseComfyPromptId(submitResp)
+
+        val pollStart = System.currentTimeMillis()
+        var videoRef: ComfyImageRef? = null
+        while (System.currentTimeMillis() - pollStart < 600_000L) {
+            currentCoroutineContext().ensureActive()
+            val elapsedSec = ((System.currentTimeMillis() - pollStart) / 1000L).toInt()
+            onProgress("Wan 2.2 I2V рендерит видео… ($elapsedSec с)")
+            val histJson = getBytes("$baseUrl/history/$promptId", headers, readTimeoutMs = 15_000)
+                .toString(Charsets.UTF_8)
+            videoRef = parseComfyHistoryMediaRef(histJson, promptId, preferVideo = true)
+            if (videoRef != null) break
+            delay(2_000)
+        }
+
+        val ref = videoRef ?: error("Wan 2.2 I2V не завершил генерацию за 10 минут")
+        val qFilename = URLEncoder.encode(ref.filename, "UTF-8")
+        val qSubfolder = URLEncoder.encode(ref.subfolder, "UTF-8")
+        val qType = URLEncoder.encode(ref.type, "UTF-8")
+        onProgress("Скачиваю готовое MP4 видео…")
+        return getBytes(
+            "$baseUrl/view?filename=$qFilename&subfolder=$qSubfolder&type=$qType",
+            headers,
+            readTimeoutMs = 90_000,
         )
     }
 
@@ -418,7 +565,7 @@ class JarvisMediaGenerator(
                 conn.disconnect()
             }
         }
-        throw lastErr ?: IllegalStateException("Ошибка загрузки изображения")
+        throw lastErr ?: IllegalStateException("Ошибка загрузки медиа")
     }
 
     private fun postBytes(
@@ -469,6 +616,17 @@ class JarvisMediaGenerator(
     }
 
     companion object {
+        const val DEFAULT_PONY_CHECKPOINT = "CyberRealisticPony_V18.0_F16.safetensors"
+        const val DEFAULT_PONY_NEGATIVE = "score_6, score_5, score_4, worst quality, low quality, lowres, bad anatomy, bad hands, signature, watermark"
+        const val DEFAULT_WAN_HIGH_MODEL = "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
+        const val DEFAULT_WAN_LOW_MODEL = "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        const val DEFAULT_WAN_TEXT_ENCODER = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+        const val DEFAULT_WAN_VAE = "wan_2.1_vae.safetensors"
+        const val DEFAULT_WAN_HIGH_LORA = "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+        const val DEFAULT_WAN_LOW_LORA = "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+        const val DEFAULT_WAN_NEGATIVE = "static image, overexposed, blurred details, worst quality, low quality, jpeg artifacts, deformed limbs, extra fingers, cluttered background"
+
+        private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mov", "mkv")
         private val gson = Gson()
 
         private fun styleSuffix(style: String): String = when (style.lowercase()) {
@@ -478,6 +636,16 @@ class JarvisMediaGenerator(
             "аниме" -> "high quality anime artwork, vibrant colors, crisp lineart, studio quality"
             "3d арт" -> "octane 3d render, unreal engine 5 style, glossy volumetric lighting"
             else -> style
+        }
+
+        private fun nodeRef(id: String, outputIndex: Int = 0) = JsonArray().apply {
+            add(id)
+            add(outputIndex)
+        }
+
+        private fun comfyNode(classType: String, inputs: JsonObject) = JsonObject().apply {
+            addProperty("class_type", classType)
+            add("inputs", inputs)
         }
 
         fun normalizeComfyBaseUrl(rawUrl: String): String {
@@ -522,56 +690,260 @@ class JarvisMediaGenerator(
             cfgScale: Float,
             seed: Int,
             checkpointName: String,
+            usePonyClipSkip2: Boolean = false,
         ): String {
             val safeW = ((width.coerceIn(256, 1536) + 7) / 8) * 8
             val safeH = ((height.coerceIn(256, 1536) + 7) / 8) * 8
-
-            fun nodeRef(id: String, outputIndex: Int = 0) = com.google.gson.JsonArray().apply {
-                add(id)
-                add(outputIndex)
+            val styledPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
+            val finalPos = if (usePonyClipSkip2 && !styledPrompt.contains("score_9", ignoreCase = true)) {
+                "score_9, score_8_up, score_7_up, $styledPrompt"
+            } else {
+                styledPrompt
             }
-
-            fun node(classType: String, inputs: JsonObject) = JsonObject().apply {
-                addProperty("class_type", classType)
-                add("inputs", inputs)
-            }
+            val finalNeg = if (usePonyClipSkip2 && negativePrompt.isBlank()) DEFAULT_PONY_NEGATIVE else negativePrompt.trim()
+            val clipNodeRef = if (usePonyClipSkip2) nodeRef("11", 0) else nodeRef("4", 1)
 
             val graph = JsonObject().apply {
-                add("4", node("CheckpointLoaderSimple", JsonObject().apply {
+                add("4", comfyNode("CheckpointLoaderSimple", JsonObject().apply {
                     addProperty("ckpt_name", checkpointName)
                 }))
-                add("5", node("EmptyLatentImage", JsonObject().apply {
+                if (usePonyClipSkip2) {
+                    add("11", comfyNode("CLIPSetLastLayer", JsonObject().apply {
+                        add("clip", nodeRef("4", 1))
+                        addProperty("stop_at_clip_layer", -2)
+                    }))
+                }
+                add("5", comfyNode("EmptyLatentImage", JsonObject().apply {
                     addProperty("width", safeW)
                     addProperty("height", safeH)
                     addProperty("batch_size", 1)
                 }))
-                add("6", node("CLIPTextEncode", JsonObject().apply {
-                    addProperty("text", "${prompt.trim()}, ${styleSuffix(style)}")
-                    add("clip", nodeRef("4", 1))
+                add("6", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", finalPos)
+                    add("clip", clipNodeRef)
                 }))
-                add("7", node("CLIPTextEncode", JsonObject().apply {
-                    addProperty("text", negativePrompt.trim())
-                    add("clip", nodeRef("4", 1))
+                add("7", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", finalNeg)
+                    add("clip", clipNodeRef)
                 }))
-                add("3", node("KSampler", JsonObject().apply {
+                add("3", comfyNode("KSampler", JsonObject().apply {
                     addProperty("seed", seed.coerceAtLeast(1))
                     addProperty("steps", steps.coerceIn(1, 100))
                     addProperty("cfg", cfgScale.coerceIn(1.0f, 30.0f))
-                    addProperty("sampler_name", "euler")
-                    addProperty("scheduler", "normal")
+                    addProperty("sampler_name", if (usePonyClipSkip2) "dpmpp_2m" else "euler")
+                    addProperty("scheduler", if (usePonyClipSkip2) "karras" else "normal")
                     addProperty("denoise", 1.0)
                     add("model", nodeRef("4", 0))
                     add("positive", nodeRef("6", 0))
                     add("negative", nodeRef("7", 0))
                     add("latent_image", nodeRef("5", 0))
                 }))
-                add("8", node("VAEDecode", JsonObject().apply {
+                add("8", comfyNode("VAEDecode", JsonObject().apply {
                     add("samples", nodeRef("3", 0))
                     add("vae", nodeRef("4", 2))
                 }))
-                add("9", node("SaveImage", JsonObject().apply {
-                    addProperty("filename_prefix", "JarvisStudio")
+                add("9", comfyNode("SaveImage", JsonObject().apply {
+                    addProperty("filename_prefix", if (usePonyClipSkip2) "JarvisPony" else "JarvisStudio")
                     add("images", nodeRef("8", 0))
+                }))
+            }
+
+            val payload = JsonObject().apply {
+                add("prompt", graph)
+                addProperty("client_id", "jarvis-android")
+            }
+            return gson.toJson(payload)
+        }
+
+        fun buildComfyUiPonyToWan22I2vWorkflowJson(
+            imagePrompt: String,
+            motionPrompt: String = "",
+            negativePrompt: String = DEFAULT_PONY_NEGATIVE,
+            style: String = "Фото",
+            imageWidth: Int = 896,
+            imageHeight: Int = 1152,
+            videoWidth: Int = 640,
+            videoHeight: Int = 640,
+            frames: Int = 49,
+            imageSteps: Int = 30,
+            imageCfg: Float = 5.5f,
+            seed: Int = 42,
+            checkpointName: String = DEFAULT_PONY_CHECKPOINT,
+            ponyClipSkip2: Boolean = true,
+            wanHighNoiseModel: String = DEFAULT_WAN_HIGH_MODEL,
+            wanLowNoiseModel: String = DEFAULT_WAN_LOW_MODEL,
+            wanTextEncoder: String = DEFAULT_WAN_TEXT_ENCODER,
+            wanVae: String = DEFAULT_WAN_VAE,
+            turboLora: Boolean = true,
+            wanHighLora: String = DEFAULT_WAN_HIGH_LORA,
+            wanLowLora: String = DEFAULT_WAN_LOW_LORA,
+        ): String {
+            val safeImgW = ((imageWidth.coerceIn(512, 1536) + 7) / 8) * 8
+            val safeImgH = ((imageHeight.coerceIn(512, 1536) + 7) / 8) * 8
+            val safeVidW = ((videoWidth.coerceIn(320, 960) + 15) / 16) * 16
+            val safeVidH = ((videoHeight.coerceIn(320, 960) + 15) / 16) * 16
+            val rawFrames = frames.coerceIn(17, 121)
+            val alignedFrames = ((rawFrames - 1) / 4) * 4 + 1
+
+            val styledImg = "${imagePrompt.trim()}, ${styleSuffix(style)}"
+            val finalImgPos = if (ponyClipSkip2 && !styledImg.contains("score_9", ignoreCase = true)) {
+                "score_9, score_8_up, score_7_up, $styledImg"
+            } else {
+                styledImg
+            }
+            val finalImgNeg = negativePrompt.trim().ifBlank { DEFAULT_PONY_NEGATIVE }
+            val resolvedMotion = motionPrompt.trim().ifBlank {
+                "${imagePrompt.trim()}, smooth cinematic camera motion, subtle natural movement"
+            }
+            val ponyClipRef = if (ponyClipSkip2) nodeRef("11", 0) else nodeRef("4", 1)
+
+            val wanSteps = if (turboLora) 4 else 20
+            val splitStep = if (turboLora) 2 else 10
+            val wanCfg = if (turboLora) 1.0f else 3.5f
+
+            val graph = JsonObject().apply {
+                // Stage 1: CyberRealistic Pony XL keyframe generation
+                add("4", comfyNode("CheckpointLoaderSimple", JsonObject().apply {
+                    addProperty("ckpt_name", checkpointName.trim().ifBlank { DEFAULT_PONY_CHECKPOINT })
+                }))
+                if (ponyClipSkip2) {
+                    add("11", comfyNode("CLIPSetLastLayer", JsonObject().apply {
+                        add("clip", nodeRef("4", 1))
+                        addProperty("stop_at_clip_layer", -2)
+                    }))
+                }
+                add("5", comfyNode("EmptyLatentImage", JsonObject().apply {
+                    addProperty("width", safeImgW)
+                    addProperty("height", safeImgH)
+                    addProperty("batch_size", 1)
+                }))
+                add("6", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", finalImgPos)
+                    add("clip", ponyClipRef)
+                }))
+                add("7", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", finalImgNeg)
+                    add("clip", ponyClipRef)
+                }))
+                add("3", comfyNode("KSampler", JsonObject().apply {
+                    addProperty("seed", seed.coerceAtLeast(1))
+                    addProperty("steps", imageSteps.coerceIn(1, 100))
+                    addProperty("cfg", imageCfg.coerceIn(1.0f, 30.0f))
+                    addProperty("sampler_name", if (ponyClipSkip2) "dpmpp_2m" else "euler")
+                    addProperty("scheduler", if (ponyClipSkip2) "karras" else "normal")
+                    addProperty("denoise", 1.0)
+                    add("model", nodeRef("4", 0))
+                    add("positive", nodeRef("6", 0))
+                    add("negative", nodeRef("7", 0))
+                    add("latent_image", nodeRef("5", 0))
+                }))
+                add("16", comfyNode("VAEDecode", JsonObject().apply {
+                    add("samples", nodeRef("3", 0))
+                    add("vae", nodeRef("4", 2))
+                }))
+                add("17", comfyNode("SaveImage", JsonObject().apply {
+                    addProperty("filename_prefix", "JarvisPonyKeyframe")
+                    add("images", nodeRef("16", 0))
+                }))
+
+                // Stage 2: Wan 2.2 I2V-14B High/Low Noise MoE image-to-video
+                add("20", comfyNode("UNETLoader", JsonObject().apply {
+                    addProperty("unet_name", wanHighNoiseModel.trim().ifBlank { DEFAULT_WAN_HIGH_MODEL })
+                    addProperty("weight_dtype", "default")
+                }))
+                add("21", comfyNode("UNETLoader", JsonObject().apply {
+                    addProperty("unet_name", wanLowNoiseModel.trim().ifBlank { DEFAULT_WAN_LOW_MODEL })
+                    addProperty("weight_dtype", "default")
+                }))
+                if (turboLora) {
+                    add("22", comfyNode("LoraLoaderModelOnly", JsonObject().apply {
+                        add("model", nodeRef("20", 0))
+                        addProperty("lora_name", wanHighLora.trim().ifBlank { DEFAULT_WAN_HIGH_LORA })
+                        addProperty("strength_model", 1.0)
+                    }))
+                    add("23", comfyNode("LoraLoaderModelOnly", JsonObject().apply {
+                        add("model", nodeRef("21", 0))
+                        addProperty("lora_name", wanLowLora.trim().ifBlank { DEFAULT_WAN_LOW_LORA })
+                        addProperty("strength_model", 1.0)
+                    }))
+                }
+                add("24", comfyNode("ModelSamplingSD3", JsonObject().apply {
+                    add("model", nodeRef(if (turboLora) "22" else "20", 0))
+                    addProperty("shift", 5.0)
+                }))
+                add("25", comfyNode("ModelSamplingSD3", JsonObject().apply {
+                    add("model", nodeRef(if (turboLora) "23" else "21", 0))
+                    addProperty("shift", 5.0)
+                }))
+                add("26", comfyNode("CLIPLoader", JsonObject().apply {
+                    addProperty("clip_name", wanTextEncoder.trim().ifBlank { DEFAULT_WAN_TEXT_ENCODER })
+                    addProperty("type", "wan")
+                    addProperty("device", "default")
+                }))
+                add("27", comfyNode("VAELoader", JsonObject().apply {
+                    addProperty("vae_name", wanVae.trim().ifBlank { DEFAULT_WAN_VAE })
+                }))
+                add("28", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", resolvedMotion)
+                    add("clip", nodeRef("26", 0))
+                }))
+                add("29", comfyNode("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", DEFAULT_WAN_NEGATIVE)
+                    add("clip", nodeRef("26", 0))
+                }))
+                add("30", comfyNode("WanImageToVideo", JsonObject().apply {
+                    add("positive", nodeRef("28", 0))
+                    add("negative", nodeRef("29", 0))
+                    add("vae", nodeRef("27", 0))
+                    add("start_image", nodeRef("16", 0))
+                    addProperty("width", safeVidW)
+                    addProperty("height", safeVidH)
+                    addProperty("length", alignedFrames)
+                    addProperty("batch_size", 1)
+                }))
+                add("31", comfyNode("KSamplerAdvanced", JsonObject().apply {
+                    addProperty("add_noise", "enable")
+                    addProperty("noise_seed", seed.coerceAtLeast(1))
+                    addProperty("steps", wanSteps)
+                    addProperty("cfg", wanCfg)
+                    addProperty("sampler_name", "euler")
+                    addProperty("scheduler", "simple")
+                    addProperty("start_at_step", 0)
+                    addProperty("end_at_step", splitStep)
+                    addProperty("return_with_leftover_noise", "enable")
+                    add("model", nodeRef("24", 0))
+                    add("positive", nodeRef("30", 0))
+                    add("negative", nodeRef("30", 1))
+                    add("latent_image", nodeRef("30", 2))
+                }))
+                add("32", comfyNode("KSamplerAdvanced", JsonObject().apply {
+                    addProperty("add_noise", "disable")
+                    addProperty("noise_seed", 0)
+                    addProperty("steps", wanSteps)
+                    addProperty("cfg", wanCfg)
+                    addProperty("sampler_name", "euler")
+                    addProperty("scheduler", "simple")
+                    addProperty("start_at_step", splitStep)
+                    addProperty("end_at_step", 10000)
+                    addProperty("return_with_leftover_noise", "disable")
+                    add("model", nodeRef("25", 0))
+                    add("positive", nodeRef("30", 0))
+                    add("negative", nodeRef("30", 1))
+                    add("latent_image", nodeRef("31", 0))
+                }))
+                add("33", comfyNode("VAEDecode", JsonObject().apply {
+                    add("samples", nodeRef("32", 0))
+                    add("vae", nodeRef("27", 0))
+                }))
+                add("34", comfyNode("CreateVideo", JsonObject().apply {
+                    add("images", nodeRef("33", 0))
+                    addProperty("fps", 16.0)
+                }))
+                add("35", comfyNode("SaveVideo", JsonObject().apply {
+                    add("video", nodeRef("34", 0))
+                    addProperty("filename_prefix", "video/JarvisWan22")
+                    addProperty("format", "mp4")
+                    addProperty("codec", "auto")
                 }))
             }
 
@@ -588,23 +960,35 @@ class JarvisMediaGenerator(
                 ?: error("ComfyUI не вернул prompt_id")
         }
 
-        fun parseComfyHistoryImageRef(historyJson: String, promptId: String): ComfyImageRef? {
+        fun parseComfyHistoryMediaRef(
+            historyJson: String,
+            promptId: String,
+            preferVideo: Boolean,
+        ): ComfyImageRef? {
             val root = JsonParser.parseString(historyJson).asJsonObject
             val entry = root.getAsJsonObject(promptId) ?: return null
             val outputs = entry.getAsJsonObject("outputs") ?: return null
-            for (key in outputs.keySet()) {
-                val nodeObj = outputs.getAsJsonObject(key) ?: continue
-                val images = nodeObj.getAsJsonArray("images") ?: continue
-                if (images.size() > 0) {
-                    val img = images[0].asJsonObject
-                    val filename = img.get("filename")?.asString?.takeIf { it.isNotBlank() } ?: continue
-                    val subfolder = img.get("subfolder")?.asString ?: ""
-                    val type = img.get("type")?.asString ?: "output"
-                    return ComfyImageRef(filename = filename, subfolder = subfolder, type = type)
+            val keys = if (preferVideo) listOf("videos", "gifs", "images") else listOf("images", "gifs", "videos")
+            for (nodeKey in outputs.keySet()) {
+                val nodeObj = outputs.getAsJsonObject(nodeKey) ?: continue
+                for (arrayKey in keys) {
+                    val arr = nodeObj.getAsJsonArray(arrayKey) ?: continue
+                    for (idx in 0 until arr.size()) {
+                        val item = arr[idx].asJsonObject
+                        val filename = item.get("filename")?.asString?.takeIf { it.isNotBlank() } ?: continue
+                        val ext = filename.substringAfterLast('.', "").lowercase()
+                        if (preferVideo && ext !in VIDEO_EXTENSIONS) continue
+                        val subfolder = item.get("subfolder")?.asString ?: ""
+                        val type = item.get("type")?.asString ?: "output"
+                        return ComfyImageRef(filename = filename, subfolder = subfolder, type = type)
+                    }
                 }
             }
             return null
         }
+
+        fun parseComfyHistoryImageRef(historyJson: String, promptId: String): ComfyImageRef? =
+            parseComfyHistoryMediaRef(historyJson, promptId, preferVideo = false)
 
         fun buildPollinationsImageUrl(
             prompt: String,

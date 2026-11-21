@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
+import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenBackend
 import com.jarvis.breeno.assistant.media.MediaGenConfig
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +74,7 @@ fun MediaStudioScreen(
     pendingPromptRequest: Pair<GeneratedMediaType, String>?,
     onClearPendingRequest: () -> Unit,
     onGenerateImage: suspend (prompt: String, style: String, width: Int, height: Int, onProgress: (String) -> Unit) -> Result<GeneratedMediaItem>,
-    onGenerateVideo: suspend (prompt: String, style: String, width: Int, height: Int, onProgress: (String) -> Unit) -> Result<GeneratedMediaItem>,
+    onGenerateVideo: suspend (prompt: String, style: String, width: Int, height: Int, motionPrompt: String, onProgress: (String) -> Unit) -> Result<GeneratedMediaItem>,
     onOpenItem: (GeneratedMediaItem) -> Unit,
     onDeleteItem: (String) -> Unit,
     onSaveConfig: (MediaGenConfig) -> Unit,
@@ -81,6 +82,7 @@ fun MediaStudioScreen(
 ) {
     val scope = rememberCoroutineScope()
     var prompt by remember { mutableStateOf("") }
+    var motionPrompt by remember { mutableStateOf("") }
     var selectedStyle by remember { mutableStateOf("Фото") }
     var selectedAspect by remember { mutableStateOf("1:1") }
     var generating by remember { mutableStateOf(false) }
@@ -97,11 +99,41 @@ fun MediaStudioScreen(
     var cfgSteps by remember(initialConfig) { mutableStateOf(initialConfig.steps.toString()) }
     var cfgScale by remember(initialConfig) { mutableStateOf(initialConfig.cfgScale.toString()) }
     var cfgCheckpoint by remember(initialConfig) { mutableStateOf(initialConfig.checkpointName) }
+    var cfgPonyClipSkip2 by remember(initialConfig) { mutableStateOf(initialConfig.comfyPonyClipSkip2) }
+    var cfgWanEnabled by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanI2vEnabled) }
+    var cfgWanHigh by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanHighNoiseModel) }
+    var cfgWanLow by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanLowNoiseModel) }
+    var cfgWanClip by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanTextEncoder) }
+    var cfgWanVae by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanVae) }
+    var cfgWanTurbo by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanTurboLora) }
+    var cfgVideoFrames by remember(initialConfig) { mutableStateOf(initialConfig.comfyVideoFrames) }
 
-    fun dimensions(): Pair<Int, Int> = when (selectedAspect) {
-        "16:9" -> 768 to 432
-        "9:16" -> 432 to 768
-        else -> 768 to 768
+    fun imageDimensions(): Pair<Int, Int> = if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI && cfgPonyClipSkip2) {
+        when (selectedAspect) {
+            "16:9" -> 1216 to 832
+            "9:16" -> 832 to 1216
+            else -> 1024 to 1024
+        }
+    } else {
+        when (selectedAspect) {
+            "16:9" -> 768 to 432
+            "9:16" -> 432 to 768
+            else -> 768 to 768
+        }
+    }
+
+    fun videoDimensions(): Pair<Int, Int> = if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI && cfgWanEnabled) {
+        when (selectedAspect) {
+            "16:9" -> 832 to 480
+            "9:16" -> 480 to 832
+            else -> 640 to 640
+        }
+    } else {
+        when (selectedAspect) {
+            "16:9" -> 640 to 368
+            "9:16" -> 368 to 640
+            else -> 512 to 512
+        }
     }
 
     fun startGeneration(type: GeneratedMediaType, overridePrompt: String? = null) {
@@ -111,19 +143,18 @@ fun MediaStudioScreen(
             errorText = "Введите описание для генерации"
             return
         }
-        val (w, h) = dimensions()
+        val (imgW, imgH) = imageDimensions()
+        val (vidW, vidH) = videoDimensions()
         generating = true
         errorText = null
         progressText = if (type == GeneratedMediaType.IMAGE) "Создаю картинку…" else "Создаю MP4 видео…"
         scope.launch {
             val res = if (type == GeneratedMediaType.IMAGE) {
-                onGenerateImage(targetPrompt, selectedStyle, w, h) { msg ->
+                onGenerateImage(targetPrompt, selectedStyle, imgW, imgH) { msg ->
                     scope.launch(Dispatchers.Main.immediate) { progressText = msg }
                 }
             } else {
-                val vidW = if (w > h) 640 else if (h > w) 368 else 512
-                val vidH = if (h > w) 640 else if (w > h) 368 else 512
-                onGenerateVideo(targetPrompt, selectedStyle, vidW, vidH) { msg ->
+                onGenerateVideo(targetPrompt, selectedStyle, vidW, vidH, motionPrompt.trim()) { msg ->
                     scope.launch(Dispatchers.Main.immediate) { progressText = msg }
                 }
             }
@@ -234,13 +265,100 @@ fun MediaStudioScreen(
                             )
                         }
                         if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI) {
+                            OutlinedButton(
+                                onClick = {
+                                    cfgCheckpoint = JarvisMediaGenerator.DEFAULT_PONY_CHECKPOINT
+                                    cfgSteps = "30"
+                                    cfgScale = "5.5"
+                                    cfgNegPrompt = JarvisMediaGenerator.DEFAULT_PONY_NEGATIVE
+                                    cfgPonyClipSkip2 = true
+                                    cfgWanEnabled = true
+                                    cfgWanHigh = JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL
+                                    cfgWanLow = JarvisMediaGenerator.DEFAULT_WAN_LOW_MODEL
+                                    cfgWanClip = JarvisMediaGenerator.DEFAULT_WAN_TEXT_ENCODER
+                                    cfgWanVae = JarvisMediaGenerator.DEFAULT_WAN_VAE
+                                    cfgWanTurbo = true
+                                    cfgVideoFrames = 49
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Пресет: CyberRealistic Pony V18 + Wan 2.2 I2V-14B")
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                FilterChip(
+                                    selected = cfgPonyClipSkip2,
+                                    onClick = { cfgPonyClipSkip2 = !cfgPonyClipSkip2 },
+                                    label = { Text("Pony Clip Skip 2") },
+                                )
+                                FilterChip(
+                                    selected = cfgWanEnabled,
+                                    onClick = { cfgWanEnabled = !cfgWanEnabled },
+                                    label = { Text("Wan 2.2 I2V-14B (Видео)") },
+                                )
+                                if (cfgWanEnabled) {
+                                    FilterChip(
+                                        selected = cfgWanTurbo,
+                                        onClick = { cfgWanTurbo = !cfgWanTurbo },
+                                        label = { Text("4-step Turbo LoRA") },
+                                    )
+                                }
+                            }
                             OutlinedTextField(
                                 value = cfgCheckpoint,
                                 onValueChange = { cfgCheckpoint = it },
-                                label = { Text("Чекпоинт .safetensors (пусто = авто)") },
+                                label = { Text("Чекпоинт .safetensors (Pony V18 / пусто = авто)") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            if (cfgWanEnabled) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("Длина Wan 2.2:", color = StudioMuted, style = MaterialTheme.typography.labelSmall)
+                                    listOf(49 to "49 кадр. (3с)", 81 to "81 кадр. (5с)").forEach { (cnt, lbl) ->
+                                        FilterChip(
+                                            selected = cfgVideoFrames == cnt,
+                                            onClick = { cfgVideoFrames = cnt },
+                                            label = { Text(lbl) },
+                                        )
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = cfgWanHigh,
+                                    onValueChange = { cfgWanHigh = it },
+                                    label = { Text("Wan 2.2 High-Noise UNET (.safetensors)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = cfgWanLow,
+                                    onValueChange = { cfgWanLow = it },
+                                    label = { Text("Wan 2.2 Low-Noise UNET (.safetensors)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = cfgWanClip,
+                                    onValueChange = { cfgWanClip = it },
+                                    label = { Text("Wan Text Encoder (umt5_xxl...)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = cfgWanVae,
+                                    onValueChange = { cfgWanVae = it },
+                                    label = { Text("Wan VAE (wan_2.1_vae.safetensors)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI || cfgBackend == MediaGenBackend.CUSTOM_A1111_SD) {
                             OutlinedTextField(
@@ -311,6 +429,14 @@ fun MediaStudioScreen(
                                         steps = cfgSteps.toIntOrNull()?.coerceIn(1, 100) ?: 24,
                                         cfgScale = cfgScale.replace(',', '.').toFloatOrNull()?.coerceIn(1f, 30f) ?: 7.0f,
                                         checkpointName = cfgCheckpoint,
+                                        comfyPonyClipSkip2 = cfgPonyClipSkip2,
+                                        comfyWanI2vEnabled = cfgWanEnabled,
+                                        comfyWanHighNoiseModel = cfgWanHigh,
+                                        comfyWanLowNoiseModel = cfgWanLow,
+                                        comfyWanTextEncoder = cfgWanClip,
+                                        comfyWanVae = cfgWanVae,
+                                        comfyWanTurboLora = cfgWanTurbo,
+                                        comfyVideoFrames = cfgVideoFrames,
                                     )
                                 )
                                 showServerSettings = false
@@ -331,6 +457,18 @@ fun MediaStudioScreen(
                 maxLines = 4,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI && cfgWanEnabled) {
+            item {
+                OutlinedTextField(
+                    value = motionPrompt,
+                    onValueChange = { motionPrompt = it },
+                    label = { Text("Движение камеры / сцены для Wan 2.2 (опционально)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         item {

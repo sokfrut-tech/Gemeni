@@ -678,7 +678,7 @@ class MainActivity : ComponentActivity() {
                         pendingPromptRequest = pendingStudioRequest,
                         onClearPendingRequest = { pendingStudioRequest = null },
                         onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
-                        onGenerateVideo = { p, s, w, h, cb -> mediaGenerator.generateVideo(p, s, w, h, cb) },
+                        onGenerateVideo = { p, s, w, h, mp, cb -> mediaGenerator.generateVideo(p, s, w, h, mp, cb) },
                         onOpenItem = { item -> openGeneratedMedia(item) },
                         onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
                         onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },

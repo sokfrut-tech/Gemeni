@@ -1,6 +1,7 @@
 package com.jarvis.breeno.assistant.media
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -109,5 +110,71 @@ class JarvisMediaGeneratorTest {
         assertEquals("JarvisStudio_00001_.png", imgRef!!.filename)
         assertEquals("sub", imgRef.subfolder)
         assertEquals("output", imgRef.type)
+    }
+
+    @Test
+    fun buildsPonyClipSkip2AndWan22I2vSingleWindowWorkflowAndParsesVideoOutput() {
+        val ponyOnly = JarvisMediaGenerator.buildComfyUiWorkflowJson(
+            prompt = "киберпанк пилот",
+            negativePrompt = "",
+            style = "Фото",
+            width = 1024,
+            height = 1024,
+            steps = 30,
+            cfgScale = 5.5f,
+            seed = 42,
+            checkpointName = JarvisMediaGenerator.DEFAULT_PONY_CHECKPOINT,
+            usePonyClipSkip2 = true,
+        )
+        assertTrue(ponyOnly.contains("\"class_type\":\"CLIPSetLastLayer\""))
+        assertTrue(ponyOnly.contains("\"stop_at_clip_layer\":-2"))
+        assertTrue(ponyOnly.contains("score_9, score_8_up, score_7_up"))
+        assertTrue(ponyOnly.contains("\"sampler_name\":\"dpmpp_2m\""))
+        assertTrue(ponyOnly.contains("\"scheduler\":\"karras\""))
+
+        val turboPipe = JarvisMediaGenerator.buildComfyUiPonyToWan22I2vWorkflowJson(
+            imagePrompt = "неоновый мегаполис под дождём",
+            motionPrompt = "slow camera push-in, glowing rain",
+            videoWidth = 650,
+            videoHeight = 490,
+            frames = 50,
+            seed = 101,
+            turboLora = true,
+        )
+        assertTrue(turboPipe.contains("\"class_type\":\"CLIPSetLastLayer\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"LoraLoaderModelOnly\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"ModelSamplingSD3\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"WanImageToVideo\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"KSamplerAdvanced\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"CreateVideo\""))
+        assertTrue(turboPipe.contains("\"class_type\":\"SaveVideo\""))
+        // 650->656, 490->496 (multiples of 16), 50->49 (4k+1)
+        assertTrue(turboPipe.contains("\"width\":656"))
+        assertTrue(turboPipe.contains("\"height\":496"))
+        assertTrue(turboPipe.contains("\"length\":49"))
+        assertTrue(turboPipe.contains("\"steps\":4"))
+
+        val basePipe = JarvisMediaGenerator.buildComfyUiPonyToWan22I2vWorkflowJson(
+            imagePrompt = "космос",
+            turboLora = false,
+        )
+        assertFalse(basePipe.contains("LoraLoaderModelOnly"))
+        assertTrue(basePipe.contains("\"steps\":20"))
+        assertTrue(basePipe.contains("\"end_at_step\":10"))
+
+        val mixedHistory = """
+            {
+              "vid-1": {
+                "outputs": {
+                  "17": {"images": [{"filename": "JarvisPonyKeyframe_00001_.png", "subfolder": "", "type": "output"}]},
+                  "35": {"images": [{"filename": "JarvisWan22_00001.mp4", "subfolder": "video", "type": "output"}]}
+                }
+              }
+            }
+        """.trimIndent()
+        val videoRef = JarvisMediaGenerator.parseComfyHistoryMediaRef(mixedHistory, "vid-1", preferVideo = true)
+        assertNotNull(videoRef)
+        assertEquals("JarvisWan22_00001.mp4", videoRef!!.filename)
+        assertEquals("video", videoRef.subfolder)
     }
 }
