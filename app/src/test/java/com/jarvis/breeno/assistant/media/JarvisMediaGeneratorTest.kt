@@ -229,4 +229,120 @@ class JarvisMediaGeneratorTest {
         assertEquals(LocalDreamSseEvent.Done, JarvisMediaGenerator.parseLocalDreamSseEvent("data: [DONE]"))
         assertNull(JarvisMediaGenerator.parseLocalDreamSseEvent(": keepalive"))
     }
+
+    @Test
+    fun buildsAuthenticatedPollinationsUrlAndParsesRetryAfter() {
+        val authUrl = JarvisMediaGenerator.buildPollinationsAuthenticatedUrl(
+            prompt = "Космонавт в шлеме",
+            style = "Фото",
+            width = 768,
+            height = 768,
+            seed = 12,
+        )
+        assertTrue(authUrl.startsWith("https://gen.pollinations.ai/image/"))
+        assertTrue(authUrl.contains("width=768&height=768&seed=12&nologo=true"))
+        assertFalse(authUrl.contains("&model="))
+
+        val authModelUrl = JarvisMediaGenerator.buildPollinationsAuthenticatedUrl(
+            prompt = "Космос",
+            model = "flux",
+        )
+        assertTrue(authModelUrl.contains("&model=flux"))
+
+        assertEquals(43, JarvisMediaGenerator.parseRetryAfterSeconds("43"))
+        assertEquals(12, JarvisMediaGenerator.parseRetryAfterSeconds(" 12 "))
+        assertNull(JarvisMediaGenerator.parseRetryAfterSeconds(""))
+        assertNull(JarvisMediaGenerator.parseRetryAfterSeconds("abc"))
+        assertNull(JarvisMediaGenerator.parseRetryAfterSeconds("-5"))
+        assertNull(JarvisMediaGenerator.parseRetryAfterSeconds("0"))
+    }
+
+    @Test
+    fun buildsAiHordeRequestAndParsesStatusAndTranslation() {
+        assertEquals(512 to 512, JarvisMediaGenerator.computeAiHordeDimensions(768, 768))
+        assertEquals(640 to 384, JarvisMediaGenerator.computeAiHordeDimensions(768, 432))
+        assertEquals(384 to 640, JarvisMediaGenerator.computeAiHordeDimensions(432, 768))
+
+        val photoJson = JarvisMediaGenerator.buildAiHordeRequestJson(
+            prompt = "sunset mountains",
+            negativePrompt = "blurry, watermark",
+            style = "Фото",
+            width = 512,
+            height = 512,
+            steps = 20,
+            cfgScale = 7.0f,
+            seed = 99,
+        )
+        assertTrue(photoJson.contains("sunset mountains, photorealistic"))
+        assertTrue(photoJson.contains(" ### blurry, watermark"))
+        assertTrue(photoJson.contains("\"r2\":true"))
+        assertTrue(photoJson.contains("\"nsfw\":false"))
+        assertTrue(photoJson.contains("\"Deliberate\""))
+
+        val animeJson = JarvisMediaGenerator.buildAiHordeRequestJson(
+            prompt = "mecha pilot",
+            style = "Аниме",
+            width = 640,
+            height = 384,
+        )
+        assertTrue(animeJson.contains("\"Flat-2D Animerge\""))
+        assertTrue(animeJson.contains("\"width\":640"))
+        assertTrue(animeJson.contains("\"height\":384"))
+
+        val customJson = JarvisMediaGenerator.buildAiHordeRequestJson(
+            prompt = "portrait",
+            customModel = "AbsoluteReality",
+        )
+        assertTrue(customJson.contains("\"models\":[\"AbsoluteReality\"]"))
+
+        val noModelsJson = JarvisMediaGenerator.buildAiHordeRequestJson(
+            prompt = "portrait",
+            includeModels = false,
+        )
+        assertFalse(noModelsJson.contains("\"models\""))
+
+        assertEquals("job-xyz-1", JarvisMediaGenerator.parseAiHordeSubmitId("""{"id":"job-xyz-1","kudos":6.0}"""))
+
+        val check = JarvisMediaGenerator.parseAiHordeCheckStatus(
+            """{"done":false,"faulted":false,"is_possible":true,"wait_time":14,"queue_position":2,"processing":1}"""
+        )
+        assertFalse(check.done)
+        assertFalse(check.faulted)
+        assertTrue(check.isPossible)
+        assertEquals(14, check.waitTime)
+        assertEquals(2, check.queuePosition)
+        assertEquals(1, check.processing)
+
+        val r2Payload = JarvisMediaGenerator.parseAiHordeCompletedImage(
+            """{"done":true,"generations":[{"img":"https://example.r2.cloudflarestorage.com/img.webp"}]}"""
+        )
+        assertTrue(r2Payload is AiHordeImagePayload.RemoteUrl)
+        assertEquals(
+            "https://example.r2.cloudflarestorage.com/img.webp",
+            (r2Payload as AiHordeImagePayload.RemoteUrl).url,
+        )
+
+        val b64Payload = JarvisMediaGenerator.parseAiHordeCompletedImage(
+            """{"done":true,"generations":[{"img":"data:image/webp;base64,UklGRg=="}]}"""
+        )
+        assertTrue(b64Payload is AiHordeImagePayload.Base64Data)
+        assertEquals("UklGRg==", (b64Payload as AiHordeImagePayload.Base64Data).base64)
+
+        assertEquals(
+            "An orange cat at sunset by the sea",
+            JarvisMediaGenerator.parseMyMemoryTranslation(
+                """{"responseData":{"translatedText":"An orange cat at sunset by the sea","match":0.85},"responseStatus":200}"""
+            ),
+        )
+        assertNull(
+            JarvisMediaGenerator.parseMyMemoryTranslation(
+                """{"responseData":{"translatedText":"MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS"},"responseStatus":429}"""
+            )
+        )
+        assertNull(
+            JarvisMediaGenerator.parseMyMemoryTranslation(
+                """{"responseData":{"translatedText":"MYMEMORY WARNING: limit exceeded"},"responseStatus":200}"""
+            )
+        )
+    }
 }

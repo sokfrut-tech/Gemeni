@@ -110,6 +110,11 @@ fun MediaStudioScreen(
     var cfgLocalDreamUrl by remember(initialConfig) { mutableStateOf(initialConfig.localDreamUrl) }
 
     fun imageDimensions(): Pair<Int, Int> = when {
+        cfgBackend == MediaGenBackend.AI_HORDE_FREE -> when (selectedAspect) {
+            "16:9" -> 640 to 384
+            "9:16" -> 384 to 640
+            else -> 512 to 512
+        }
         cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU -> when (selectedAspect) {
             "16:9" -> 768 to 512
             "9:16" -> 512 to 768
@@ -221,7 +226,7 @@ fun MediaStudioScreen(
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Движок генерации", color = Color.White, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Встроенный онлайн-движок ограничен правилами внешнего сервиса. Для полного контроля над чекпоинтами (SDXL / Flux / локальные модели) выберите ComfyUI или SD / A1111 на вашем ПК.",
+                            text = "Встроенный онлайн-движок (Pollinations) при лимите IP (HTTP 402/429) автоматически переключается на бесплатный AI Horde. Для полностью локальной генерации без интернета выберите Local Dream NPU или ComfyUI на ПК.",
                             color = StudioMuted,
                             style = MaterialTheme.typography.labelSmall,
                         )
@@ -235,6 +240,11 @@ fun MediaStudioScreen(
                                 selected = cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE,
                                 onClick = { cfgBackend = MediaGenBackend.POLLINATIONS_ONLINE },
                                 label = { Text("Встроенный") },
+                            )
+                            FilterChip(
+                                selected = cfgBackend == MediaGenBackend.AI_HORDE_FREE,
+                                onClick = { cfgBackend = MediaGenBackend.AI_HORDE_FREE },
+                                label = { Text("AI Horde") },
                             )
                             FilterChip(
                                 selected = cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU,
@@ -255,6 +265,13 @@ fun MediaStudioScreen(
                                 selected = cfgBackend == MediaGenBackend.CUSTOM_OPENAI_IMAGES,
                                 onClick = { cfgBackend = MediaGenBackend.CUSTOM_OPENAI_IMAGES },
                                 label = { Text("OpenAI API") },
+                            )
+                        }
+                        if (cfgBackend == MediaGenBackend.AI_HORDE_FREE) {
+                            Text(
+                                text = "Бесплатная распределённая генерация (без лимита HTTP 402, работает анонимно). При желании можно указать свой ключ с aihorde.net/register для более быстрой очереди.",
+                                color = Color(0xFF34D399),
+                                style = MaterialTheme.typography.labelSmall,
                             )
                         }
                         if (cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU) {
@@ -282,7 +299,10 @@ fun MediaStudioScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE && cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
+                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE &&
+                            cfgBackend != MediaGenBackend.AI_HORDE_FREE &&
+                            cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU
+                        ) {
                             OutlinedTextField(
                                 value = cfgImgUrl,
                                 onValueChange = { cfgImgUrl = it },
@@ -397,7 +417,8 @@ fun MediaStudioScreen(
                         }
                         if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI ||
                             cfgBackend == MediaGenBackend.CUSTOM_A1111_SD ||
-                            cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU
+                            cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU ||
+                            cfgBackend == MediaGenBackend.AI_HORDE_FREE
                         ) {
                             OutlinedTextField(
                                 value = cfgNegPrompt,
@@ -428,11 +449,19 @@ fun MediaStudioScreen(
                                 )
                             }
                         }
-                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE && cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
+                        if (cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
                             OutlinedTextField(
                                 value = cfgKey,
                                 onValueChange = { cfgKey = it },
-                                label = { Text("API-ключ (если требуется)") },
+                                label = {
+                                    Text(
+                                        when (cfgBackend) {
+                                            MediaGenBackend.POLLINATIONS_ONLINE -> "API-ключ Pollinations (необязательно, с enter.pollinations.ai)"
+                                            MediaGenBackend.AI_HORDE_FREE -> "API-ключ AI Horde (пусто = бесплатный анонимный)"
+                                            else -> "API-ключ (если требуется)"
+                                        }
+                                    )
+                                },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
@@ -445,7 +474,10 @@ fun MediaStudioScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        if (cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE || cfgBackend == MediaGenBackend.CUSTOM_OPENAI_IMAGES) {
+                        if (cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE ||
+                            cfgBackend == MediaGenBackend.AI_HORDE_FREE ||
+                            cfgBackend == MediaGenBackend.CUSTOM_OPENAI_IMAGES
+                        ) {
                             OutlinedTextField(
                                 value = cfgModel,
                                 onValueChange = { cfgModel = it },

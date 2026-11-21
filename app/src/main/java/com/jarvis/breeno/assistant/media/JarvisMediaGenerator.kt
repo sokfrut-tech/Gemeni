@@ -9,7 +9,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -30,7 +32,8 @@ import java.util.UUID
 import kotlin.random.Random
 
 enum class MediaGenBackend(val title: String) {
-    POLLINATIONS_ONLINE("Встроенный онлайн-генератор (без ключа)"),
+    POLLINATIONS_ONLINE("Встроенный онлайн (Pollinations + AI Horde)"),
+    AI_HORDE_FREE("AI Horde онлайн (бесплатно, без HTTP 402)"),
     LOCAL_DREAM_NPU("Офлайн на телефоне (Local Dream NPU)"),
     CUSTOM_COMFYUI("Свой ПК (ComfyUI API)"),
     CUSTOM_A1111_SD("Свой ПК (Stable Diffusion / A1111 WebUI)"),
@@ -184,11 +187,32 @@ sealed interface LocalDreamSseEvent {
     data object Done : LocalDreamSseEvent
 }
 
+data class AiHordeCheckStatus(
+    val done: Boolean,
+    val faulted: Boolean,
+    val isPossible: Boolean,
+    val waitTime: Int,
+    val queuePosition: Int,
+    val processing: Int,
+)
+
+sealed interface AiHordeImagePayload {
+    data class RemoteUrl(val url: String) : AiHordeImagePayload
+    data class Base64Data(val base64: String) : AiHordeImagePayload
+}
+
+internal class MediaHttpException(
+    val statusCode: Int,
+    val retryAfterSeconds: Int?,
+    val responseBody: String,
+    message: String,
+) : IllegalStateException(message)
+
 /**
  * Generates images and animated MP4 videos on the phone or via self-hosted PC ComfyUI:
  * - On-device Qualcomm NPU image generation via Local Dream (http://127.0.0.1:8081/generate SSE).
  * - Single-window ComfyUI pipeline supports CyberRealistic Pony XL (Clip Skip 2) -> Wan 2.2 I2V-14B.
- * - Also supports Automatic1111/Forge WebUI, OpenAI Images, Pollinations images, and on-device MediaCodec MP4.
+ * - Also supports Pollinations + automatic AI Horde free fallback, Automatic1111/Forge WebUI, OpenAI Images, and MP4.
  */
 class JarvisMediaGenerator(
     private val studioDir: File,
@@ -200,6 +224,9 @@ class JarvisMediaGenerator(
     private val gson = Gson()
     private val _items = MutableStateFlow(loadHistory())
     val items: StateFlow<List<GeneratedMediaItem>> = _items.asStateFlow()
+
+    @Volatile
+    private var pollinationsCooldownUntilMs: Long = 0L
 
     init {
         studioDir.mkdirs()
@@ -366,10 +393,17 @@ class JarvisMediaGenerator(
         onProgress: (String) -> Unit,
     ): ByteArray {
         return when (cfg.backend) {
-            MediaGenBackend.POLLINATIONS_ONLINE -> {
-                val url = buildPollinationsImageUrl(prompt, style, width, height, seed, cfg.modelName)
-                getBytes(url, emptyMap(), readTimeoutMs = 45_000)
-            }
+            MediaGenBackend.POLLINATIONS_ONLINE -> fetchOnlineAuto(cfg, prompt, style, width, height, seed, onProgress)
+            MediaGenBackend.AI_HORDE_FREE -> fetchFromAiHorde(
+                cfg = cfg,
+                prompt = prompt,
+                style = style,
+                width = width,
+                height = height,
+                seed = seed,
+                onProgress = onProgress,
+                useCustomKey = true,
+            )
             MediaGenBackend.LOCAL_DREAM_NPU -> fetchFromLocalDreamNpu(cfg, prompt, style, width, height, seed, onProgress)
             MediaGenBackend.CUSTOM_COMFYUI -> fetchFromComfyUi(cfg, prompt, style, width, height, seed, onProgress)
             MediaGenBackend.CUSTOM_A1111_SD -> {
@@ -399,9 +433,276 @@ class JarvisMediaGenerator(
                 val resp = postBytes(url, reqJson, headers, readTimeoutMs = 90_000)
                 when (val payload = parseOpenAiImageResult(resp.toString(Charsets.UTF_8))) {
                     is OpenAiImagePayload.Base64Data -> Base64.decode(payload.base64, Base64.DEFAULT)
-                    is OpenAiImagePayload.RemoteUrl -> getBytes(payload.url, emptyMap(), readTimeoutMs = 45_000)
+                    is OpenAiImagePayload.RemoteUrl -> getBytes(payload.url, emptyMap(), readTimeoutMs = 45_000, expectImage = true)
                 }
             }
+        }
+    }
+
+    private suspend fun fetchOnlineAuto(
+        cfg: MediaGenConfig,
+        prompt: String,
+        style: String,
+        width: Int,
+        height: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+    ): ByteArray {
+        var pollinationsErr: Throwable? = null
+        val customKey = cfg.apiKey.trim()
+        if (customKey.isNotEmpty() && !customKey.startsWith("sk-proj-")) {
+            try {
+                onProgress("Отправляю запрос в Pollinations (API-ключ)…")
+                val authUrl = buildPollinationsAuthenticatedUrl(prompt, style, width, height, seed, cfg.modelName)
+                val bytes = getBytes(
+                    urlStr = authUrl,
+                    headers = mapOf("Authorization" to "Bearer $customKey"),
+                    readTimeoutMs = 45_000,
+                    expectImage = true,
+                )
+                return ensureJpegBytes(bytes)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (err: Throwable) {
+                pollinationsErr = err
+                val codeInfo = if (err is MediaHttpException) " (HTTP ${err.statusCode})" else ""
+                onProgress("Pollinations по ключу не ответил$codeInfo — пробую резервный AI Horde…")
+            }
+        }
+
+        val now = System.currentTimeMillis()
+        if (now >= pollinationsCooldownUntilMs) {
+            try {
+                val url = buildPollinationsImageUrl(prompt, style, width, height, seed, cfg.modelName)
+                val bytes = getBytes(url, emptyMap(), readTimeoutMs = 35_000, expectImage = true)
+                pollinationsCooldownUntilMs = System.currentTimeMillis() + 46_000L
+                return ensureJpegBytes(bytes)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (err: MediaHttpException) {
+                pollinationsErr = err
+                if (err.statusCode == 402 || err.statusCode == 429) {
+                    val waitSec = (err.retryAfterSeconds ?: 45).coerceIn(10, 120)
+                    pollinationsCooldownUntilMs = System.currentTimeMillis() + waitSec * 1000L
+                    onProgress("Pollinations занят (HTTP ${err.statusCode}) — переключаюсь на резервный AI Horde…")
+                } else {
+                    onProgress("Pollinations недоступен (HTTP ${err.statusCode}) — переключаюсь на AI Horde…")
+                }
+            } catch (err: Throwable) {
+                pollinationsErr = err
+                onProgress("Pollinations не ответил — переключаюсь на AI Horde…")
+            }
+        } else {
+            onProgress("Pollinations на паузе (лимит 45 с) — генерирую через AI Horde…")
+        }
+
+        return try {
+            fetchFromAiHorde(
+                cfg = cfg,
+                prompt = prompt,
+                style = style,
+                width = width,
+                height = height,
+                seed = seed,
+                onProgress = onProgress,
+                useCustomKey = false,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (hordeErr: Throwable) {
+            val pollHint = if (pollinationsErr is MediaHttpException && pollinationsErr.statusCode == 402) {
+                "Pollinations: лимит 1 фото / 45 сек (HTTP 402)"
+            } else {
+                pollinationsErr?.message ?: "Pollinations на паузе"
+            }
+            error("$pollHint; резервный AI Horde: ${hordeErr.message ?: hordeErr.javaClass.simpleName}. Повторите чуть позже или используйте Local Dream NPU.")
+        }
+    }
+
+    private suspend fun fetchFromAiHorde(
+        cfg: MediaGenConfig,
+        prompt: String,
+        style: String,
+        width: Int,
+        height: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+        useCustomKey: Boolean,
+    ): ByteArray {
+        val cleanPrompt = translatePromptIfCyrillic(prompt, onProgress)
+        val (hordeW, hordeH) = computeAiHordeDimensions(width, height)
+        val customModel = if (cfg.backend == MediaGenBackend.AI_HORDE_FREE) cfg.modelName.trim() else ""
+        val apiKey = if (useCustomKey && cfg.apiKey.isNotBlank()) cfg.apiKey.trim() else DEFAULT_AI_HORDE_ANON_KEY
+        val headers = mapOf(
+            "apikey" to apiKey,
+            "Client-Agent" to AI_HORDE_CLIENT_AGENT,
+        )
+
+        onProgress("AI Horde: отправляю задачу ($hordeW×$hordeH)…")
+        var jobId = submitAiHordeJob(
+            prompt = cleanPrompt,
+            cfg = cfg,
+            style = style,
+            hordeW = hordeW,
+            hordeH = hordeH,
+            seed = seed,
+            customModel = customModel,
+            headers = headers,
+            includeModels = true,
+        )
+
+        val pollStart = System.currentTimeMillis()
+        var retriedWithoutModelFilter = false
+        try {
+            while (System.currentTimeMillis() - pollStart < 120_000L) {
+                currentCoroutineContext().ensureActive()
+                val checkJson = getBytes("$AI_HORDE_BASE_URL/generate/check/$jobId", mapOf("Client-Agent" to AI_HORDE_CLIENT_AGENT), readTimeoutMs = 15_000)
+                    .toString(Charsets.UTF_8)
+                val status = parseAiHordeCheckStatus(checkJson)
+                if (status.faulted) {
+                    error("AI Horde: сбой воркера (faulted)")
+                }
+                if (status.done) {
+                    onProgress("AI Horde: скачиваю готовое изображение…")
+                    val statusJson = getBytes("$AI_HORDE_BASE_URL/generate/status/$jobId", mapOf("Client-Agent" to AI_HORDE_CLIENT_AGENT), readTimeoutMs = 20_000)
+                        .toString(Charsets.UTF_8)
+                    val rawBytes = when (val payload = parseAiHordeCompletedImage(statusJson)) {
+                        is AiHordeImagePayload.RemoteUrl -> {
+                            require(payload.url.startsWith("https://", ignoreCase = true)) {
+                                "AI Horde вернул небезопасный URL"
+                            }
+                            getBytes(payload.url, emptyMap(), readTimeoutMs = 45_000, expectImage = true)
+                        }
+                        is AiHordeImagePayload.Base64Data -> Base64.decode(payload.base64, Base64.DEFAULT)
+                    }
+                    return ensureJpegBytes(rawBytes)
+                }
+                if (!status.isPossible && !retriedWithoutModelFilter) {
+                    retriedWithoutModelFilter = true
+                    cancelAiHordeJobBestEffort(jobId)
+                    onProgress("AI Horde: подбираю свободного воркера…")
+                    jobId = submitAiHordeJob(
+                        prompt = cleanPrompt,
+                        cfg = cfg,
+                        style = style,
+                        hordeW = hordeW,
+                        hordeH = hordeH,
+                        seed = seed,
+                        customModel = "",
+                        headers = headers,
+                        includeModels = false,
+                    )
+                    delay(1_500)
+                    continue
+                }
+                val progressMsg = if (status.processing > 0) {
+                    "AI Horde рисует… (~${status.waitTime} с)"
+                } else {
+                    "AI Horde: очередь ${status.queuePosition}, ~${status.waitTime} с…"
+                }
+                onProgress(progressMsg)
+                delay(2_500)
+            }
+            cancelAiHordeJobBestEffort(jobId)
+            error("AI Horde не успел завершить генерацию за 2 минуты")
+        } catch (cancelled: CancellationException) {
+            withContext(NonCancellable) { cancelAiHordeJobBestEffort(jobId) }
+            throw cancelled
+        }
+    }
+
+    private fun submitAiHordeJob(
+        prompt: String,
+        cfg: MediaGenConfig,
+        style: String,
+        hordeW: Int,
+        hordeH: Int,
+        seed: Int,
+        customModel: String,
+        headers: Map<String, String>,
+        includeModels: Boolean,
+    ): String {
+        fun postOnce(withModels: Boolean, modelName: String): String {
+            val reqJson = buildAiHordeRequestJson(
+                prompt = prompt,
+                negativePrompt = cfg.negativePrompt,
+                style = style,
+                width = hordeW,
+                height = hordeH,
+                steps = cfg.steps.coerceIn(12, 28),
+                cfgScale = cfg.cfgScale.coerceIn(3.0f, 15.0f),
+                seed = seed,
+                customModel = modelName,
+                includeModels = withModels,
+            )
+            val resp = postBytes("$AI_HORDE_BASE_URL/generate/async", reqJson, headers, readTimeoutMs = 20_000)
+                .toString(Charsets.UTF_8)
+            return parseAiHordeSubmitId(resp)
+        }
+        return try {
+            postOnce(includeModels, customModel)
+        } catch (err: MediaHttpException) {
+            if (includeModels && err.statusCode == 400) {
+                postOnce(false, "")
+            } else {
+                throw err
+            }
+        }
+    }
+
+    private fun translatePromptIfCyrillic(prompt: String, onProgress: (String) -> Unit): String {
+        val clean = prompt.trim()
+        if (!CYRILLIC_REGEX.containsMatchIn(clean)) return clean
+        return runCatching {
+            onProgress("Перевожу промпт для SD 1.5…")
+            val q = URLEncoder.encode(clean.take(450), "UTF-8")
+            val conn = (URL("https://api.mymemory.translated.net/get?q=$q&langpair=ru|en").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 4_000
+                readTimeout = 4_000
+                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+            }
+            try {
+                if (conn.responseCode !in 200..299) return@runCatching clean
+                val json = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                parseMyMemoryTranslation(json) ?: clean
+            } finally {
+                conn.disconnect()
+            }
+        }.getOrDefault(clean)
+    }
+
+    private fun cancelAiHordeJobBestEffort(jobId: String) {
+        runCatching {
+            val conn = (URL("$AI_HORDE_BASE_URL/generate/status/$jobId").openConnection() as HttpURLConnection).apply {
+                requestMethod = "DELETE"
+                connectTimeout = 5_000
+                readTimeout = 5_000
+                setRequestProperty("Client-Agent", AI_HORDE_CLIENT_AGENT)
+                setRequestProperty("User-Agent", "Jarvis-Android/1.0")
+            }
+            try {
+                conn.responseCode
+            } finally {
+                conn.disconnect()
+            }
+        }
+    }
+
+    private fun ensureJpegBytes(rawBytes: ByteArray): ByteArray {
+        val isJpeg = rawBytes.size >= 3 &&
+            rawBytes[0] == 0xFF.toByte() &&
+            rawBytes[1] == 0xD8.toByte() &&
+            rawBytes[2] == 0xFF.toByte()
+        if (isJpeg) return rawBytes
+        val bmp = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size) ?: return rawBytes
+        return try {
+            ByteArrayOutputStream().use { out ->
+                bmp.compress(Bitmap.CompressFormat.JPEG, 94, out)
+                out.toByteArray()
+            }
+        } finally {
+            bmp.recycle()
         }
     }
 
@@ -671,7 +972,12 @@ class JarvisMediaGenerator(
     private fun buildAuthHeaders(apiKey: String): Map<String, String> =
         if (apiKey.isBlank()) emptyMap() else mapOf("Authorization" to "Bearer ${apiKey.trim()}")
 
-    private fun getBytes(urlStr: String, headers: Map<String, String>, readTimeoutMs: Int): ByteArray {
+    private fun getBytes(
+        urlStr: String,
+        headers: Map<String, String>,
+        readTimeoutMs: Int,
+        expectImage: Boolean = false,
+    ): ByteArray {
         var lastErr: Throwable? = null
         for (attempt in 1..2) {
             val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
@@ -684,8 +990,26 @@ class JarvisMediaGenerator(
             }
             try {
                 val code = conn.responseCode
-                check(code in 200..299) { "Сервер генерации вернул HTTP $code" }
+                if (code !in 200..299) {
+                    val errText = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                    val retryAfter = parseRetryAfterSeconds(conn.getHeaderField("Retry-After"))
+                    throw MediaHttpException(
+                        statusCode = code,
+                        retryAfterSeconds = retryAfter,
+                        responseBody = errText,
+                        message = "Сервер генерации вернул HTTP $code",
+                    )
+                }
+                if (expectImage) {
+                    val ctype = conn.contentType.orEmpty().lowercase()
+                    if (ctype.startsWith("text/") || ctype.startsWith("application/json")) {
+                        throw IllegalStateException("Сервер вернул не изображение (${conn.contentType})")
+                    }
+                }
                 return conn.inputStream.use { it.readBytes() }
+            } catch (err: MediaHttpException) {
+                lastErr = err
+                if (err.statusCode in 400..499 || attempt == 2) throw err
             } catch (err: Throwable) {
                 lastErr = err
                 if (attempt == 2) throw err
@@ -719,7 +1043,14 @@ class JarvisMediaGenerator(
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val data = stream?.use { it.readBytes() } ?: ByteArray(0)
             if (code !in 200..299) {
-                error("Сервер генерации вернул HTTP $code: ${data.toString(Charsets.UTF_8).take(140)}")
+                val errText = data.toString(Charsets.UTF_8)
+                val retryAfter = parseRetryAfterSeconds(conn.getHeaderField("Retry-After"))
+                throw MediaHttpException(
+                    statusCode = code,
+                    retryAfterSeconds = retryAfter,
+                    responseBody = errText,
+                    message = "Сервер генерации вернул HTTP $code: ${errText.take(140)}",
+                )
             }
             return data
         } finally {
@@ -744,6 +1075,9 @@ class JarvisMediaGenerator(
     }
 
     companion object {
+        const val DEFAULT_AI_HORDE_ANON_KEY = "0000000000"
+        const val AI_HORDE_BASE_URL = "https://aihorde.net/api/v2"
+        const val AI_HORDE_CLIENT_AGENT = "JarvisAndroid:1.0:github.com/sokfrut-tech/Gemeni"
         const val DEFAULT_LOCAL_DREAM_URL = "http://127.0.0.1:8081"
         const val DEFAULT_LOCAL_DREAM_NEGATIVE = "bad anatomy, extra fingers, deformed, blurry, low quality, worst quality"
         const val DEFAULT_PONY_CHECKPOINT = "CyberRealisticPony_V18.0_F16.safetensors"
@@ -756,6 +1090,7 @@ class JarvisMediaGenerator(
         const val DEFAULT_WAN_LOW_LORA = "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
         const val DEFAULT_WAN_NEGATIVE = "static image, overexposed, blurred details, worst quality, low quality, jpeg artifacts, deformed limbs, extra fingers, cluttered background"
 
+        private val CYRILLIC_REGEX = Regex("[а-яА-ЯёЁ]")
         private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "mov", "mkv")
         private val gson = Gson()
 
@@ -1189,6 +1524,22 @@ class JarvisMediaGenerator(
         fun parseComfyHistoryImageRef(historyJson: String, promptId: String): ComfyImageRef? =
             parseComfyHistoryMediaRef(historyJson, promptId, preferVideo = false)
 
+        private fun buildPollinationsPathAndQuery(
+            prompt: String,
+            style: String,
+            width: Int,
+            height: Int,
+            seed: Int,
+            model: String,
+        ): String {
+            val fullPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
+            val encoded = URLEncoder.encode(fullPrompt, "UTF-8").replace("+", "%20")
+            val modelParam = model.trim().takeIf { it.isNotEmpty() }
+                ?.let { "&model=${URLEncoder.encode(it, "UTF-8")}" }
+                .orEmpty()
+            return "$encoded?width=$width&height=$height&seed=$seed&nologo=true$modelParam"
+        }
+
         fun buildPollinationsImageUrl(
             prompt: String,
             style: String = "Фото",
@@ -1196,14 +1547,132 @@ class JarvisMediaGenerator(
             height: Int = 768,
             seed: Int = 42,
             model: String = "",
-        ): String {
-            val fullPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
-            val encoded = URLEncoder.encode(fullPrompt, "UTF-8").replace("+", "%20")
-            val modelParam = model.trim().takeIf { it.isNotEmpty() }
-                ?.let { "&model=${URLEncoder.encode(it, "UTF-8")}" }
-                .orEmpty()
-            return "https://image.pollinations.ai/prompt/$encoded?width=$width&height=$height&seed=$seed&nologo=true$modelParam"
+        ): String = "https://image.pollinations.ai/prompt/${buildPollinationsPathAndQuery(prompt, style, width, height, seed, model)}"
+
+        fun buildPollinationsAuthenticatedUrl(
+            prompt: String,
+            style: String = "Фото",
+            width: Int = 768,
+            height: Int = 768,
+            seed: Int = 42,
+            model: String = "",
+        ): String = "https://gen.pollinations.ai/image/${buildPollinationsPathAndQuery(prompt, style, width, height, seed, model)}"
+
+        fun parseRetryAfterSeconds(headerValue: String?): Int? =
+            headerValue?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+
+        fun computeAiHordeDimensions(width: Int, height: Int): Pair<Int, Int> = when {
+            width > height -> 640 to 384
+            height > width -> 384 to 640
+            else -> 512 to 512
         }
+
+        fun aiHordePreferredModels(style: String, customModel: String = ""): List<String> {
+            val custom = customModel.trim()
+            if (custom.isNotEmpty()) return listOf(custom)
+            return if (style.equals("Аниме", ignoreCase = true)) {
+                listOf("Flat-2D Animerge", "Rev Animated", "Deliberate", "stable_diffusion")
+            } else {
+                listOf("Deliberate", "ICBINP - I Can't Believe It's Not Photography", "AbsoluteReality", "Rev Animated", "stable_diffusion")
+            }
+        }
+
+        fun buildAiHordeRequestJson(
+            prompt: String,
+            negativePrompt: String = DEFAULT_LOCAL_DREAM_NEGATIVE,
+            style: String = "Фото",
+            width: Int = 512,
+            height: Int = 512,
+            steps: Int = 20,
+            cfgScale: Float = 7.0f,
+            seed: Int = 42,
+            customModel: String = "",
+            includeModels: Boolean = true,
+        ): String {
+            val safeW = ((width.coerceIn(384, 768) + 32) / 64) * 64
+            val safeH = ((height.coerceIn(384, 768) + 32) / 64) * 64
+            val neg = negativePrompt.trim().ifBlank { DEFAULT_LOCAL_DREAM_NEGATIVE }
+            val combinedPrompt = "${prompt.trim()}, ${styleSuffix(style)} ### $neg"
+            val params = JsonObject().apply {
+                addProperty("width", safeW)
+                addProperty("height", safeH)
+                addProperty("steps", steps.coerceIn(12, 28))
+                addProperty("cfg_scale", cfgScale.coerceIn(3.0f, 15.0f))
+                addProperty("sampler_name", "k_euler_a")
+                addProperty("karras", true)
+                addProperty("n", 1)
+                if (seed > 0) {
+                    addProperty("seed", seed.toString())
+                }
+            }
+            val root = JsonObject().apply {
+                addProperty("prompt", combinedPrompt)
+                add("params", params)
+                addProperty("nsfw", false)
+                addProperty("censor_nsfw", false)
+                addProperty("r2", true)
+                addProperty("shared", false)
+                if (includeModels) {
+                    val modelsArr = JsonArray()
+                    aiHordePreferredModels(style, customModel).forEach { modelsArr.add(it) }
+                    add("models", modelsArr)
+                }
+            }
+            return gson.toJson(root)
+        }
+
+        fun parseAiHordeSubmitId(json: String): String {
+            val root = JsonParser.parseString(json).asJsonObject
+            return root.get("id")?.asString?.takeIf { it.isNotBlank() }
+                ?: error("AI Horde не вернул ID задачи")
+        }
+
+        fun parseAiHordeCheckStatus(json: String): AiHordeCheckStatus {
+            val root = JsonParser.parseString(json).asJsonObject
+            return AiHordeCheckStatus(
+                done = root.get("done")?.asBoolean ?: false,
+                faulted = root.get("faulted")?.asBoolean ?: false,
+                isPossible = root.get("is_possible")?.asBoolean ?: true,
+                waitTime = root.get("wait_time")?.asInt ?: 0,
+                queuePosition = root.get("queue_position")?.asInt ?: 0,
+                processing = root.get("processing")?.asInt ?: 0,
+            )
+        }
+
+        fun parseAiHordeCompletedImage(json: String): AiHordeImagePayload {
+            val root = JsonParser.parseString(json).asJsonObject
+            val gens = root.getAsJsonArray("generations")
+                ?: error("AI Horde не вернул массив generations")
+            if (gens.size() == 0) error("AI Horde вернул пустой список изображений")
+            val first = gens[0].asJsonObject
+            val rawImg = first.get("img")?.asString?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("AI Horde вернул пустое поле img")
+            return if (rawImg.startsWith("https://", ignoreCase = true) || rawImg.startsWith("http://", ignoreCase = true)) {
+                AiHordeImagePayload.RemoteUrl(rawImg)
+            } else {
+                AiHordeImagePayload.Base64Data(rawImg.substringAfter("base64,"))
+            }
+        }
+
+        fun parseMyMemoryTranslation(json: String): String? = runCatching {
+            val root = JsonParser.parseString(json).asJsonObject
+            val statusCode = root.get("responseStatus")?.asString?.toDoubleOrNull()?.toInt()
+            if (statusCode != null && statusCode != 200) return null
+            val translated = root.getAsJsonObject("responseData")
+                ?.get("translatedText")
+                ?.asString
+                ?.trim()
+                ?: return null
+            if (translated.isBlank() ||
+                translated.startsWith("MYMEMORY WARNING", ignoreCase = true) ||
+                translated.startsWith("PLEASE SELECT", ignoreCase = true) ||
+                translated.startsWith("QUERY LENGTH LIMIT", ignoreCase = true)
+            ) {
+                null
+            } else {
+                translated
+            }
+        }.getOrNull()
 
         fun buildStoryboardPrompts(videoPrompt: String, style: String): List<String> {
             val clean = videoPrompt.trim()
