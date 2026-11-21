@@ -53,6 +53,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("com.google.protobuf:protobuf-javalite:4.29.3")
     implementation("com.google.code.gson:gson:2.12.1")
+    implementation("org.apache.commons:commons-compress:1.27.1")
 
     // Official Sherpa-ONNX Android API and bundled native runtimes (ASR, TTS, KWS, VAD).
     implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
