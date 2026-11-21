@@ -1,10 +1,16 @@
 package com.jarvis.breeno.assistant.voice
 
+import com.google.gson.JsonParser
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
+
+data class PiperInferenceParams(
+    val noiseScale: Float,
+    val noiseScaleW: Float,
+)
 
 /** Local VITS/Piper-compatible TTS through the actual Sherpa-ONNX Kotlin API. */
 class PiperTtsEngine {
@@ -23,9 +29,12 @@ class PiperTtsEngine {
         require(model.isFile && tokens.isFile) { "TTS model is incomplete: ${modelDir.absolutePath}" }
         require(data.isDirectory) { "espeak-ng-data is missing: ${data.absolutePath}" }
 
+        val inference = parseVoiceInferenceParams(modelDir)
+
         tts?.release()
         // Construct OfflineTtsConfig directly: getOfflineTtsConfig() in v1.13.8 turns an
         // empty lexicon string into "$modelDir/", which breaks Piper VITS loading.
+        // Also override sherpa-onnx's default silenceScale=0.2f so Russian pauses are preserved.
         val config = OfflineTtsConfig(
             model = OfflineTtsModelConfig(
                 vits = OfflineTtsVitsModelConfig(
@@ -33,12 +42,16 @@ class PiperTtsEngine {
                     lexicon = "",
                     tokens = tokens.absolutePath,
                     dataDir = data.absolutePath,
+                    noiseScale = inference.noiseScale,
+                    noiseScaleW = inference.noiseScaleW,
+                    lengthScale = 1.0f,
                 ),
                 numThreads = 2,
                 debug = false,
                 provider = "cpu",
             ),
             maxNumSentences = 1,
+            silenceScale = 1.0f,
         )
         tts = OfflineTts(assetManager = null, config = config)
         loadedDirPath = modelDir.absolutePath
@@ -48,7 +61,7 @@ class PiperTtsEngine {
     fun synthesize(text: String, speakerId: Int = 0, speed: Float = 1.0f): FloatArray {
         require(text.isNotBlank()) { "TTS text must not be blank" }
         val engine = tts ?: error("TTS engine is not loaded")
-        return engine.generate(text = text, sid = speakerId, speed = speed).samples
+        return engine.generate(text = text, sid = speakerId, speed = speed.coerceIn(0.65f, 1.25f)).samples
     }
 
     @Synchronized
@@ -65,11 +78,33 @@ class PiperTtsEngine {
         private val MARKDOWN_NOISE = Regex("""[*_`#~>]+""")
         private val SENTENCE_SPLIT = Regex("""(?<=[.!?…\n])\s+""")
 
+        fun parseVoiceInferenceParams(modelDir: File): PiperInferenceParams {
+            val fallback = if (modelDir.name.contains("dmitri", ignoreCase = true) ||
+                modelDir.listFiles()?.any { it.name.contains("dmitri", ignoreCase = true) } == true
+            ) {
+                PiperInferenceParams(noiseScale = 0.5f, noiseScaleW = 0.333f)
+            } else {
+                PiperInferenceParams(noiseScale = 0.667f, noiseScaleW = 0.8f)
+            }
+
+            val jsonFile = modelDir.listFiles()?.firstOrNull {
+                it.isFile && it.name.endsWith(".onnx.json", ignoreCase = true)
+            } ?: return fallback
+
+            return runCatching {
+                val root = JsonParser.parseString(jsonFile.readText(Charsets.UTF_8)).asJsonObject
+                val inf = root.getAsJsonObject("inference") ?: return fallback
+                val noiseScale = inf.get("noise_scale")?.asFloat?.coerceIn(0.1f, 1.5f) ?: fallback.noiseScale
+                val noiseScaleW = inf.get("noise_w")?.asFloat?.coerceIn(0.1f, 1.5f) ?: fallback.noiseScaleW
+                PiperInferenceParams(noiseScale = noiseScale, noiseScaleW = noiseScaleW)
+            }.getOrDefault(fallback)
+        }
+
         /**
          * Strips markdown formatting and splits Russian response text into
          * low-latency chunks suitable for streaming Piper TTS playback.
          */
-        fun splitForTts(text: String, maxChunkChars: Int = 220): List<String> {
+        fun splitForTts(text: String, maxChunkChars: Int = 160): List<String> {
             val cleaned = text
                 .replace(MARKDOWN_NOISE, " ")
                 .replace(Regex("""\[(.*?)]\([^)]*\)"""), "$1")

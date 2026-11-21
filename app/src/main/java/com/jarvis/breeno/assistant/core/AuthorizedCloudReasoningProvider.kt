@@ -7,11 +7,26 @@ class ExternalAiConfigStore(context: Context) {
 
     fun load(): ExternalAiConfig {
         val modeName = prefs.getString(KEY_MODE, ExternalAiMode.OPENAI_COMPATIBLE.name)
-        val mode = runCatching { ExternalAiMode.valueOf(modeName ?: "") }
+        val rawMode = runCatching { ExternalAiMode.valueOf(modeName ?: "") }
             .getOrDefault(ExternalAiMode.OPENAI_COMPATIBLE)
+        // Migrate legacy free Pollinations text mode off after upstream moved it behind HTTP 402 paywall.
+        if (rawMode == ExternalAiMode.POLLINATIONS_FREE) {
+            prefs.edit()
+                .putBoolean(KEY_ENABLED, false)
+                .putString(KEY_MODE, ExternalAiMode.OPENAI_COMPATIBLE.name)
+                .apply()
+            return ExternalAiConfig(
+                enabled = false,
+                mode = ExternalAiMode.OPENAI_COMPATIBLE,
+                baseUrl = prefs.getString(KEY_BASE_URL, "https://api.openai.com/v1/chat/completions")
+                    ?: "https://api.openai.com/v1/chat/completions",
+                modelName = prefs.getString(KEY_MODEL, "gpt-4o-mini") ?: "gpt-4o-mini",
+                apiKey = prefs.getString(KEY_API_KEY, "") ?: "",
+            )
+        }
         return ExternalAiConfig(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
-            mode = mode,
+            mode = rawMode,
             baseUrl = prefs.getString(KEY_BASE_URL, "https://api.openai.com/v1/chat/completions")
                 ?: "https://api.openai.com/v1/chat/completions",
             modelName = prefs.getString(KEY_MODEL, "gpt-4o-mini") ?: "gpt-4o-mini",

@@ -121,8 +121,8 @@ class GeminiCloudClient(
         val connection = (URL(urlStr).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
-            connectTimeout = 12_000
-            readTimeout = 35_000
+            connectTimeout = 8_000
+            readTimeout = 20_000
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
             setRequestProperty("Accept", "application/json")
             extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
@@ -132,6 +132,9 @@ class GeminiCloudClient(
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (code == 402) {
+                error("Сервер ИИ требует оплату (HTTP 402). Переключитесь на бесплатный офлайн-мозг Dolphin 3.0 / Hermes 3 во вкладке «Модели» или укажите свой сервер/API-ключ.")
+            }
             if (code !in 200..299) {
                 error("Сервер ИИ вернул HTTP $code: ${text.take(180)}")
             }

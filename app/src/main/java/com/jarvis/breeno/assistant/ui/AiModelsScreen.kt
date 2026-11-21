@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -71,6 +70,7 @@ fun AiModelsScreen(
     onDownloadVoice: (String) -> Unit,
     onCancelDownload: () -> Unit,
     onSelectVoice: (String) -> Unit,
+    onSetSpeechSpeed: (Float) -> Unit,
     onDeleteVoice: (String) -> Unit,
     onTestVoice: () -> Unit,
     onDownloadLlm: (String) -> Unit,
@@ -85,7 +85,15 @@ fun AiModelsScreen(
     var localFeedback by remember { mutableStateOf<String?>(null) }
 
     var extEnabled by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.enabled) }
-    var extMode by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.mode) }
+    var extMode by remember(status.externalAiConfig) {
+        mutableStateOf(
+            if (status.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE) {
+                ExternalAiMode.OPENAI_COMPATIBLE
+            } else {
+                status.externalAiConfig.mode
+            }
+        )
+    }
     var extUrl by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.baseUrl) }
     var extModel by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.modelName) }
     var extKey by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.apiKey) }
@@ -149,50 +157,7 @@ fun AiModelsScreen(
             )
         }
 
-        // 0. Instant 1-tap Smart Online AI (works immediately without waiting for 1-2 GB GGUF download)
-        val onlineFreeActive = status.externalAiConfig.enabled &&
-            status.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CardBg),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Мгновенный умный онлайн-ИИ (без ключа)", color = GoldAccent, fontWeight = FontWeight.Bold)
-                Text(
-                    text = if (onlineFreeActive) {
-                        "✓ Включён: Джарвис отвечает с высокой скоростью и интеллектом через сеть."
-                    } else {
-                        "Работает сразу без API-ключей и гигабайтных загрузок (используется при выключенном/недоступном офлайн-мозге)."
-                    },
-                    color = if (onlineFreeActive) GreenReady else MutedText,
-                    style = MaterialTheme.typography.labelSmall,
-                )
-                Button(
-                    onClick = {
-                        val next = ExternalAiConfig(
-                            enabled = !onlineFreeActive,
-                            mode = ExternalAiMode.POLLINATIONS_FREE,
-                            baseUrl = status.externalAiConfig.baseUrl,
-                            modelName = "openai",
-                            apiKey = status.externalAiConfig.apiKey,
-                        )
-                        onSaveExternalAi(next)
-                        localFeedback = if (!onlineFreeActive) "Онлайн-мозг Джарвиса включён" else "Онлайн-мозг отключён"
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (onlineFreeActive) Color(0xFF1F2937) else Color(0xFFB45309),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null)
-                    Spacer(Modifier.padding(horizontal = 4.dp))
-                    Text(if (onlineFreeActive) "Отключить онлайн-мозг" else "Включить умный онлайн-ИИ сейчас")
-                }
-            }
-        }
-
-        // 1. Offline Starter Bundle
+        // 1. Offline Starter Bundle (works locally without external keys or HTTP 402 paywalls)
         val starterComplete = status.asrReady && status.ttsVoiceReady && status.vadReady && status.activeLlmId != null
         Card(
             colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -200,7 +165,7 @@ fun AiModelsScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Полный офлайн Джарвис (без интернета)", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Полный офлайн Джарвис (без ключей и HTTP 402)", color = GoldAccent, fontWeight = FontWeight.Bold)
                 Text(
                     text = "Слух: ${if (status.asrReady) "✓" else "✗"}  •  Голос: ${if (status.ttsVoiceReady) "✓" else "✗"}  •  VAD: ${if (status.vadReady) "✓" else "✗"}  •  Мозг: ${if (status.activeLlmId != null) "✓" else "✗"}",
                     color = if (starterComplete) GreenReady else MutedText,
@@ -215,7 +180,7 @@ fun AiModelsScreen(
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 4.dp))
-                        Text("Скачать базовый офлайн-набор (~440 МБ)")
+                        Text("Скачать офлайн-набор: Dolphin 3.0 + Дмитрий HD (~480 МБ)")
                     }
                 }
             }
@@ -245,6 +210,27 @@ fun AiModelsScreen(
                         Icon(Icons.Default.VolumeUp, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 2.dp))
                         Text("Тест")
+                    }
+                }
+
+                Text("Скорость речи:", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf(
+                        0.75f to "0.75x",
+                        0.85f to "0.85x (Джарвис)",
+                        0.95f to "0.95x",
+                        1.05f to "1.05x",
+                    ).forEach { (speed, label) ->
+                        FilterChip(
+                            selected = kotlin.math.abs(status.speechSpeed - speed) < 0.04f,
+                            onClick = { onSetSpeechSpeed(speed) },
+                            label = { Text(label) },
+                        )
                     }
                 }
 
@@ -422,19 +408,14 @@ fun AiModelsScreen(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(
-                        selected = extMode == ExternalAiMode.POLLINATIONS_FREE,
-                        onClick = { extMode = ExternalAiMode.POLLINATIONS_FREE },
-                        label = { Text("Без ключа") },
-                    )
-                    FilterChip(
                         selected = extMode == ExternalAiMode.OPENAI_COMPATIBLE,
                         onClick = { extMode = ExternalAiMode.OPENAI_COMPATIBLE },
-                        label = { Text("OpenAI/ПК") },
+                        label = { Text("OpenAI / ПК Ollama") },
                     )
                     FilterChip(
                         selected = extMode == ExternalAiMode.GEMINI,
                         onClick = { extMode = ExternalAiMode.GEMINI },
-                        label = { Text("Gemini") },
+                        label = { Text("Gemini API") },
                     )
                 }
 
@@ -448,24 +429,22 @@ fun AiModelsScreen(
                     )
                 }
 
-                if (extMode != ExternalAiMode.POLLINATIONS_FREE) {
-                    OutlinedTextField(
-                        value = extModel,
-                        onValueChange = { extModel = it },
-                        label = { Text(if (extMode == ExternalAiMode.GEMINI) "Модель (напр. gemini-2.0-flash)" else "Модель (напр. gpt-4o-mini)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                OutlinedTextField(
+                    value = extModel,
+                    onValueChange = { extModel = it },
+                    label = { Text(if (extMode == ExternalAiMode.GEMINI) "Модель (напр. gemini-2.0-flash)" else "Модель (напр. gpt-4o-mini)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-                    OutlinedTextField(
-                        value = extKey,
-                        onValueChange = { extKey = it },
-                        label = { Text("API-ключ (хранится только локально)") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                OutlinedTextField(
+                    value = extKey,
+                    onValueChange = { extKey = it },
+                    label = { Text("API-ключ (хранится только локально)") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
                 Button(
                     onClick = {

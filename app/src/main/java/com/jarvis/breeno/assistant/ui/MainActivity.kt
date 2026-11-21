@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Grain
@@ -306,9 +307,11 @@ class MainActivity : ComponentActivity() {
                 statusSink?.invoke("Ошибка runtime: $msg")
                 controlCenter.logEvent("RUNTIME", "Ошибка голосового ядра", msg, JarvisEventLevel.ERROR)
             } finally {
-                audioRmsSink?.invoke(0f)
-                busySink?.invoke(false)
-                replySink?.invoke(null)
+                runOnUiThread {
+                    audioRmsSink?.invoke(0f)
+                    busySink?.invoke(false)
+                    replySink?.invoke(null)
+                }
                 listeningJob = null
             }
         }
@@ -319,6 +322,7 @@ class MainActivity : ComponentActivity() {
         if (clean.isEmpty() || listeningJob != null) return
         listeningJob = lifecycleScope.launch {
             try {
+                orbModeSink?.invoke(JarvisOrbMode.THINKING)
                 busySink?.invoke(true)
                 replySink?.invoke("Думаю над: «$clean»…")
                 runtime.submitText(
@@ -334,8 +338,10 @@ class MainActivity : ComponentActivity() {
                 orbModeSink?.invoke(JarvisOrbMode.ERROR)
                 statusSink?.invoke("Ошибка: $msg")
             } finally {
-                busySink?.invoke(false)
-                replySink?.invoke(null)
+                runOnUiThread {
+                    busySink?.invoke(false)
+                    replySink?.invoke(null)
+                }
                 listeningJob = null
             }
         }
@@ -347,9 +353,10 @@ class MainActivity : ComponentActivity() {
         listeningJob?.cancel()
         runtime.cancelActiveWork()
         audioRmsSink?.invoke(0f)
+        busySink?.invoke(false)
         replySink?.invoke(null)
         orbModeSink?.invoke(JarvisOrbMode.IDLE)
-        statusSink?.invoke("Прослушивание остановлено")
+        statusSink?.invoke("Работа остановлена")
     }
 
     private fun openGeneratedMedia(item: GeneratedMediaItem) {
@@ -467,6 +474,7 @@ class MainActivity : ComponentActivity() {
                 busy = !(
                     value == "Ожидаю команду" ||
                         value == "Прослушивание остановлено" ||
+                        value == "Работа остановлена" ||
                         value == "Речь не распознана" ||
                         value.startsWith("Ошибка") ||
                         value.startsWith("Русский голос") ||
@@ -595,8 +603,15 @@ class MainActivity : ComponentActivity() {
                         stackStatus = stackStatus,
                         downloadState = downloadState,
                         activeTasksCount = controlSnapshot.activeTasks,
-                        onOrbClick = { if (busy || listening) stopListening() else requestAndListen() },
+                        onOrbClick = {
+                            if (listeningJob != null || modelCheckJob != null || busy || listening || speaking) {
+                                stopListening()
+                            } else {
+                                requestAndListen()
+                            }
+                        },
                         onSendText = { query -> submitTextQuery(query) },
+                        onStopWork = { stopListening() },
                         onToggleMute = {
                             muted = !muted
                             runtime.setMuted(muted)
@@ -637,6 +652,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onCancelDownload = { jarvisApp.downloads.cancel() },
                         onSelectVoice = { id -> runtime.selectTtsVoice(id) },
+                        onSetSpeechSpeed = { speed -> runtime.setSpeechSpeed(speed) },
                         onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
                         onTestVoice = { runtime.testRussianVoice() },
                         onDownloadLlm = { id ->
@@ -704,6 +720,7 @@ class MainActivity : ComponentActivity() {
         activeTasksCount: Int,
         onOrbClick: () -> Unit,
         onSendText: (String) -> Unit,
+        onStopWork: () -> Unit,
         onToggleMute: () -> Unit,
         onToggleContinuous: () -> Unit,
         onOpenModels: () -> Unit,
@@ -722,7 +739,6 @@ class MainActivity : ComponentActivity() {
             activeLlm?.startsWith("hermes") == true -> "HERMES ОФЛАЙН"
             activeLlm?.startsWith("custom_") == true -> "СВОЙ GGUF"
             activeLlm != null -> "QWEN ОФЛАЙН"
-            stackStatus.externalAiConfig.enabled && stackStatus.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE -> "ОНЛАЙН ИИ"
             stackStatus.externalAiConfig.enabled -> "ВНЕШНИЙ ИИ"
             else -> "НАСТРОИТЬ ИИ"
         }
@@ -924,14 +940,20 @@ class MainActivity : ComponentActivity() {
                         }
                     }),
                     trailingIcon = {
-                        IconButton(onClick = {
-                            val q = textQuery.trim()
-                            if (q.isNotEmpty()) {
-                                textQuery = ""
-                                onSendText(q)
+                        if (busy || listening) {
+                            IconButton(onClick = onStopWork) {
+                                Icon(Icons.Default.Close, contentDescription = "Остановить", tint = Color(0xFFFF9C9C))
                             }
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = Cyan)
+                        } else {
+                            IconButton(onClick = {
+                                val q = textQuery.trim()
+                                if (q.isNotEmpty()) {
+                                    textQuery = ""
+                                    onSendText(q)
+                                }
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = Cyan)
+                            }
                         }
                     },
                     modifier = Modifier

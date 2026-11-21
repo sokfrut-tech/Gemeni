@@ -15,6 +15,7 @@ class LlamaCppReasoningProvider(
     private val historyProvider: () -> List<ChatTurn> = { emptyList() },
     private val memorySearchProvider: (String) -> List<String> = { emptyList() },
     var onTokenDelta: ((String) -> Unit)? = null,
+    var onStatusUpdate: ((String) -> Unit)? = null,
 ) : ManagedLocalReasoningProvider {
 
     override val id: String = "llama-cpp-local"
@@ -59,6 +60,7 @@ class LlamaCppReasoningProvider(
                         loadedPackId = null
                     }
                     val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+                    onStatusUpdate?.invoke("Загружаю ${pack.title} в память…")
                     val handle = LlamaNativeBridge.nativeLoadModel(
                         modelPath = verifiedFile.absolutePath,
                         nCtx = requestedCtx,
@@ -72,6 +74,7 @@ class LlamaCppReasoningProvider(
                     loadedNCtx = requestedCtx
                 }
 
+                onStatusUpdate?.invoke("Джарвис генерирует ответ…")
                 val recentTurns = runCatching { historyProvider() }.getOrDefault(emptyList())
                 val recalledFacts = runCatching { memorySearchProvider(turn.userText) }.getOrDefault(emptyList())
                 val prompt = JarvisChatPromptBuilder.buildQwenChatMlPrompt(

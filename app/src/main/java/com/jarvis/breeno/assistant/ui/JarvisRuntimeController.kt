@@ -59,6 +59,7 @@ data class AiStackStatus(
     val externalAiConfig: ExternalAiConfig,
     val allLlmPacks: List<LocalLlmPack> = LocalLlmModelManager.CATALOG,
     val selectedPersona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+    val speechSpeed: Float = PiperTtsModelDownloadManager.DEFAULT_SPEECH_SPEED,
 )
 
 /**
@@ -81,7 +82,11 @@ class JarvisRuntimeController(context: Context) {
     private val asr = SherpaRussianAsrEngine()
     private val vad = SileroVadEngine()
     private val intents = RussianIntentDispatcher()
-    private val speaker = JarvisSpeaker(appContext) { ttsModels.activeVoiceDir() }
+    private val speaker = JarvisSpeaker(
+        context = appContext,
+        speechSpeedProvider = { ttsModels.speechSpeed() },
+        piperModelDirProvider = { ttsModels.activeVoiceDir() },
+    )
 
     private val llamaProvider = LlamaCppReasoningProvider(
         modelManager = llmModels,
@@ -138,6 +143,7 @@ class JarvisRuntimeController(context: Context) {
             externalAiConfig = externalAiStore.load(),
             allLlmPacks = allPacks,
             selectedPersona = llmModels.selectedPersona(),
+            speechSpeed = ttsModels.speechSpeed(),
         )
     }
 
@@ -168,6 +174,11 @@ class JarvisRuntimeController(context: Context) {
 
     fun selectTtsVoice(voiceId: String) {
         ttsModels.selectVoice(voiceId)
+        onStackStatusChanged?.invoke()
+    }
+
+    fun setSpeechSpeed(speed: Float) {
+        ttsModels.setSpeechSpeed(speed)
         onStackStatusChanged?.invoke()
     }
 
@@ -235,9 +246,9 @@ class JarvisRuntimeController(context: Context) {
             onStackStatusChanged?.invoke()
         }
         if (!ttsModels.isReady()) {
-            onStageProgress("Скачиваю голос Дмитрий (Piper 20 МБ)…", 0)
-            ttsModels.ensureVoice(PiperTtsModelDownloadManager.VOICE_DMITRI_INT8) { p ->
-                onStageProgress("Голос Дмитрий (Piper): $p%", p)
+            onStageProgress("Скачиваю голос Дмитрий HD (Piper FP32, 64 МБ)…", 0)
+            ttsModels.ensureVoice(PiperTtsModelDownloadManager.VOICE_DMITRI_HD) { p ->
+                onStageProgress("Голос Дмитрий HD (Piper): $p%", p)
             }
             onStackStatusChanged?.invoke()
         }
@@ -380,7 +391,9 @@ class JarvisRuntimeController(context: Context) {
             memory.saveMessage("assistant", deterministic, "deterministic")
             onTokenStream(deterministic)
             onCommandCompleted?.invoke(text, deterministic)
-            speaker.speak(deterministic)
+            if (!speaker.speak(deterministic)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            }
             onProgress(deterministic)
             return@withContext deterministic
         }
@@ -390,24 +403,28 @@ class JarvisRuntimeController(context: Context) {
 
         // Only show setup hint when BOTH local GGUF AND external AI are unconfigured/disabled.
         if (!hasLocalLlm && !extCfg.enabled) {
-            val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни онлайн-мозг. " +
-                "Откройте вкладку «Модели»: там можно за 1 нажатие включить онлайн-ИИ, скачать Dolphin 3.0 / Hermes 3 / Qwen 2.5 или импортировать свой .gguf файл."
+            val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни внешний сервер. " +
+                "Откройте вкладку «Модели»: скачайте офлайн-набор с Dolphin 3.0 + голос Дмитрий HD, выберите Hermes 3 / Qwen 2.5 или импортируйте свой .gguf файл."
             memory.saveMessage("user", text, "user")
             memory.saveMessage("assistant", guidance, "setup-hint")
             onTokenStream(guidance)
             onCommandCompleted?.invoke(text, guidance)
-            speaker.speak(guidance)
-            onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            if (!speaker.speak(guidance)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            }
             onProgress("Нужна модель ИИ — откройте вкладку «Модели»")
             return@withContext guidance
         }
 
-        // 2. Real Cognitive Kernel (Local Qwen via llama.cpp -> Optional Opt-in Cloud/PC)
+        // 2. Real Cognitive Kernel (Local GGUF via llama.cpp -> Optional Opt-in Cloud/PC)
         onOrbModeChanged?.invoke(JarvisOrbMode.THINKING)
         onProgress("Джарвис думает…")
 
         llamaProvider.onTokenDelta = { partial ->
             onTokenStream(partial)
+        }
+        llamaProvider.onStatusUpdate = { statusMsg ->
+            onProgress(statusMsg)
         }
 
         val turn = KernelTurn(
@@ -421,16 +438,16 @@ class JarvisRuntimeController(context: Context) {
         return@withContext try {
             val result = try {
                 cognitiveKernel.process(turn)
-            } catch (policyOrAvailErr: IllegalStateException) {
-                // If user already downloaded local Qwen and device is NOT critically overheating,
-                // do not block inference on soft RAM/battery-saver hints (fall through with bounded budget).
+            } catch (kernelErr: Throwable) {
+                if (kernelErr is CancellationException) throw kernelErr
+                // If user has a ready local GGUF model and device is NOT critically overheating,
+                // seamlessly fall back to local inference on soft policy denial or upstream cloud errors (e.g. HTTP 402).
                 val heatState = JarvisFoldedRuntimePolicy().plan(signalsSource.snapshot()).heatState
-                val msg = policyOrAvailErr.message.orEmpty()
-                val deniedBySoftGuard = hasLocalLlm &&
+                val canFallbackToLocal = hasLocalLlm &&
                     heatState != DeviceHeatState.CRITICAL &&
-                    LlamaNativeBridge.isNativeLibraryLoaded &&
-                    (msg.contains("policy denied", ignoreCase = true) || msg.contains("No reasoning provider", ignoreCase = true))
-                if (deniedBySoftGuard) {
+                    LlamaNativeBridge.isNativeLibraryLoaded
+                if (canFallbackToLocal) {
+                    onProgress("Переключаюсь на локальный ИИ…")
                     val direct = llamaProvider.reason(
                         turn.copy(budget = turn.budget.copy(maxOutputTokens = 256))
                     )
@@ -442,7 +459,7 @@ class JarvisRuntimeController(context: Context) {
                         modelId = direct.modelId,
                     )
                 } else {
-                    throw policyOrAvailErr
+                    throw kernelErr
                 }
             }
 
@@ -450,7 +467,9 @@ class JarvisRuntimeController(context: Context) {
             memory.saveMessage("assistant", result.answer, result.modelId)
             onTokenStream(result.answer)
             onCommandCompleted?.invoke(text, result.answer)
-            speaker.speak(result.answer)
+            if (!speaker.speak(result.answer)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            }
             onProgress("Ответ готов (${result.modelId})")
             result.answer
         } catch (cancelled: CancellationException) {
@@ -468,6 +487,7 @@ class JarvisRuntimeController(context: Context) {
             failText
         } finally {
             llamaProvider.onTokenDelta = null
+            llamaProvider.onStatusUpdate = null
         }
     }
 

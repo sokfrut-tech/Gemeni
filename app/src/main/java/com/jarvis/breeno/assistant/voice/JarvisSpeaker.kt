@@ -14,12 +14,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.Executors
-import kotlin.coroutines.coroutineContext
 
 /**
  * Dual-backend Russian voice output:
@@ -28,6 +30,7 @@ import kotlin.coroutines.coroutineContext
  */
 class JarvisSpeaker(
     context: Context,
+    private val speechSpeedProvider: () -> Float = { 0.85f },
     private val piperModelDirProvider: () -> File? = { null },
 ) {
     private val appContext = context.applicationContext
@@ -70,20 +73,24 @@ class JarvisSpeaker(
     fun activeEngineLabel(): String = when {
         piperModelDirProvider() != null -> "Piper RU (офлайн)"
         systemTtsInitialized -> "Android TTS (RU)"
-        else -> "Нет русского голоса — скачайте Piper (20 МБ)"
+        else -> "Нет русского голоса — скачайте Дмитрий HD (~64 МБ)"
     }
 
-    fun speak(text: String) {
-        if (text.isBlank() || isMuted) return
+    /** Starts voice output; returns true if playback was queued/started, false otherwise. */
+    fun speak(text: String): Boolean {
+        if (text.isBlank() || isMuted) return false
         stop()
 
         val piperDir = runCatching { piperModelDirProvider() }.getOrNull()
-        if (piperDir != null) {
+        return if (piperDir != null) {
             speakWithPiper(piperDir, text)
+            true
         } else if (systemTtsInitialized) {
             speakWithSystemTts(text)
+            true
         } else {
-            onError?.invoke("Русский голос не установлен: откройте вкладку «Модели» и скачайте «Дмитрий» (20 МБ)")
+            onError?.invoke("Русский голос не установлен: откройте вкладку «Модели» и скачайте «Дмитрий HD» (~64 МБ)")
+            false
         }
     }
 
@@ -95,7 +102,7 @@ class JarvisSpeaker(
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
@@ -103,6 +110,9 @@ class JarvisSpeaker(
 
             var focusGranted = false
             var track: AudioTrack? = null
+            var startedPlayback = false
+            var completedNormally = false
+
             try {
                 piperEngine.load(modelDir)
                 val sampleRate = piperEngine.sampleRate()
@@ -110,12 +120,13 @@ class JarvisSpeaker(
                     sampleRate,
                     AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT,
-                ).coerceAtLeast(sampleRate / 2)
+                ).coerceAtLeast(sampleRate)
+                val bufferBytes = (minBufferBytes * 2).coerceAtLeast(sampleRate * 2)
 
                 track = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                             .build()
                     )
@@ -126,31 +137,52 @@ class JarvisSpeaker(
                             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                             .build()
                     )
-                    .setBufferSizeInBytes(minBufferBytes * 2)
+                    .setBufferSizeInBytes(bufferBytes)
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .build()
 
                 activeTrack = track
-                focusGranted = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-                track.play()
-                onSpeakingChanged?.invoke(true)
-
+                val speed = speechSpeedProvider().coerceIn(0.65f, 1.25f)
                 val sliceSamples = (sampleRate / 10).coerceAtLeast(1600)
-                for (chunk in chunks) {
-                    coroutineContext.ensureActive()
-                    val floats = piperEngine.synthesize(chunk, speakerId = 0, speed = 1.0f)
+                val interChunkSilence = ShortArray((sampleRate * 0.20f).toInt())
+
+                for ((index, chunk) in chunks.withIndex()) {
+                    currentCoroutineContext().ensureActive()
+                    val floats = piperEngine.synthesize(chunk, speakerId = 0, speed = speed)
                     if (floats.isEmpty()) continue
+
+                    if (!startedPlayback) {
+                        focusGranted = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+                        track.play()
+                        startedPlayback = true
+                        onSpeakingChanged?.invoke(true)
+                    }
+
                     val pcm16 = ShortArray(floats.size) { idx ->
                         (floats[idx].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
                     }
                     var offset = 0
                     while (offset < pcm16.size) {
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         val count = minOf(sliceSamples, pcm16.size - offset)
-                        val written = track.write(pcm16, offset, count)
+                        val written = track.write(pcm16, offset, count, AudioTrack.WRITE_BLOCKING)
                         if (written < 0) break
                         offset += written
                     }
+
+                    if (index < chunks.lastIndex) {
+                        currentCoroutineContext().ensureActive()
+                        track.write(interChunkSilence, 0, interChunkSilence.size, AudioTrack.WRITE_BLOCKING)
+                    }
+                }
+
+                if (startedPlayback && currentCoroutineContext().isActive) {
+                    val tailSilence = ShortArray((sampleRate * 0.25f).toInt())
+                    track.write(tailSilence, 0, tailSilence.size, AudioTrack.WRITE_BLOCKING)
+                    track.stop()
+                    delay(250)
+                    currentCoroutineContext().ensureActive()
+                    completedNormally = true
                 }
             } catch (_: CancellationException) {
                 // Barge-in or user stop requested.
@@ -163,8 +195,10 @@ class JarvisSpeaker(
             } finally {
                 activeTrack = null
                 runCatching {
-                    track?.pause()
-                    track?.flush()
+                    if (!completedNormally) {
+                        track?.pause()
+                        track?.flush()
+                    }
                     track?.release()
                 }
                 if (focusGranted) {
@@ -181,6 +215,7 @@ class JarvisSpeaker(
             pendingSystemText = text
             return
         }
+        runCatching { current.setSpeechRate(speechSpeedProvider().coerceIn(0.65f, 1.25f)) }
         current.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 onSpeakingChanged?.invoke(true)

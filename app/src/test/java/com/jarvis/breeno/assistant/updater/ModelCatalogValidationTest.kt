@@ -5,6 +5,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class ModelCatalogValidationTest {
     @Test
@@ -45,11 +47,41 @@ class ModelCatalogValidationTest {
 
     @Test
     fun piperVoiceCatalogEntriesArePinnedWithSha256() {
-        assertEquals(2, PiperTtsModelDownloadManager.VOICES.size)
+        assertEquals(4, PiperTtsModelDownloadManager.VOICES.size)
+        val ids = PiperTtsModelDownloadManager.VOICES.map { it.id }.toSet()
+        assertTrue(PiperTtsModelDownloadManager.VOICE_DMITRI_HD in ids)
+        assertTrue(PiperTtsModelDownloadManager.VOICE_RUSLAN_HD in ids)
+        assertTrue(PiperTtsModelDownloadManager.VOICE_DMITRI_INT8 in ids)
+        assertTrue(PiperTtsModelDownloadManager.VOICE_RUSLAN_INT8 in ids)
         PiperTtsModelDownloadManager.VOICES.forEach { voice ->
             assertTrue(voice.downloadUrl.startsWith("https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/"))
             assertTrue(voice.archiveSizeBytes > 10_000_000L)
             assertEquals(64, voice.archiveSha256.length)
+        }
+    }
+
+    @Test
+    fun parsesPiperInferenceParamsWithDmitriFallback() {
+        val dir = Files.createTempDirectory("piper-dmitri-test").toFile()
+        try {
+            File(dir, "ru_RU-dmitri-medium.onnx.json").writeText(
+                """{"inference":{"noise_scale":0.5,"length_scale":1.0,"noise_w":0.333}}""",
+                Charsets.UTF_8,
+            )
+            val parsed = PiperTtsEngine.parseVoiceInferenceParams(dir)
+            assertEquals(0.5f, parsed.noiseScale, 0.0001f)
+            assertEquals(0.333f, parsed.noiseScaleW, 0.0001f)
+        } finally {
+            dir.deleteRecursively()
+        }
+
+        val emptyOtherDir = Files.createTempDirectory("piper-ruslan-empty").toFile()
+        try {
+            val defaults = PiperTtsEngine.parseVoiceInferenceParams(emptyOtherDir)
+            assertEquals(0.667f, defaults.noiseScale, 0.0001f)
+            assertEquals(0.8f, defaults.noiseScaleW, 0.0001f)
+        } finally {
+            emptyOtherDir.deleteRecursively()
         }
     }
 

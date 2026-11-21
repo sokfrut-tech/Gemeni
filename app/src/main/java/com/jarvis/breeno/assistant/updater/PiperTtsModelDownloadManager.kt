@@ -31,12 +31,18 @@ class PiperTtsModelDownloadManager(private val context: Context) {
 
     fun voiceDir(voiceId: String): File = context.filesDir.resolve("models/tts/$voiceId")
 
-    fun selectedVoiceId(): String = prefs.getString(KEY_SELECTED_VOICE, VOICE_DMITRI_INT8) ?: VOICE_DMITRI_INT8
+    fun selectedVoiceId(): String = prefs.getString(KEY_SELECTED_VOICE, VOICE_DMITRI_HD) ?: VOICE_DMITRI_HD
 
     fun selectVoice(voiceId: String) {
         if (findVoice(voiceId) != null) {
             prefs.edit().putString(KEY_SELECTED_VOICE, voiceId).apply()
         }
+    }
+
+    fun speechSpeed(): Float = prefs.getFloat(KEY_SPEECH_SPEED, DEFAULT_SPEECH_SPEED).coerceIn(0.65f, 1.25f)
+
+    fun setSpeechSpeed(speed: Float) {
+        prefs.edit().putFloat(KEY_SPEECH_SPEED, speed.coerceIn(0.65f, 1.25f)).apply()
     }
 
     fun isVoiceReady(voiceId: String): Boolean {
@@ -154,23 +160,43 @@ class PiperTtsModelDownloadManager(private val context: Context) {
     }
 
     companion object {
+        const val VOICE_DMITRI_HD = "dmitri-fp32"
+        const val VOICE_RUSLAN_HD = "ruslan-fp32"
         const val VOICE_DMITRI_INT8 = "dmitri-int8"
         const val VOICE_RUSLAN_INT8 = "ruslan-int8"
+        const val DEFAULT_SPEECH_SPEED = 0.85f
         private const val KEY_SELECTED_VOICE = "selected_piper_voice_id"
+        private const val KEY_SPEECH_SPEED = "piper_speech_speed"
 
         val VOICES: List<PiperVoicePack> = listOf(
             PiperVoicePack(
+                id = VOICE_DMITRI_HD,
+                title = "Дмитрий HD (чистый мужской, FP32)",
+                description = "Студийное качество без сжатия int8, чистая дикция (~64 МБ).",
+                downloadUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-dmitri-medium.tar.bz2",
+                archiveSizeBytes = 67_188_551L,
+                archiveSha256 = "c86d0803737de13d441923ff3b3f309482fab8d7af3ec85949942809eb9a3660",
+            ),
+            PiperVoicePack(
+                id = VOICE_RUSLAN_HD,
+                title = "Руслан HD (глубокий баритон, FP32)",
+                description = "Глубокий естественный баритон без сжатия int8 (~64 МБ).",
+                downloadUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-ruslan-medium.tar.bz2",
+                archiveSizeBytes = 67_210_684L,
+                archiveSha256 = "0690b1cad01f86e8db9ba988af24898bdc1af774e23cb2e46b9c730269b6fd83",
+            ),
+            PiperVoicePack(
                 id = VOICE_DMITRI_INT8,
-                title = "Дмитрий (мужской, офлайн Piper int8)",
-                description = "Чёткий мужской русский голос, работает полностью без интернета (~20 МБ).",
+                title = "Дмитрий (компактный, Piper int8)",
+                description = "Сжатый мужской русский голос (~20 МБ).",
                 downloadUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-dmitri-medium-int8.tar.bz2",
                 archiveSizeBytes = 21_129_441L,
                 archiveSha256 = "7636793307f634ce54c6e65528a91a61683114f1a6635a08caf64ba6c54e6a63",
             ),
             PiperVoicePack(
                 id = VOICE_RUSLAN_INT8,
-                title = "Руслан (глубокий мужской, Piper int8)",
-                description = "Глубокий баритон для ассистента, офлайн (~20 МБ).",
+                title = "Руслан (компактный, Piper int8)",
+                description = "Сжатый баритон для ассистента (~20 МБ).",
                 downloadUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-ruslan-medium-int8.tar.bz2",
                 archiveSizeBytes = 21_127_907L,
                 archiveSha256 = "93b9f8c7b34c1420bdc253a0ce5ab1cb6b6be2e8fa26c1f3b36c6189233c3e7e",
