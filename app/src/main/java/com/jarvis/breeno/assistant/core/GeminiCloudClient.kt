@@ -32,6 +32,7 @@ data class ExternalAiConfig(
  */
 class GeminiCloudClient(
     private val configProvider: () -> ExternalAiConfig = { ExternalAiConfig() },
+    private val personaProvider: () -> JarvisPersona = { JarvisPersona.STARK_JARVIS },
 ) {
     suspend fun complete(
         prompt: String,
@@ -61,6 +62,7 @@ class GeminiCloudClient(
             recentTurns = recentTurns,
             recalledFacts = recalledFacts,
             maxTokens = maxOutputTokens,
+            persona = personaProvider(),
         )
         val responseBody = postJson(POLLINATIONS_TEXT_ENDPOINT, bodyJson, emptyMap())
         return parseOpenAiResponseJson(responseBody)
@@ -83,6 +85,7 @@ class GeminiCloudClient(
             recentTurns = recentTurns,
             recalledFacts = recalledFacts,
             maxTokens = maxOutputTokens,
+            persona = personaProvider(),
         )
         val headers = mutableMapOf<String, String>()
         if (cfg.apiKey.isNotBlank()) {
@@ -108,6 +111,7 @@ class GeminiCloudClient(
             recentTurns = recentTurns,
             recalledFacts = recalledFacts,
             maxTokens = maxOutputTokens,
+            persona = personaProvider(),
         )
         val responseBody = postJson(endpoint, bodyJson, mapOf("x-goog-api-key" to key))
         return parseGeminiResponseJson(responseBody)
@@ -141,11 +145,11 @@ class GeminiCloudClient(
         const val POLLINATIONS_TEXT_ENDPOINT = "https://text.pollinations.ai/openai"
         private val gson = Gson()
 
-        fun buildSystemInstruction(recalledFacts: List<String>): String {
-            val sb = StringBuilder(
-                "Ты — Джарвис (J.A.R.V.I.S.), персональный интеллектуальный ИИ-помощник в стиле помощника Тони Старка. " +
-                    "Общайся живо, умно, естественно и уважительно на грамотном русском языке, давая содержательные и полезные ответы."
-            )
+        fun buildSystemInstruction(
+            recalledFacts: List<String>,
+            persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+        ): String {
+            val sb = StringBuilder(persona.systemPrompt)
             if (recalledFacts.isNotEmpty()) {
                 sb.append("\n\nФакты из памяти пользователя:")
                 recalledFacts.forEach { sb.append("\n- ").append(it.trim()) }
@@ -159,11 +163,12 @@ class GeminiCloudClient(
             recentTurns: List<ChatTurn> = emptyList(),
             recalledFacts: List<String> = emptyList(),
             maxTokens: Int = 512,
+            persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         ): String {
             val messages = JsonArray()
             messages.add(JsonObject().apply {
                 addProperty("role", "system")
-                addProperty("content", buildSystemInstruction(recalledFacts))
+                addProperty("content", buildSystemInstruction(recalledFacts, persona))
             })
             recentTurns.takeLast(6).forEach { turn ->
                 messages.add(JsonObject().apply {
@@ -199,6 +204,7 @@ class GeminiCloudClient(
             recentTurns: List<ChatTurn> = emptyList(),
             recalledFacts: List<String> = emptyList(),
             maxTokens: Int = 512,
+            persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         ): String {
             val contents = JsonArray()
             recentTurns.takeLast(6).forEach { turn ->
@@ -218,7 +224,7 @@ class GeminiCloudClient(
             val root = JsonObject().apply {
                 add("systemInstruction", JsonObject().apply {
                     add("parts", JsonArray().apply {
-                        add(JsonObject().apply { addProperty("text", buildSystemInstruction(recalledFacts)) })
+                        add(JsonObject().apply { addProperty("text", buildSystemInstruction(recalledFacts, persona)) })
                     })
                 })
                 add("contents", contents)

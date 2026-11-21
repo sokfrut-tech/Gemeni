@@ -46,7 +46,8 @@ class AuthorizedCloudReasoningProvider(
     private val configProvider: () -> ExternalAiConfig,
     private val historyProvider: () -> List<ChatTurn> = { emptyList() },
     private val memorySearchProvider: (String) -> List<String> = { emptyList() },
-    private val client: GeminiCloudClient = GeminiCloudClient(configProvider),
+    private val personaProvider: () -> JarvisPersona = { JarvisPersona.STARK_JARVIS },
+    private val client: GeminiCloudClient = GeminiCloudClient(configProvider, personaProvider),
 ) : JarvisReasoningProvider {
 
     override val id: String = "authorized-cloud-or-pc"

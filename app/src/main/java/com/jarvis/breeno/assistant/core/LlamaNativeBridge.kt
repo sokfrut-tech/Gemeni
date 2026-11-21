@@ -9,23 +9,52 @@ data class ChatTurn(
     val content: String,
 )
 
+enum class JarvisPersona(
+    val id: String,
+    val title: String,
+    val systemPrompt: String,
+) {
+    STARK_JARVIS(
+        id = "stark",
+        title = "Джарвис (Старк)",
+        systemPrompt = "Ты — Джарвис (J.A.R.V.I.S.), персональный интеллектуальный ИИ-помощник пользователя в стиле помощника Тони Старка. " +
+            "Общайся естественно, живо, уважительно и умно на грамотном русском языке. " +
+            "Давай конкретные, полезные и содержательные ответы без канцелярита, воды и технических тегов.",
+    ),
+    DIRECT_ASSISTANT(
+        id = "direct",
+        title = "Прямой (Dolphin / Hermes)",
+        systemPrompt = "Ты — прямой, эрудированный и открытый локальный ИИ-ассистент пользователя. " +
+            "Отвечай на грамотном русском языке чётко, подробно и по существу, без нравоучений, воды и лишних оговорок.",
+    );
+
+    companion object {
+        fun fromId(id: String?): JarvisPersona = entries.firstOrNull { it.id == id } ?: STARK_JARVIS
+    }
+}
+
 /**
- * Pure-Kotlin ChatML prompt formatter and output sanitizer for local Qwen2.5 models.
+ * Pure-Kotlin ChatML prompt formatter and output sanitizer for local Dolphin / Hermes / Qwen models.
  */
 object JarvisChatPromptBuilder {
-    private val STOP_MARKERS = listOf("<|im_end|>", "<|endoftext|>", "<|im_start|>assistant", "<|im_start|>")
+    private val STOP_MARKERS = listOf(
+        "<|im_end|>",
+        "<|endoftext|>",
+        "<|eot_id|>",
+        "</s>",
+        "<|start_header_id|>",
+        "<|im_start|>assistant",
+        "<|im_start|>",
+    )
 
     fun buildQwenChatMlPrompt(
         userText: String,
         recentTurns: List<ChatTurn> = emptyList(),
         recalledFacts: List<String> = emptyList(),
         systemInfoNote: String = "",
+        persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
     ): String {
-        val systemBuilder = StringBuilder(
-            "Ты — Джарвис (J.A.R.V.I.S.), персональный интеллектуальный ИИ-помощник пользователя в стиле помощника Тони Старка. " +
-                "Общайся естественно, живо, уважительно и умно на грамотном русском языке. " +
-                "Давай конкретные, полезные и содержательные ответы без канцелярита, воды и технических тегов."
-        )
+        val systemBuilder = StringBuilder(persona.systemPrompt)
         if (recalledFacts.isNotEmpty()) {
             systemBuilder.append("\n\nФакты из памяти пользователя:")
             recalledFacts.forEach { fact ->

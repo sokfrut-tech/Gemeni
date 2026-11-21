@@ -1,5 +1,6 @@
 package com.jarvis.breeno.assistant.ui
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.DownloadTaskState
 import com.jarvis.breeno.assistant.core.ExternalAiConfig
 import com.jarvis.breeno.assistant.core.ExternalAiMode
+import com.jarvis.breeno.assistant.core.JarvisPersona
+import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.PiperVoicePack
 import kotlinx.coroutines.launch
@@ -72,6 +76,8 @@ fun AiModelsScreen(
     onDownloadLlm: (String) -> Unit,
     onSelectLlm: (String) -> Unit,
     onDeleteLlm: suspend (String) -> Unit,
+    onImportCustomGguf: () -> Unit,
+    onSelectPersona: (JarvisPersona) -> Unit,
     onSaveExternalAi: (ExternalAiConfig) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -209,7 +215,7 @@ fun AiModelsScreen(
                     ) {
                         Icon(Icons.Default.Download, contentDescription = null)
                         Spacer(Modifier.padding(horizontal = 4.dp))
-                        Text("Скачать базовый офлайн-набор (~520 МБ)")
+                        Text("Скачать базовый офлайн-набор (~440 МБ)")
                     }
                 }
             }
@@ -289,7 +295,7 @@ fun AiModelsScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Локальный ИИ-мозг (llama.cpp + Qwen 2.5)", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Локальный ИИ-мозг (llama.cpp: Dolphin 3.0 / Hermes 3 / Qwen / свой GGUF)", color = Color.White, fontWeight = FontWeight.Bold)
                 Text(
                     text = if (status.nativeLlamaLoaded) {
                         "Движок libjarvis_llama.so (ARM64 dotprod+fp16): готов"
@@ -300,42 +306,59 @@ fun AiModelsScreen(
                     style = MaterialTheme.typography.labelSmall,
                 )
 
-                llmCatalog.forEach { pack ->
-                    val isInstalled = pack.id in status.readyLlmIds
-                    val isActive = status.activeLlmId == pack.id
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(pack.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                text = if (isInstalled) "✓ Скачана и проверена SHA-256" else pack.description,
-                                color = if (isInstalled) GreenReady else MutedText,
-                                style = MaterialTheme.typography.labelSmall,
+                Text("Характер ответов Джарвиса:", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    JarvisPersona.entries.forEach { persona ->
+                        FilterChip(
+                            selected = status.selectedPersona == persona,
+                            onClick = { onSelectPersona(persona) },
+                            label = { Text(persona.title) },
+                        )
+                    }
+                }
+
+                val familyOrder = listOf(
+                    LocalLlmModelManager.FAMILY_OPEN_COMMUNITY,
+                    LocalLlmModelManager.FAMILY_QWEN,
+                    LocalLlmModelManager.FAMILY_CUSTOM,
+                )
+                familyOrder.forEach { familyName ->
+                    val group = llmCatalog.filter { it.family == familyName }
+                    if (group.isNotEmpty()) {
+                        Text(
+                            text = familyName,
+                            color = if (familyName == LocalLlmModelManager.FAMILY_OPEN_COMMUNITY) GoldAccent else CyanAccent,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        group.forEach { pack ->
+                            LlmPackRow(
+                                pack = pack,
+                                isInstalled = pack.id in status.readyLlmIds,
+                                isActive = status.activeLlmId == pack.id,
+                                downloadActive = downloadState.active,
+                                onDownload = { onDownloadLlm(pack.id) },
+                                onSelect = { onSelectLlm(pack.id) },
+                                onDelete = { scope.launch { onDeleteLlm(pack.id) } },
                             )
                         }
-                        if (isInstalled) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                FilterChip(
-                                    selected = isActive,
-                                    onClick = { onSelectLlm(pack.id) },
-                                    label = { Text(if (isActive) "Активна" else "Выбрать") },
-                                )
-                                IconButton(onClick = { scope.launch { onDeleteLlm(pack.id) } }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Удалить модель", tint = MutedText)
-                                }
-                            }
-                        } else {
-                            OutlinedButton(
-                                onClick = { onDownloadLlm(pack.id) },
-                                enabled = !downloadState.active,
-                            ) {
-                                Text("Скачать")
-                            }
-                        }
                     }
+                }
+
+                OutlinedButton(
+                    onClick = onImportCustomGguf,
+                    enabled = !downloadState.active,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.padding(horizontal = 4.dp))
+                    Text("Импортировать свой .gguf файл с телефона")
                 }
             }
         }
@@ -465,5 +488,54 @@ fun AiModelsScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun LlmPackRow(
+    pack: LocalLlmPack,
+    isInstalled: Boolean,
+    isActive: Boolean,
+    downloadActive: Boolean,
+    onDownload: () -> Unit,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(pack.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = when {
+                    isInstalled -> "✓ Проверена SHA-256 и готова"
+                    pack.isCustom -> "Файл отсутствует — переимпортируйте"
+                    else -> pack.description
+                },
+                color = if (isInstalled) GreenReady else MutedText,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+        if (isInstalled || pack.isCustom) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(
+                    selected = isActive,
+                    onClick = onSelect,
+                    label = { Text(if (isActive) "Активна" else "Выбрать") },
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Удалить модель", tint = MutedText)
+                }
+            }
+        } else {
+            OutlinedButton(
+                onClick = onDownload,
+                enabled = !downloadActive,
+            ) {
+                Text("Скачать")
+            }
+        }
     }
 }

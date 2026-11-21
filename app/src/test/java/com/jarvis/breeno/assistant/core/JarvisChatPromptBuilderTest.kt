@@ -28,8 +28,19 @@ class JarvisChatPromptBuilderTest {
 
     @Test
     fun sanitizesStopTokensFromModelOutput() {
-        val dirty = "  Здравствуйте! Чем могу помочь?<|im_end|><|endoftext|>  "
+        val dirty = "  Здравствуйте! Чем могу помочь?<|im_end|><|endoftext|><|eot_id|></s>  "
         assertEquals("Здравствуйте! Чем могу помочь?", JarvisChatPromptBuilder.sanitizeOutput(dirty))
         assertFalse(JarvisChatPromptBuilder.sanitizeOutput("Ответ<|im_start|>assistant").contains("<|im_start|>"))
+        assertFalse(JarvisChatPromptBuilder.sanitizeOutput("Ответ<|start_header_id|>user").contains("<|start_header_id|>"))
+    }
+
+    @Test
+    fun appliesSelectedPersonaSystemPrompt() {
+        val prompt = JarvisChatPromptBuilder.buildQwenChatMlPrompt(
+            userText = "Объясни квантовую запутанность",
+            persona = JarvisPersona.DIRECT_ASSISTANT,
+        )
+        assertTrue(prompt.contains("Dolphin / Hermes") || prompt.contains("без нравоучений"))
+        assertFalse(prompt.contains("Тони Старка"))
     }
 }

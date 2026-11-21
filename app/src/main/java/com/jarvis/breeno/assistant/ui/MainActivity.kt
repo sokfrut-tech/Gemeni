@@ -3,8 +3,10 @@ package com.jarvis.breeno.assistant.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -143,6 +145,28 @@ class MainActivity : ComponentActivity() {
         }
         pendingListen = false
         pendingModelDownloadConsent = false
+    }
+
+    private val importGgufLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        val displayName = resolveDocumentDisplayName(uri)
+        jarvisApp.downloads.start("Импорт $displayName") { update ->
+            runtime.importCustomGguf(uri, displayName) { pct ->
+                update("Импорт $displayName: $pct%", pct)
+            }
+        }
+    }
+
+    private fun resolveDocumentDisplayName(uri: Uri): String {
+        val queried = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+            }
+        }.getOrNull()
+        return queried?.takeIf { it.isNotBlank() }
+            ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+            ?: "custom_model.gguf"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -588,7 +612,7 @@ class MainActivity : ComponentActivity() {
                     JarvisTab.MODELS -> AiModelsScreen(
                         status = stackStatus,
                         downloadState = downloadState,
-                        llmCatalog = runtime.llmModels.catalog(),
+                        llmCatalog = stackStatus.allLlmPacks,
                         voiceCatalog = runtime.ttsModels.catalog(),
                         onDownloadStarterBundle = {
                             jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
@@ -627,6 +651,8 @@ class MainActivity : ComponentActivity() {
                         },
                         onSelectLlm = { id -> runtime.selectLlmPack(id) },
                         onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
+                        onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
+                        onSelectPersona = { persona -> runtime.selectPersona(persona) },
                         onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
                     )
 
@@ -690,8 +716,12 @@ class MainActivity : ComponentActivity() {
             dialogueScroll.animateScrollTo(dialogueScroll.maxValue)
         }
 
+        val activeLlm = stackStatus.activeLlmId
         val brainBadge = when {
-            stackStatus.activeLlmId != null -> "QWEN ОФЛАЙН"
+            activeLlm?.startsWith("dolphin") == true -> "DOLPHIN ОФЛАЙН"
+            activeLlm?.startsWith("hermes") == true -> "HERMES ОФЛАЙН"
+            activeLlm?.startsWith("custom_") == true -> "СВОЙ GGUF"
+            activeLlm != null -> "QWEN ОФЛАЙН"
             stackStatus.externalAiConfig.enabled && stackStatus.externalAiConfig.mode == ExternalAiMode.POLLINATIONS_FREE -> "ОНЛАЙН ИИ"
             stackStatus.externalAiConfig.enabled -> "ВНЕШНИЙ ИИ"
             else -> "НАСТРОИТЬ ИИ"

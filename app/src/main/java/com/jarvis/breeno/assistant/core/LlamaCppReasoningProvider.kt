@@ -36,7 +36,7 @@ class LlamaCppReasoningProvider(
             )
         }
         if (modelManager.activeReadyPack() == null) {
-            return ProviderAvailability.Unavailable("Локальная модель ИИ (Qwen 2.5) ещё не загружена")
+            return ProviderAvailability.Unavailable("Локальная модель ИИ (Dolphin / Hermes / Qwen) ещё не загружена")
         }
         return ProviderAvailability.Ready
     }
@@ -78,6 +78,7 @@ class LlamaCppReasoningProvider(
                     userText = turn.userText,
                     recentTurns = recentTurns,
                     recalledFacts = recalledFacts,
+                    persona = modelManager.selectedPersona(),
                 )
 
                 val streamedBuffer = StringBuilder()

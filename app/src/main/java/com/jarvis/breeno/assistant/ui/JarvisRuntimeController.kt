@@ -11,6 +11,7 @@ import com.jarvis.breeno.assistant.core.ExternalAiConfigStore
 import com.jarvis.breeno.assistant.core.JarvisCognitiveKernel
 import com.jarvis.breeno.assistant.core.JarvisFoldedRuntimePolicy
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
+import com.jarvis.breeno.assistant.core.JarvisPersona
 import com.jarvis.breeno.assistant.core.KernelBudget
 import com.jarvis.breeno.assistant.core.KernelTurn
 import com.jarvis.breeno.assistant.core.LlamaCppReasoningProvider
@@ -22,6 +23,7 @@ import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
+import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
 import com.jarvis.breeno.assistant.updater.PiperTtsModelDownloadManager
 import com.jarvis.breeno.assistant.updater.SileroVadModelManager
@@ -55,6 +57,8 @@ data class AiStackStatus(
     val activeLlmId: String?,
     val activeLlmTitle: String?,
     val externalAiConfig: ExternalAiConfig,
+    val allLlmPacks: List<LocalLlmPack> = LocalLlmModelManager.CATALOG,
+    val selectedPersona: JarvisPersona = JarvisPersona.STARK_JARVIS,
 )
 
 /**
@@ -89,6 +93,7 @@ class JarvisRuntimeController(context: Context) {
         configProvider = { externalAiStore.load() },
         historyProvider = { memory.recentChatTurns(limit = 6) },
         memorySearchProvider = { query -> memory.searchFacts(query, limit = 4) },
+        personaProvider = { llmModels.selectedPersona() },
     )
     private val cognitiveKernel = JarvisCognitiveKernel(listOf(guardedLocalProvider, cloudProvider))
 
@@ -114,8 +119,9 @@ class JarvisRuntimeController(context: Context) {
     fun isRussianAsrReady(): Boolean = models.isRussianAsrReady()
 
     fun currentStackStatus(): AiStackStatus {
+        val allPacks = llmModels.allPacks()
         val activePack = llmModels.activeReadyPack()
-        val readyIds = llmModels.catalog().filter { llmModels.isPackReady(it.id) }.map { it.id }.toSet()
+        val readyIds = allPacks.filter { llmModels.isPackReady(it.id) }.map { it.id }.toSet()
         val readyVoices = ttsModels.catalog().filter { ttsModels.isVoiceReady(it.id) }.map { it.id }.toSet()
         return AiStackStatus(
             asrReady = models.isRussianAsrReady(),
@@ -130,6 +136,8 @@ class JarvisRuntimeController(context: Context) {
             activeLlmId = activePack?.id,
             activeLlmTitle = activePack?.title,
             externalAiConfig = externalAiStore.load(),
+            allLlmPacks = allPacks,
+            selectedPersona = llmModels.selectedPersona(),
         )
     }
 
@@ -172,6 +180,21 @@ class JarvisRuntimeController(context: Context) {
     fun selectLlmPack(packId: String) {
         llmModels.selectPack(packId)
         onStackStatusChanged?.invoke()
+    }
+
+    fun selectPersona(persona: JarvisPersona) {
+        llmModels.selectPersona(persona)
+        onStackStatusChanged?.invoke()
+    }
+
+    suspend fun importCustomGguf(
+        uri: Uri,
+        displayName: String,
+        onProgress: (Int) -> Unit,
+    ): LocalLlmPack {
+        val pack = llmModels.importCustomGguf(uri, displayName, onProgress)
+        onStackStatusChanged?.invoke()
+        return pack
     }
 
     suspend fun deleteLlmPack(packId: String) {
@@ -224,11 +247,11 @@ class JarvisRuntimeController(context: Context) {
             onStackStatusChanged?.invoke()
         }
         if (llmModels.activeReadyPack() == null) {
-            onStageProgress("Скачиваю локальный ИИ Qwen 2.5 0.5B (469 МБ)…", 0)
-            llmModels.ensurePack(LocalLlmModelManager.PACK_QWEN_05B) { p, dl, total ->
+            onStageProgress("Скачиваю Dolphin 3.0 Qwen2.5 0.5B (379 МБ)…", 0)
+            llmModels.ensurePack(LocalLlmModelManager.PACK_DOLPHIN_QWEN_05B) { p, dl, total ->
                 val dlMb = dl / (1024 * 1024)
                 val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
-                onStageProgress("Мозг Qwen 2.5 0.5B: $dlMb/$totalMb МБ ($p%)", p)
+                onStageProgress("Мозг Dolphin 3.0 0.5B: $dlMb/$totalMb МБ ($p%)", p)
             }
             onStackStatusChanged?.invoke()
         }
@@ -365,10 +388,10 @@ class JarvisRuntimeController(context: Context) {
         val hasLocalLlm = llmModels.activeReadyPack() != null
         val extCfg = externalAiStore.load()
 
-        // Only show setup hint when BOTH local Qwen AND external AI are unconfigured/disabled.
+        // Only show setup hint when BOTH local GGUF AND external AI are unconfigured/disabled.
         if (!hasLocalLlm && !extCfg.enabled) {
             val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни онлайн-мозг. " +
-                "Откройте вкладку «Модели»: там можно за 1 нажатие включить бесплатный онлайн-ИИ или скачать офлайн-модель Qwen 2.5 и голос Дмитрий."
+                "Откройте вкладку «Модели»: там можно за 1 нажатие включить онлайн-ИИ, скачать Dolphin 3.0 / Hermes 3 / Qwen 2.5 или импортировать свой .gguf файл."
             memory.saveMessage("user", text, "user")
             memory.saveMessage("assistant", guidance, "setup-hint")
             onTokenStream(guidance)

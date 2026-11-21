@@ -2,6 +2,7 @@ package com.jarvis.breeno.assistant.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
@@ -47,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +93,10 @@ fun MediaStudioScreen(
     var cfgVidUrl by remember(initialConfig) { mutableStateOf(initialConfig.customVideoUrl) }
     var cfgModel by remember(initialConfig) { mutableStateOf(initialConfig.modelName) }
     var cfgKey by remember(initialConfig) { mutableStateOf(initialConfig.apiKey) }
+    var cfgNegPrompt by remember(initialConfig) { mutableStateOf(initialConfig.negativePrompt) }
+    var cfgSteps by remember(initialConfig) { mutableStateOf(initialConfig.steps.toString()) }
+    var cfgScale by remember(initialConfig) { mutableStateOf(initialConfig.cfgScale.toString()) }
+    var cfgCheckpoint by remember(initialConfig) { mutableStateOf(initialConfig.checkpointName) }
 
     fun dimensions(): Pair<Int, Int> = when (selectedAspect) {
         "16:9" -> 768 to 432
@@ -176,11 +184,26 @@ fun MediaStudioScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Движок генерации", color = Color.White, fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Встроенный онлайн-движок ограничен правилами внешнего сервиса. Для полного контроля над чекпоинтами (SDXL / Flux / локальные модели) выберите ComfyUI или SD / A1111 на вашем ПК.",
+                            color = StudioMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
                             FilterChip(
                                 selected = cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE,
                                 onClick = { cfgBackend = MediaGenBackend.POLLINATIONS_ONLINE },
                                 label = { Text("Встроенный") },
+                            )
+                            FilterChip(
+                                selected = cfgBackend == MediaGenBackend.CUSTOM_COMFYUI,
+                                onClick = { cfgBackend = MediaGenBackend.CUSTOM_COMFYUI },
+                                label = { Text("ComfyUI") },
                             )
                             FilterChip(
                                 selected = cfgBackend == MediaGenBackend.CUSTOM_A1111_SD,
@@ -197,10 +220,59 @@ fun MediaStudioScreen(
                             OutlinedTextField(
                                 value = cfgImgUrl,
                                 onValueChange = { cfgImgUrl = it },
-                                label = { Text("URL API изображений") },
+                                label = {
+                                    Text(
+                                        when (cfgBackend) {
+                                            MediaGenBackend.CUSTOM_COMFYUI -> "URL ComfyUI (напр. https://.../comfy или http://PC:8188)"
+                                            MediaGenBackend.CUSTOM_A1111_SD -> "URL A1111 / Forge (напр. http://PC:7860)"
+                                            else -> "URL API изображений"
+                                        }
+                                    )
+                                },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                        }
+                        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI) {
+                            OutlinedTextField(
+                                value = cfgCheckpoint,
+                                onValueChange = { cfgCheckpoint = it },
+                                label = { Text("Чекпоинт .safetensors (пусто = авто)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI || cfgBackend == MediaGenBackend.CUSTOM_A1111_SD) {
+                            OutlinedTextField(
+                                value = cfgNegPrompt,
+                                onValueChange = { cfgNegPrompt = it },
+                                label = { Text("Негативный промпт (Negative prompt)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                OutlinedTextField(
+                                    value = cfgSteps,
+                                    onValueChange = { cfgSteps = it.filter { ch -> ch.isDigit() } },
+                                    label = { Text("Шаги (Steps)") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = cfgScale,
+                                    onValueChange = { cfgScale = it },
+                                    label = { Text("CFG Scale") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE) {
                             OutlinedTextField(
                                 value = cfgKey,
                                 onValueChange = { cfgKey = it },
@@ -217,13 +289,15 @@ fun MediaStudioScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        OutlinedTextField(
-                            value = cfgModel,
-                            onValueChange = { cfgModel = it },
-                            label = { Text("Модель (напр. flux)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE || cfgBackend == MediaGenBackend.CUSTOM_OPENAI_IMAGES) {
+                            OutlinedTextField(
+                                value = cfgModel,
+                                onValueChange = { cfgModel = it },
+                                label = { Text("Модель (пусто = по умолчанию)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         Button(
                             onClick = {
                                 onSaveConfig(
@@ -233,6 +307,10 @@ fun MediaStudioScreen(
                                         customVideoUrl = cfgVidUrl,
                                         apiKey = cfgKey,
                                         modelName = cfgModel,
+                                        negativePrompt = cfgNegPrompt,
+                                        steps = cfgSteps.toIntOrNull()?.coerceIn(1, 100) ?: 24,
+                                        cfgScale = cfgScale.replace(',', '.').toFloatOrNull()?.coerceIn(1f, 30f) ?: 7.0f,
+                                        checkpointName = cfgCheckpoint,
                                     )
                                 )
                                 showServerSettings = false
@@ -257,7 +335,9 @@ fun MediaStudioScreen(
 
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 listOf("Фото", "Кино", "Киберпанк", "Аниме", "3D Арт").forEach { style ->

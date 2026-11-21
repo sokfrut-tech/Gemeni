@@ -9,6 +9,9 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +26,9 @@ import kotlin.random.Random
 
 enum class MediaGenBackend(val title: String) {
     POLLINATIONS_ONLINE("Встроенный онлайн-генератор (без ключа)"),
-    CUSTOM_OPENAI_IMAGES("Свой сервер (OpenAI Images API)"),
+    CUSTOM_COMFYUI("Свой ПК (ComfyUI API)"),
     CUSTOM_A1111_SD("Свой ПК (Stable Diffusion / A1111 WebUI)"),
+    CUSTOM_OPENAI_IMAGES("Свой сервер (OpenAI Images API)"),
 }
 
 data class MediaGenConfig(
@@ -33,6 +37,16 @@ data class MediaGenConfig(
     val customVideoUrl: String = "",
     val apiKey: String = "",
     val modelName: String = "",
+    val negativePrompt: String = "lowres, blurry, bad anatomy, watermark, text",
+    val steps: Int = 24,
+    val cfgScale: Float = 7.0f,
+    val checkpointName: String = "",
+)
+
+data class ComfyImageRef(
+    val filename: String,
+    val subfolder: String,
+    val type: String,
 )
 
 class MediaGenConfigStore(context: Context) {
@@ -55,6 +69,11 @@ class MediaGenConfigStore(context: Context) {
             customVideoUrl = prefs.getString(KEY_VID_URL, "") ?: "",
             apiKey = prefs.getString(KEY_API_KEY, "") ?: "",
             modelName = resolvedModel,
+            negativePrompt = prefs.getString(KEY_NEG_PROMPT, "lowres, blurry, bad anatomy, watermark, text")
+                ?: "lowres, blurry, bad anatomy, watermark, text",
+            steps = prefs.getInt(KEY_STEPS, 24).coerceIn(1, 100),
+            cfgScale = prefs.getFloat(KEY_CFG_SCALE, 7.0f).coerceIn(1.0f, 30.0f),
+            checkpointName = prefs.getString(KEY_CHECKPOINT, "") ?: "",
         )
     }
 
@@ -65,6 +84,10 @@ class MediaGenConfigStore(context: Context) {
             .putString(KEY_VID_URL, config.customVideoUrl.trim())
             .putString(KEY_API_KEY, config.apiKey.trim())
             .putString(KEY_MODEL, config.modelName.trim())
+            .putString(KEY_NEG_PROMPT, config.negativePrompt.trim())
+            .putInt(KEY_STEPS, config.steps.coerceIn(1, 100))
+            .putFloat(KEY_CFG_SCALE, config.cfgScale.coerceIn(1.0f, 30.0f))
+            .putString(KEY_CHECKPOINT, config.checkpointName.trim())
             .apply()
     }
 
@@ -74,6 +97,10 @@ class MediaGenConfigStore(context: Context) {
         private const val KEY_VID_URL = "media_custom_video_url"
         private const val KEY_API_KEY = "media_api_key"
         private const val KEY_MODEL = "media_model"
+        private const val KEY_NEG_PROMPT = "media_neg_prompt"
+        private const val KEY_STEPS = "media_steps"
+        private const val KEY_CFG_SCALE = "media_cfg_scale"
+        private const val KEY_CHECKPOINT = "media_checkpoint"
     }
 }
 
@@ -100,7 +127,7 @@ sealed interface OpenAiImagePayload {
 /**
  * Generates images and animated MP4 videos on the phone:
  * - Default mode works immediately without an API key via Pollinations + on-device MediaCodec MP4 synthesis.
- * - Optional custom server mode connects to user's own Stable Diffusion / ComfyUI / OpenAI-compatible GPU server.
+ * - Self-hosted mode connects to user's own PC GPU ComfyUI, Automatic1111/Forge WebUI, OpenAI Images, or video API.
  */
 class JarvisMediaGenerator(
     private val studioDir: File,
@@ -139,7 +166,7 @@ class JarvisMediaGenerator(
         onProgress("Генерирую изображение…")
 
         runCatching {
-            val imageBytes = fetchImageBytes(cfg, cleanPrompt, style, width, height, Random.nextInt(1, 999_999))
+            val imageBytes = fetchImageBytes(cfg, cleanPrompt, style, width, height, Random.nextInt(1, 999_999), onProgress)
             check(imageBytes.size > 1024) { "Получен слишком маленький или пустой файл изображения" }
 
             studioDir.mkdirs()
@@ -206,7 +233,7 @@ class JarvisMediaGenerator(
                     val baseSeed = Random.nextInt(1, 999_999)
                     scenes.forEachIndexed { idx, scenePrompt ->
                         onProgress("Рисую сцену ${idx + 1}/${scenes.size}…")
-                        val bytes = fetchImageBytes(cfg, scenePrompt, style, width, height, baseSeed + idx)
+                        val bytes = fetchImageBytes(cfg, scenePrompt, style, width, height, baseSeed + idx, onProgress)
                         val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                             ?: error("Не удалось декодировать кадр ${idx + 1}")
                         bitmaps.add(bmp)
@@ -254,26 +281,38 @@ class JarvisMediaGenerator(
         persistHistory()
     }
 
-    private fun fetchImageBytes(
+    private suspend fun fetchImageBytes(
         cfg: MediaGenConfig,
         prompt: String,
         style: String,
         width: Int,
         height: Int,
         seed: Int,
+        onProgress: (String) -> Unit,
     ): ByteArray {
         return when (cfg.backend) {
             MediaGenBackend.POLLINATIONS_ONLINE -> {
                 val url = buildPollinationsImageUrl(prompt, style, width, height, seed, cfg.modelName)
                 getBytes(url, emptyMap(), readTimeoutMs = 45_000)
             }
+            MediaGenBackend.CUSTOM_COMFYUI -> fetchFromComfyUi(cfg, prompt, style, width, height, seed, onProgress)
             MediaGenBackend.CUSTOM_A1111_SD -> {
-                val url = cfg.customImageUrl.trim()
-                require(url.startsWith("http://", true) || url.startsWith("https://", true)) {
-                    "Укажите URL вашего Stable Diffusion (например, .../sdapi/v1/txt2img)"
+                val rawUrl = cfg.customImageUrl.trim()
+                require(rawUrl.startsWith("http://", true) || rawUrl.startsWith("https://", true)) {
+                    "Укажите URL вашего Stable Diffusion (например, http://192.168.1.50:7860)"
                 }
-                val reqJson = buildA1111RequestJson(prompt, style, width, height)
-                val resp = postBytes(url, reqJson, buildAuthHeaders(cfg.apiKey), readTimeoutMs = 90_000)
+                val targetUrl = normalizeA1111Txt2ImgUrl(rawUrl)
+                val reqJson = buildA1111RequestJson(
+                    prompt = prompt,
+                    style = style,
+                    width = width,
+                    height = height,
+                    negativePrompt = cfg.negativePrompt,
+                    steps = cfg.steps,
+                    cfgScale = cfg.cfgScale,
+                    seed = seed,
+                )
+                val resp = postBytes(targetUrl, reqJson, buildAuthHeaders(cfg.apiKey), readTimeoutMs = 90_000)
                 val b64 = parseA1111Base64Image(resp.toString(Charsets.UTF_8))
                 Base64.decode(b64, Base64.DEFAULT)
             }
@@ -288,6 +327,70 @@ class JarvisMediaGenerator(
                 }
             }
         }
+    }
+
+    private suspend fun fetchFromComfyUi(
+        cfg: MediaGenConfig,
+        prompt: String,
+        style: String,
+        width: Int,
+        height: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+    ): ByteArray {
+        val rawUrl = cfg.customImageUrl.trim()
+        require(rawUrl.startsWith("http://", true) || rawUrl.startsWith("https://", true)) {
+            "Укажите URL вашего ComfyUI сервера (например, http://192.168.1.50:8188)"
+        }
+        val baseUrl = normalizeComfyBaseUrl(rawUrl)
+        val headers = buildAuthHeaders(cfg.apiKey)
+
+        val ckpt = cfg.checkpointName.trim().ifBlank {
+            onProgress("Определяю чекпоинт ComfyUI…")
+            val infoJson = getBytes("$baseUrl/object_info/CheckpointLoaderSimple", headers, readTimeoutMs = 15_000)
+                .toString(Charsets.UTF_8)
+            parseComfyFirstCheckpoint(infoJson)
+                ?: error("Не найден чекпоинт в ComfyUI: укажите имя .safetensors в настройках")
+        }
+
+        val workflowJson = buildComfyUiWorkflowJson(
+            prompt = prompt,
+            negativePrompt = cfg.negativePrompt,
+            style = style,
+            width = width,
+            height = height,
+            steps = cfg.steps,
+            cfgScale = cfg.cfgScale,
+            seed = seed,
+            checkpointName = ckpt,
+        )
+
+        onProgress("Отправляю задачу в ComfyUI ($ckpt)…")
+        val submitResp = postBytes("$baseUrl/prompt", workflowJson, headers, readTimeoutMs = 30_000)
+            .toString(Charsets.UTF_8)
+        val promptId = parseComfyPromptId(submitResp)
+
+        onProgress("ComfyUI рендерит изображение…")
+        val pollStart = System.currentTimeMillis()
+        var imageRef: ComfyImageRef? = null
+        while (System.currentTimeMillis() - pollStart < 90_000L) {
+            currentCoroutineContext().ensureActive()
+            val histJson = getBytes("$baseUrl/history/$promptId", headers, readTimeoutMs = 15_000)
+                .toString(Charsets.UTF_8)
+            imageRef = parseComfyHistoryImageRef(histJson, promptId)
+            if (imageRef != null) break
+            delay(800)
+        }
+
+        val ref = imageRef ?: error("ComfyUI не завершил генерацию за 90 секунд")
+        val qFilename = URLEncoder.encode(ref.filename, "UTF-8")
+        val qSubfolder = URLEncoder.encode(ref.subfolder, "UTF-8")
+        val qType = URLEncoder.encode(ref.type, "UTF-8")
+        return getBytes(
+            "$baseUrl/view?filename=$qFilename&subfolder=$qSubfolder&type=$qType",
+            headers,
+            readTimeoutMs = 30_000,
+        )
     }
 
     private fun buildAuthHeaders(apiKey: String): Map<String, String> =
@@ -377,6 +480,132 @@ class JarvisMediaGenerator(
             else -> style
         }
 
+        fun normalizeComfyBaseUrl(rawUrl: String): String {
+            var base = rawUrl.trim().trimEnd('/')
+            for (suffix in listOf("/prompt", "/view", "/history")) {
+                if (base.endsWith(suffix, ignoreCase = true)) {
+                    base = base.dropLast(suffix.length).trimEnd('/')
+                }
+            }
+            return base
+        }
+
+        fun normalizeA1111Txt2ImgUrl(rawUrl: String): String {
+            val clean = rawUrl.trim().trimEnd('/')
+            return if (clean.contains("/sdapi/", ignoreCase = true)) {
+                clean
+            } else {
+                "$clean/sdapi/v1/txt2img"
+            }
+        }
+
+        fun parseComfyFirstCheckpoint(objectInfoJson: String): String? {
+            return runCatching {
+                val root = JsonParser.parseString(objectInfoJson).asJsonObject
+                val ckptArray = root.getAsJsonObject("CheckpointLoaderSimple")
+                    ?.getAsJsonObject("input")
+                    ?.getAsJsonObject("required")
+                    ?.getAsJsonArray("ckpt_name")
+                    ?: return null
+                val choices = ckptArray.get(0)?.asJsonArray ?: return null
+                if (choices.size() > 0) choices[0].asString else null
+            }.getOrNull()
+        }
+
+        fun buildComfyUiWorkflowJson(
+            prompt: String,
+            negativePrompt: String,
+            style: String,
+            width: Int,
+            height: Int,
+            steps: Int,
+            cfgScale: Float,
+            seed: Int,
+            checkpointName: String,
+        ): String {
+            val safeW = ((width.coerceIn(256, 1536) + 7) / 8) * 8
+            val safeH = ((height.coerceIn(256, 1536) + 7) / 8) * 8
+
+            fun nodeRef(id: String, outputIndex: Int = 0) = com.google.gson.JsonArray().apply {
+                add(id)
+                add(outputIndex)
+            }
+
+            fun node(classType: String, inputs: JsonObject) = JsonObject().apply {
+                addProperty("class_type", classType)
+                add("inputs", inputs)
+            }
+
+            val graph = JsonObject().apply {
+                add("4", node("CheckpointLoaderSimple", JsonObject().apply {
+                    addProperty("ckpt_name", checkpointName)
+                }))
+                add("5", node("EmptyLatentImage", JsonObject().apply {
+                    addProperty("width", safeW)
+                    addProperty("height", safeH)
+                    addProperty("batch_size", 1)
+                }))
+                add("6", node("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", "${prompt.trim()}, ${styleSuffix(style)}")
+                    add("clip", nodeRef("4", 1))
+                }))
+                add("7", node("CLIPTextEncode", JsonObject().apply {
+                    addProperty("text", negativePrompt.trim())
+                    add("clip", nodeRef("4", 1))
+                }))
+                add("3", node("KSampler", JsonObject().apply {
+                    addProperty("seed", seed.coerceAtLeast(1))
+                    addProperty("steps", steps.coerceIn(1, 100))
+                    addProperty("cfg", cfgScale.coerceIn(1.0f, 30.0f))
+                    addProperty("sampler_name", "euler")
+                    addProperty("scheduler", "normal")
+                    addProperty("denoise", 1.0)
+                    add("model", nodeRef("4", 0))
+                    add("positive", nodeRef("6", 0))
+                    add("negative", nodeRef("7", 0))
+                    add("latent_image", nodeRef("5", 0))
+                }))
+                add("8", node("VAEDecode", JsonObject().apply {
+                    add("samples", nodeRef("3", 0))
+                    add("vae", nodeRef("4", 2))
+                }))
+                add("9", node("SaveImage", JsonObject().apply {
+                    addProperty("filename_prefix", "JarvisStudio")
+                    add("images", nodeRef("8", 0))
+                }))
+            }
+
+            val payload = JsonObject().apply {
+                add("prompt", graph)
+                addProperty("client_id", "jarvis-android")
+            }
+            return gson.toJson(payload)
+        }
+
+        fun parseComfyPromptId(submitJson: String): String {
+            val root = JsonParser.parseString(submitJson).asJsonObject
+            return root.get("prompt_id")?.asString?.takeIf { it.isNotBlank() }
+                ?: error("ComfyUI не вернул prompt_id")
+        }
+
+        fun parseComfyHistoryImageRef(historyJson: String, promptId: String): ComfyImageRef? {
+            val root = JsonParser.parseString(historyJson).asJsonObject
+            val entry = root.getAsJsonObject(promptId) ?: return null
+            val outputs = entry.getAsJsonObject("outputs") ?: return null
+            for (key in outputs.keySet()) {
+                val nodeObj = outputs.getAsJsonObject(key) ?: continue
+                val images = nodeObj.getAsJsonArray("images") ?: continue
+                if (images.size() > 0) {
+                    val img = images[0].asJsonObject
+                    val filename = img.get("filename")?.asString?.takeIf { it.isNotBlank() } ?: continue
+                    val subfolder = img.get("subfolder")?.asString ?: ""
+                    val type = img.get("type")?.asString ?: "output"
+                    return ComfyImageRef(filename = filename, subfolder = subfolder, type = type)
+                }
+            }
+            return null
+        }
+
         fun buildPollinationsImageUrl(
             prompt: String,
             style: String = "Фото",
@@ -402,13 +631,28 @@ class JarvisMediaGenerator(
             )
         }
 
-        fun buildA1111RequestJson(prompt: String, style: String, width: Int, height: Int): String {
+        fun buildA1111RequestJson(
+            prompt: String,
+            style: String,
+            width: Int,
+            height: Int,
+            negativePrompt: String = "",
+            steps: Int = 24,
+            cfgScale: Float = 7.0f,
+            seed: Int = -1,
+        ): String {
             val root = JsonObject().apply {
                 addProperty("prompt", "${prompt.trim()}, ${styleSuffix(style)}")
+                if (negativePrompt.isNotBlank()) {
+                    addProperty("negative_prompt", negativePrompt.trim())
+                }
                 addProperty("width", width)
                 addProperty("height", height)
-                addProperty("steps", 24)
-                addProperty("cfg_scale", 7.0)
+                addProperty("steps", steps.coerceIn(1, 100))
+                addProperty("cfg_scale", cfgScale.coerceIn(1.0f, 30.0f))
+                if (seed > 0) {
+                    addProperty("seed", seed)
+                }
             }
             return gson.toJson(root)
         }

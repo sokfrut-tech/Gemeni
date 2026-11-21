@@ -126,7 +126,19 @@ static bool ends_with(const std::string& text, const std::string& suffix) {
 }
 
 static bool contains_stop_marker(const std::string& text) {
-    return ends_with(text, "<|im_end|>") || ends_with(text, "<|endoftext|>");
+    return ends_with(text, "<|im_end|>") ||
+           ends_with(text, "<|endoftext|>") ||
+           ends_with(text, "<|eot_id|>") ||
+           ends_with(text, "</s>");
+}
+
+static void strip_all_stop_markers(std::string& text) {
+    while (contains_stop_marker(text)) {
+        strip_trailing_marker(text, "<|im_end|>");
+        strip_trailing_marker(text, "<|endoftext|>");
+        strip_trailing_marker(text, "<|eot_id|>");
+        strip_trailing_marker(text, "</s>");
+    }
 }
 
 } // namespace
@@ -326,8 +338,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
                 output.append(chunk);
 
                 if (contains_stop_marker(output)) {
-                    strip_trailing_marker(output, "<|im_end|>");
-                    strip_trailing_marker(output, "<|endoftext|>");
+                    strip_all_stop_markers(output);
                     break;
                 }
 
@@ -351,8 +362,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
     }
 
     llama_sampler_free(smpl);
-    strip_trailing_marker(output, "<|im_end|>");
-    strip_trailing_marker(output, "<|endoftext|>");
+    strip_all_stop_markers(output);
     return utf8_to_jstring(env, output);
 }
 
