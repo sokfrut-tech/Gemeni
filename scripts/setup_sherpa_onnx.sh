@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # Fetch a pinned, reproducible Sherpa-ONNX Android runtime and its Kotlin API.
-# Models are intentionally NOT bundled into the APK; ModelDownloadManager fetches
-# the Russian model into app-private storage and verifies hashes where available.
+# Pinned to v1.13.8 so it matches Gradle's AAR (v1.13.8) and retains built-in
+# espeak-ng / piper-phonemize for offline Russian Piper TTS voices.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SHERPA_VERSION="v2.0.1"
+SHERPA_VERSION="v1.13.8"
 WORK="$ROOT/.sherpa-onnx"
 API_DST="$ROOT/app/src/main/java/com/k2fsa/sherpa/onnx"
 JNI_DST="$ROOT/app/src/main/jniLibs"
@@ -23,7 +23,12 @@ curl -fL --retry 4 --retry-delay 2 \
 tar -xjf "$WORK/android.tar.bz2" -C "$WORK"
 
 # The release archive contains prebuilt Android libraries for the common ABIs.
-find "$WORK" -type f \( -name 'libsherpa-onnx-jni.so' -o -name 'libonnxruntime.so' \) -print0 | while IFS= read -r -d '' lib; do
+find "$WORK" -type f \( \
+  -name 'libsherpa-onnx-jni.so' -o \
+  -name 'libonnxruntime.so' -o \
+  -name 'libsherpa-onnx-c-api.so' -o \
+  -name 'libsherpa-onnx-cxx-api.so' \
+\) -print0 | while IFS= read -r -d '' lib; do
   abi="$(basename "$(dirname "$lib")")"
   case "$abi" in
     arm64-v8a|armeabi-v7a|x86_64|x86)

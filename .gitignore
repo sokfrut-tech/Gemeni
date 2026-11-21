@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+.llama.cpp/
+.sherpa-onnx/
+build/
+app/build/
+app/.cxx/
+local.properties
+*.iml
+*.apk
+*.aab

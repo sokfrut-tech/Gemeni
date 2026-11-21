@@ -1,1 +1,8 @@
-<resources><style name="Theme.Material3.DayNight.NoActionBar" parent="android:style/Theme.Material.Light.NoActionBar"/></resources>
+<resources>
+    <style name="Theme.Material3.DayNight.NoActionBar" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="android:statusBarColor">#04070F</item>
+        <item name="android:navigationBarColor">#080E1A</item>
+    </style>
+</resources>
