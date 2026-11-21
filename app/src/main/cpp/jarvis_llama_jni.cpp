@@ -159,7 +159,6 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeLoadModel(
 
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0;
-    model_params.use_mmap = true;
 
     llama_model* model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (!model) {
