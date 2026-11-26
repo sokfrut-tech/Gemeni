@@ -524,7 +524,7 @@ fun JarvisHomeScreen(
         activeLlm?.startsWith("custom_") == true -> "СВОЙ GGUF"
         activeLlm != null -> "QWEN ОФЛАЙН"
         stackStatus.externalAiConfig.enabled -> "ВНЕШНИЙ ИИ"
-        else -> "НАСТРОИТЬ ИИ"
+        else -> "МОДЕЛИ ИИ"
     }
 
     val orbTitle = when {
@@ -958,7 +958,7 @@ fun JarvisHomeScreen(
                         onValueChange = { textQuery = it },
                         placeholder = {
                             Text(
-                                text = "Спросите Jarvis Ai…",
+                                text = "Спросить…",
                                 color = TextSecondary,
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
@@ -1046,6 +1046,14 @@ private fun DialogueBubbleRow(
     onSpeak: (() -> Unit)?,
 ) {
     val isUser = role == "user"
+    val displayProvider = when (provider) {
+        "deterministic" -> "Мгновенный ответ"
+        "setup-hint" -> "Подсказка"
+        "error" -> "Ошибка"
+        "llama-cpp-local" -> "Локальный ИИ"
+        "генерация…" -> "Генерация…"
+        else -> provider
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -1070,7 +1078,7 @@ private fun DialogueBubbleRow(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = provider,
+                            text = displayProvider,
                             color = TextSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,

@@ -2,7 +2,6 @@ package com.jarvis.breeno.assistant.ui
 
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -100,12 +100,8 @@ fun JarvisSettingsScreen(
     fun launchSystemAction(action: String, fallbackAction: String = Settings.ACTION_SETTINGS) {
         val primary = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val launched = runCatching {
-            if (primary.resolveActivity(context.packageManager) != null) {
-                context.startActivity(primary)
-                true
-            } else {
-                false
-            }
+            context.startActivity(primary)
+            true
         }.getOrDefault(false)
         if (!launched) {
             runCatching {
@@ -118,7 +114,8 @@ fun JarvisSettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(SettingsBg)
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding(),
     ) {
         Row(
             modifier = Modifier
@@ -222,7 +219,7 @@ fun JarvisSettingsScreen(
                             expanded = voiceExpanded,
                             onClick = { voiceExpanded = !voiceExpanded },
                         )
-                        AnimatedVisibility(visible = voiceExpanded) {
+                        if (voiceExpanded) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -262,7 +259,7 @@ fun JarvisSettingsScreen(
                             expanded = asrExpanded,
                             onClick = { asrExpanded = !asrExpanded },
                         )
-                        AnimatedVisibility(visible = asrExpanded) {
+                        if (asrExpanded) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -315,7 +312,7 @@ fun JarvisSettingsScreen(
                             expanded = modelsExpanded,
                             onClick = { modelsExpanded = !modelsExpanded },
                         )
-                        AnimatedVisibility(visible = modelsExpanded) {
+                        if (modelsExpanded) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 SectionDivider()
                                 SettingsLinkRow(
@@ -344,7 +341,7 @@ fun JarvisSettingsScreen(
                             expanded = enginesExpanded,
                             onClick = { enginesExpanded = !enginesExpanded },
                         )
-                        AnimatedVisibility(visible = enginesExpanded) {
+                        if (enginesExpanded) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 SectionDivider()
                                 SettingsLinkRow(
@@ -445,7 +442,7 @@ fun JarvisSettingsScreen(
                             expanded = aboutExpanded,
                             onClick = { aboutExpanded = !aboutExpanded },
                         )
-                        AnimatedVisibility(visible = aboutExpanded) {
+                        if (aboutExpanded) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()

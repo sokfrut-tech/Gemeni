@@ -164,6 +164,7 @@ class JarvisRuntimeSmokeTest {
         val modelsGroup = findAfterScroll(By.text("Локальные модели и Hugging Face GGUF"))
         assertNotNull("Collapsed models group missing in Settings", modelsGroup)
         modelsGroup!!.click()
+        device.waitForIdle()
 
         val modelsLink = findAfterScroll(By.text("Каталог Dolphin / Hermes / Stheno / Qwen"))
         assertNotNull("Catalog sub-link missing after expanding models group", modelsLink)
