@@ -153,9 +153,15 @@ class GeminiCloudClient(
             persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         ): String {
             val sb = StringBuilder(persona.systemPrompt)
-            if (recalledFacts.isNotEmpty()) {
+            val memoryFacts = recalledFacts.filterNot { it.trimStart().startsWith("[Документ:") }
+            val docSnippets = recalledFacts.filter { it.trimStart().startsWith("[Документ:") }
+            if (memoryFacts.isNotEmpty()) {
                 sb.append("\n\nФакты из памяти пользователя:")
-                recalledFacts.forEach { sb.append("\n- ").append(it.trim()) }
+                memoryFacts.forEach { sb.append("\n- ").append(it.trim()) }
+            }
+            if (docSnippets.isNotEmpty()) {
+                sb.append("\n\nФрагменты из документов пользователя:")
+                docSnippets.forEach { sb.append("\n- ").append(it.trim()) }
             }
             return sb.toString()
         }

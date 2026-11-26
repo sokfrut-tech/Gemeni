@@ -252,10 +252,11 @@ class JarvisMediaGenerator(
         }
 
         val cfg = configStore.load()
+        val visualPrompt = RussianMediaPromptBridge.toVisualPrompt(cleanPrompt).ifBlank { cleanPrompt }
         onProgress("Генерирую изображение…")
 
         runCatching {
-            val imageBytes = fetchImageBytes(cfg, cleanPrompt, style, width, height, Random.nextInt(1, 999_999), onProgress)
+            val imageBytes = fetchImageBytes(cfg, visualPrompt, style, width, height, Random.nextInt(1, 999_999), onProgress)
             check(imageBytes.size > 1024) { "Получен слишком маленький или пустой файл изображения" }
 
             studioDir.mkdirs()
@@ -295,6 +296,12 @@ class JarvisMediaGenerator(
         }
 
         val cfg = configStore.load()
+        val visualPrompt = RussianMediaPromptBridge.toVisualPrompt(cleanPrompt).ifBlank { cleanPrompt }
+        val visualMotion = if (motionPrompt.isNotBlank()) {
+            RussianMediaPromptBridge.toVisualPrompt(motionPrompt.trim()).ifBlank { motionPrompt.trim() }
+        } else {
+            ""
+        }
         val id = UUID.randomUUID().toString().take(8)
         studioDir.mkdirs()
         val outFile = File(studioDir, "jarvis_vid_${id}_${System.currentTimeMillis()}.mp4")
@@ -302,7 +309,7 @@ class JarvisMediaGenerator(
         runCatching {
             if (cfg.customVideoUrl.isNotBlank()) {
                 onProgress("Отправляю запрос на ваш видео-сервер…")
-                val reqJson = gson.toJson(mapOf("prompt" to cleanPrompt, "style" to style, "motion_prompt" to motionPrompt.trim()))
+                val reqJson = gson.toJson(mapOf("prompt" to visualPrompt, "style" to style, "motion_prompt" to visualMotion))
                 val headers = buildAuthHeaders(cfg.apiKey)
                 val bytes = postBytes(cfg.customVideoUrl, reqJson, headers, readTimeoutMs = 90_000)
                 // Support either raw MP4 bytes or JSON { "video_url": "..." }
@@ -319,8 +326,8 @@ class JarvisMediaGenerator(
             } else if (cfg.backend == MediaGenBackend.CUSTOM_COMFYUI && cfg.comfyWanI2vEnabled) {
                 val mp4Bytes = fetchVideoFromComfyUiWan22(
                     cfg = cfg,
-                    imagePrompt = cleanPrompt,
-                    motionPrompt = motionPrompt,
+                    imagePrompt = visualPrompt,
+                    motionPrompt = visualMotion,
                     style = style,
                     videoWidth = width,
                     videoHeight = height,
@@ -329,7 +336,7 @@ class JarvisMediaGenerator(
                 )
                 outFile.writeBytes(mp4Bytes)
             } else {
-                val scenes = buildStoryboardPrompts(cleanPrompt, style)
+                val scenes = buildStoryboardPrompts(visualPrompt, style)
                 val bitmaps = mutableListOf<Bitmap>()
                 try {
                     val baseSeed = Random.nextInt(1, 999_999)

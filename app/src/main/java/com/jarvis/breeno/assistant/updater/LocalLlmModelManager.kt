@@ -278,6 +278,75 @@ class LocalLlmModelManager(private val context: Context) {
         }
     }
 
+    suspend fun downloadCustomGgufFromUrl(
+        downloadUrl: String,
+        displayName: String,
+        expectedSizeBytes: Long = -1L,
+        onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+    ): LocalLlmPack = withContext(Dispatchers.IO) {
+        val cleanUrl = downloadUrl.trim()
+        require(cleanUrl.startsWith("https://", ignoreCase = true)) {
+            "Загрузка GGUF разрешена только по защищённому HTTPS URL"
+        }
+
+        val safeName = sanitizeCustomFileName(displayName)
+        val packId = "custom_${System.currentTimeMillis()}"
+        val customRoot = context.filesDir.resolve("models/llm/custom")
+        val packDir = customRoot.resolve(packId)
+        packDir.mkdirs()
+
+        val target = packDir.resolve(safeName)
+        val canonRoot = customRoot.canonicalFile
+        check(target.canonicalFile.path.startsWith(canonRoot.path + File.separator)) {
+            "Недопустимое имя файла: $safeName"
+        }
+
+        try {
+            val fallbackUrls = if (cleanUrl.startsWith("https://huggingface.co/", ignoreCase = true)) {
+                listOf(URL(cleanUrl.replace("https://huggingface.co/", "https://hf-mirror.com/")))
+            } else {
+                emptyList()
+            }
+            ResumableModelDownloader.downloadVerified(
+                url = URL(cleanUrl),
+                destination = target,
+                expectedBytes = expectedSizeBytes.takeIf { it > 0L },
+                expectedSha256 = null,
+                fallbackUrls = fallbackUrls,
+                onProgress = onProgress,
+            )
+
+            check(target.isFile && target.length() > 1024L) { "Скачанный файл слишком мал или пуст" }
+            val header = ByteArray(4)
+            val headerRead = target.inputStream().use { it.read(header) }
+            check(headerRead >= 4 && isValidGgufMagic(header)) {
+                "Скачанный файл не является моделью формата GGUF"
+            }
+
+            val shaHex = ResumableModelDownloader.sha256(target)
+            val actualSize = target.length()
+            val record = StoredCustomPack(
+                id = packId,
+                title = safeName.removeSuffix(".gguf"),
+                fileName = safeName,
+                sizeBytes = actualSize,
+                sha256 = shaHex,
+            )
+            val marker = File(packDir, "$safeName.verified")
+            marker.writeText("${record.sizeBytes}:${record.sha256}", Charsets.UTF_8)
+
+            val updated = loadStoredCustomPacks() + record
+            saveStoredCustomPacks(updated)
+            selectPack(record.id)
+            onProgress(100, actualSize, actualSize)
+
+            findPack(record.id) ?: error("Скачанная модель не найдена после сохранения")
+        } catch (err: Throwable) {
+            packDir.deleteRecursively()
+            throw err
+        }
+    }
+
     suspend fun verifyBeforeLoad(pack: LocalLlmPack): File = withContext(Dispatchers.IO) {
         val target = modelFile(pack)
         val marker = markerFile(pack)

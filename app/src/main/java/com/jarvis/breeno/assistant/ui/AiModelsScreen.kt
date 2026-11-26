@@ -1,5 +1,6 @@
 package com.jarvis.breeno.assistant.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -16,7 +18,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,10 +53,14 @@ import com.jarvis.breeno.assistant.core.ExternalAiConfig
 import com.jarvis.breeno.assistant.core.ExternalAiMode
 import com.jarvis.breeno.assistant.core.JarvisPersona
 import com.jarvis.breeno.assistant.core.PromptTemplateFormat
+import com.jarvis.breeno.assistant.updater.HfGgufFile
+import com.jarvis.breeno.assistant.updater.HfRepoSummary
+import com.jarvis.breeno.assistant.updater.HuggingFaceGgufBrowser
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.PiperVoicePack
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 private val CardBg = Color(0xCC0C1628)
 private val CyanAccent = Color(0xFF00E5FF)
@@ -81,10 +90,19 @@ fun AiModelsScreen(
     onSelectPersona: (JarvisPersona) -> Unit,
     onSelectPromptTemplate: (PromptTemplateFormat) -> Unit,
     onSaveExternalAi: (ExternalAiConfig) -> Unit,
+    onDownloadHfGguf: (downloadUrl: String, fileName: String, sizeBytes: Long) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     var localFeedback by remember { mutableStateOf<String?>(null) }
+
+    var hfExpanded by remember { mutableStateOf(false) }
+    var hfQuery by remember { mutableStateOf("Saiga") }
+    var hfBusy by remember { mutableStateOf(false) }
+    var hfRepos by remember { mutableStateOf<List<HfRepoSummary>>(emptyList()) }
+    var hfSelectedRepo by remember { mutableStateOf<String?>(null) }
+    var hfFiles by remember { mutableStateOf<List<HfGgufFile>>(emptyList()) }
+    var hfStatus by remember { mutableStateOf<String?>(null) }
 
     var extEnabled by remember(status.externalAiConfig) { mutableStateOf(status.externalAiConfig.enabled) }
     var extMode by remember(status.externalAiConfig) {
@@ -363,6 +381,146 @@ fun AiModelsScreen(
                     Icon(Icons.Default.FolderOpen, contentDescription = null)
                     Spacer(Modifier.padding(horizontal = 4.dp))
                     Text("Импортировать свой .gguf файл с телефона")
+                }
+
+                // Hugging Face GGUF Browser & Downloader (open / uncensored / Russian community models)
+                OutlinedButton(
+                    onClick = { hfExpanded = !hfExpanded },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Поиск GGUF на Hugging Face (Saiga, Dolphin, Qwen 3)")
+                    Spacer(Modifier.width(6.dp))
+                    Icon(if (hfExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null)
+                }
+
+                AnimatedVisibility(visible = hfExpanded) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf("Saiga", "Dolphin", "Qwen3", "Gemma", "Llama-3").forEach { tag ->
+                                FilterChip(
+                                    selected = hfQuery.equals(tag, ignoreCase = true),
+                                    onClick = { hfQuery = tag },
+                                    label = { Text(tag) },
+                                )
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = hfQuery,
+                                onValueChange = { hfQuery = it },
+                                label = { Text("Запрос Hugging Face") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        hfBusy = true
+                                        hfSelectedRepo = null
+                                        hfFiles = emptyList()
+                                        hfStatus = "Ищу GGUF-репозитории…"
+                                        HuggingFaceGgufBrowser.searchGgufRepos(hfQuery).fold(
+                                            onSuccess = { repos ->
+                                                hfRepos = repos
+                                                hfStatus = "Найдено репозиториев: ${repos.size}"
+                                            },
+                                            onFailure = { err ->
+                                                hfStatus = "Ошибка поиска: ${err.message ?: err.javaClass.simpleName}"
+                                            },
+                                        )
+                                        hfBusy = false
+                                    }
+                                },
+                                enabled = !hfBusy && hfQuery.isNotBlank(),
+                            ) {
+                                Text("Найти")
+                            }
+                        }
+                        hfStatus?.let {
+                            Text(text = it, color = CyanAccent, style = MaterialTheme.typography.labelSmall)
+                        }
+                        hfRepos.forEach { repo ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xCC162436)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(repo.repoId, color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                                            Text("↓ ${repo.downloads} • ♥ ${repo.likes}", color = MutedText, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    hfBusy = true
+                                                    hfSelectedRepo = repo.repoId
+                                                    hfStatus = "Загружаю список .gguf…"
+                                                    HuggingFaceGgufBrowser.listGgufFiles(repo.repoId).fold(
+                                                        onSuccess = { files ->
+                                                            hfFiles = files
+                                                            hfStatus = "${repo.repoId}: ${files.size} .gguf файлов"
+                                                        },
+                                                        onFailure = { err ->
+                                                            hfFiles = emptyList()
+                                                            hfStatus = "Ошибка файлов: ${err.message}"
+                                                        },
+                                                    )
+                                                    hfBusy = false
+                                                }
+                                            },
+                                            enabled = !hfBusy,
+                                        ) {
+                                            Text("Файлы")
+                                        }
+                                    }
+                                    if (hfSelectedRepo == repo.repoId && hfFiles.isNotEmpty()) {
+                                        hfFiles.take(8).forEach { file ->
+                                            val sizeLabel = if (file.sizeBytes > 0L) {
+                                                "%.0f МБ".format(Locale.US, file.sizeBytes / (1024f * 1024f))
+                                            } else {
+                                                "?"
+                                            }
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(file.fileName, color = Color.White, style = MaterialTheme.typography.labelMedium)
+                                                    Text(sizeLabel, color = MutedText, style = MaterialTheme.typography.labelSmall)
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { onDownloadHfGguf(file.downloadUrl, file.fileName, file.sizeBytes) },
+                                                    enabled = !downloadState.active,
+                                                ) {
+                                                    Text("Скачать")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

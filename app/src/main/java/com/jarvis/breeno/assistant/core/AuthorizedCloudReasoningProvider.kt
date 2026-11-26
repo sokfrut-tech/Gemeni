@@ -63,6 +63,7 @@ class AuthorizedCloudReasoningProvider(
     private val memorySearchProvider: (String) -> List<String> = { emptyList() },
     private val personaProvider: () -> JarvisPersona = { JarvisPersona.STARK_JARVIS },
     private val client: GeminiCloudClient = GeminiCloudClient(configProvider, personaProvider),
+    private val documentSearchProvider: (String) -> List<String> = { emptyList() },
 ) : JarvisReasoningProvider {
 
     override val id: String = "authorized-cloud-or-pc"
@@ -85,10 +86,12 @@ class AuthorizedCloudReasoningProvider(
 
     override suspend fun reason(turn: KernelTurn): ProviderTurnResult {
         val cfg = configProvider()
+        val recalledFacts = runCatching { memorySearchProvider(turn.userText) }.getOrDefault(emptyList())
+        val docSnippets = runCatching { documentSearchProvider(turn.userText) }.getOrDefault(emptyList())
         val answer = client.complete(
             prompt = turn.userText,
             recentTurns = runCatching { historyProvider() }.getOrDefault(emptyList()),
-            recalledFacts = runCatching { memorySearchProvider(turn.userText) }.getOrDefault(emptyList()),
+            recalledFacts = recalledFacts + docSnippets,
             maxOutputTokens = turn.budget.maxOutputTokens,
         )
         return ProviderTurnResult(

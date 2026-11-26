@@ -20,9 +20,18 @@ import com.jarvis.breeno.assistant.core.PromptTemplateFormat
 import com.jarvis.breeno.assistant.core.ResourceGuardedLocalProvider
 import com.jarvis.breeno.assistant.core.RuntimeSignals
 import com.jarvis.breeno.assistant.core.computeAudioRms
+import com.jarvis.breeno.assistant.documents.IndexedDocument
+import com.jarvis.breeno.assistant.documents.JarvisDocumentStore
+import com.jarvis.breeno.assistant.memory.ChatSession
 import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
+import com.jarvis.breeno.assistant.memory.MemoryFact
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
+import com.jarvis.breeno.assistant.tools.JarvisPhoneActionExecutor
+import com.jarvis.breeno.assistant.tools.JarvisPhoneActions
+import com.jarvis.breeno.assistant.tools.McpServerConfig
+import com.jarvis.breeno.assistant.tools.McpServerStore
+import com.jarvis.breeno.assistant.tools.PhoneActionIntent
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
@@ -39,8 +48,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,8 +80,8 @@ data class AiStackStatus(
 /**
  * Full Jarvis runtime orchestrator:
  * Microphone / Text -> Russian ASR (Sherpa-ONNX + optional Silero VAD)
- * -> Deterministic Intents OR JarvisCognitiveKernel (ResourceGuarded LlamaCpp / Opt-in Cloud)
- * -> SQLite+FTS5 Memory -> Offline Russian Piper TTS (with Android TTS fallback).
+ * -> Deterministic Intents & Phone Actions OR JarvisCognitiveKernel (ResourceGuarded LlamaCpp / Opt-in Cloud) + Local Document RAG
+ * -> Multi-session SQLite+FTS5 Memory with SecretGuard -> Offline Russian Piper TTS.
  */
 class JarvisRuntimeController(context: Context) {
     private val appContext = context.applicationContext
@@ -78,6 +91,9 @@ class JarvisRuntimeController(context: Context) {
     val vadModels = SileroVadModelManager(appContext)
     private val externalAiStore = ExternalAiConfigStore(appContext)
     val memory = JarvisMemoryRepository(appContext)
+    val documentStore = JarvisDocumentStore(appContext)
+    val mcpServerStore = McpServerStore(appContext)
+    private val phoneActionExecutor = JarvisPhoneActionExecutor(appContext)
     private val signalsSource = AndroidRuntimeSignalsSource(appContext)
 
     private val audio = AudioRecordPipeline(appContext)
@@ -92,17 +108,46 @@ class JarvisRuntimeController(context: Context) {
 
     private val llamaProvider = LlamaCppReasoningProvider(
         modelManager = llmModels,
-        historyProvider = { memory.recentChatTurns(limit = 6) },
+        historyProvider = { memory.recentChatTurns(limit = 8, sessionId = memory.activeSessionId()) },
         memorySearchProvider = { query -> memory.searchFacts(query, limit = 4) },
+        documentSearchProvider = { query -> documentStore.searchRelevantSnippets(query, limit = 3) },
     )
     private val guardedLocalProvider = ResourceGuardedLocalProvider(llamaProvider, signalsSource)
     private val cloudProvider = AuthorizedCloudReasoningProvider(
         configProvider = { externalAiStore.load() },
-        historyProvider = { memory.recentChatTurns(limit = 6) },
+        historyProvider = { memory.recentChatTurns(limit = 8, sessionId = memory.activeSessionId()) },
         memorySearchProvider = { query -> memory.searchFacts(query, limit = 4) },
         personaProvider = { llmModels.selectedPersona() },
+        documentSearchProvider = { query -> documentStore.searchRelevantSnippets(query, limit = 3) },
     )
     private val cognitiveKernel = JarvisCognitiveKernel(listOf(guardedLocalProvider, cloudProvider))
+
+    private val _sessions = MutableStateFlow<List<ChatSession>>(emptyList())
+    val sessions: StateFlow<List<ChatSession>> = _sessions.asStateFlow()
+
+    private val _activeSessionId = MutableStateFlow(memory.ensureActiveSession().id)
+    val activeSessionId: StateFlow<String> = _activeSessionId.asStateFlow()
+
+    private val _dialogueMessages = MutableStateFlow<List<DialogueMessage>>(emptyList())
+    val dialogueMessages: StateFlow<List<DialogueMessage>> = _dialogueMessages.asStateFlow()
+
+    private val _memoryFacts = MutableStateFlow<List<MemoryFact>>(emptyList())
+    val memoryFacts: StateFlow<List<MemoryFact>> = _memoryFacts.asStateFlow()
+
+    private val _memoryPaused = MutableStateFlow(memory.isMemoryPaused())
+    val memoryPaused: StateFlow<Boolean> = _memoryPaused.asStateFlow()
+
+    private val _lastDeletedFact = MutableStateFlow<MemoryFact?>(null)
+    val lastDeletedFact: StateFlow<MemoryFact?> = _lastDeletedFact.asStateFlow()
+
+    private val _documents = MutableStateFlow<List<IndexedDocument>>(emptyList())
+    val documents: StateFlow<List<IndexedDocument>> = _documents.asStateFlow()
+
+    private val _mcpServers = MutableStateFlow<List<McpServerConfig>>(emptyList())
+    val mcpServers: StateFlow<List<McpServerConfig>> = _mcpServers.asStateFlow()
+
+    private val _generationWarning = MutableStateFlow<String?>(null)
+    val generationWarning: StateFlow<String?> = _generationWarning.asStateFlow()
 
     @Volatile private var vadLoaded = false
     @Volatile private var lastSpeakingState = false
@@ -169,10 +214,133 @@ class JarvisRuntimeController(context: Context) {
         }
     }
 
-    fun recentDialogue(limit: Int = 12): List<DialogueMessage> = memory.recentMessages(limit)
+    fun recentDialogue(limit: Int = 40): List<DialogueMessage> =
+        memory.recentMessages(limit, _activeSessionId.value)
+
+    fun refreshWorkspaceState() {
+        val activeId = memory.activeSessionId()
+        _activeSessionId.value = activeId
+        _sessions.value = memory.listSessions()
+        _dialogueMessages.value = memory.recentMessages(100, activeId)
+        _memoryFacts.value = memory.listFacts()
+        _memoryPaused.value = memory.isMemoryPaused()
+        _documents.value = documentStore.listDocuments()
+        _mcpServers.value = mcpServerStore.list()
+    }
+
+    fun selectSession(sessionId: String) {
+        memory.setActiveSessionId(sessionId)
+        refreshWorkspaceState()
+    }
+
+    fun startNewSession(): ChatSession {
+        val created = memory.createSession(JarvisMemoryRepository.DEFAULT_SESSION_TITLE)
+        refreshWorkspaceState()
+        return created
+    }
+
+    fun deleteSession(sessionId: String) {
+        memory.deleteSession(sessionId)
+        refreshWorkspaceState()
+    }
+
+    fun setMemoryPaused(paused: Boolean) {
+        memory.setMemoryPaused(paused)
+        refreshWorkspaceState()
+    }
+
+    fun addMemoryFact(key: String, content: String): Pair<Boolean, String> {
+        val outcome = memory.rememberFactChecked(key, content)
+        refreshWorkspaceState()
+        return outcome
+    }
+
+    fun deleteMemoryFact(factId: Long) {
+        val removed = memory.deleteFactById(factId)
+        if (removed != null) {
+            _lastDeletedFact.value = removed
+        }
+        refreshWorkspaceState()
+    }
+
+    fun undoDeleteMemoryFact(): Boolean {
+        val fact = _lastDeletedFact.value ?: return false
+        val restored = memory.restoreFact(fact)
+        _lastDeletedFact.value = null
+        refreshWorkspaceState()
+        return restored
+    }
+
+    fun clearLastDeletedFact() {
+        _lastDeletedFact.value = null
+    }
+
+    fun exportMemoryJson(): String = memory.exportFactsJson()
+
+    suspend fun importDocument(
+        uri: Uri,
+        displayName: String,
+        mimeType: String = "",
+    ): Result<IndexedDocument> {
+        val result = documentStore.importDocument(uri, displayName, mimeType)
+        refreshWorkspaceState()
+        return result
+    }
+
+    fun deleteDocument(docId: String) {
+        documentStore.deleteDocument(docId)
+        refreshWorkspaceState()
+    }
+
+    fun saveMcpServers(servers: List<McpServerConfig>) {
+        mcpServerStore.save(servers)
+        refreshWorkspaceState()
+    }
+
+    fun executePhoneAction(action: PhoneActionIntent): Result<String> =
+        phoneActionExecutor.execute(action)
+
+    suspend fun downloadCustomHfGguf(
+        downloadUrl: String,
+        displayName: String,
+        expectedSizeBytes: Long,
+        onProgress: (Int, Long, Long) -> Unit,
+    ): LocalLlmPack {
+        val pack = llmModels.downloadCustomGgufFromUrl(
+            downloadUrl = downloadUrl,
+            displayName = displayName,
+            expectedSizeBytes = expectedSizeBytes,
+            onProgress = onProgress,
+        )
+        onStackStatusChanged?.invoke()
+        return pack
+    }
+
+    fun calculateAppCacheBytes(): Long {
+        fun dirSize(file: File?): Long {
+            if (file == null || !file.exists()) return 0L
+            if (file.isFile) return file.length()
+            return file.listFiles()?.sumOf { dirSize(it) } ?: 0L
+        }
+        return dirSize(appContext.cacheDir) + dirSize(appContext.externalCacheDir)
+    }
+
+    fun clearAppCache(): Long {
+        val freed = calculateAppCacheBytes()
+        appContext.cacheDir?.listFiles()?.forEach { child -> runCatching { child.deleteRecursively() } }
+        appContext.externalCacheDir?.listFiles()?.forEach { child -> runCatching { child.deleteRecursively() } }
+        return freed
+    }
 
     fun testRussianVoice() {
         speaker.speak("Привет! Я Джарвис. Локальный русский голосовой движок работает отлично.")
+    }
+
+    fun speakerSpeakDirect(text: String) {
+        val clean = text.trim()
+        if (clean.isNotEmpty()) {
+            speaker.speak(clean)
+        }
     }
 
     fun selectTtsVoice(voiceId: String) {
@@ -395,12 +563,13 @@ class JarvisRuntimeController(context: Context) {
     ): String = withContext(Dispatchers.IO) {
         userCancelledSpeech = false
 
-        // 1. Instant deterministic commands (time, date, memory, status, tabs, media gen, system intents)
+        // 1. Instant deterministic commands (time, date, memory, status, tabs, media gen, safe phone actions)
         val deterministic = tryDeterministicCommand(text)
         if (deterministic != null) {
             onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
-            memory.saveMessage("user", text, "user")
-            memory.saveMessage("assistant", deterministic, "deterministic")
+            memory.saveMessage("user", text, "user", _activeSessionId.value)
+            memory.saveMessage("assistant", deterministic, "deterministic", _activeSessionId.value)
+            refreshWorkspaceState()
             onTokenStream(deterministic)
             onCommandCompleted?.invoke(text, deterministic)
             if (!speaker.speak(deterministic)) {
@@ -416,15 +585,16 @@ class JarvisRuntimeController(context: Context) {
         // Only show setup hint when BOTH local GGUF AND external AI are unconfigured/disabled.
         if (!hasLocalLlm && !extCfg.enabled) {
             val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни внешний сервер. " +
-                "Откройте вкладку «Модели»: скачайте офлайн-набор с Dolphin 3.0 + голос Дмитрий HD, выберите Hermes 3 / Qwen 2.5 или импортируйте свой .gguf файл."
-            memory.saveMessage("user", text, "user")
-            memory.saveMessage("assistant", guidance, "setup-hint")
+                "Откройте раздел «Модели ИИ» (в Настройках или через боковое меню): скачайте офлайн-набор с Dolphin 3.0 + голос Дмитрий HD, поищите GGUF на Hugging Face или импортируйте свой файл."
+            memory.saveMessage("user", text, "user", _activeSessionId.value)
+            memory.saveMessage("assistant", guidance, "setup-hint", _activeSessionId.value)
+            refreshWorkspaceState()
             onTokenStream(guidance)
             onCommandCompleted?.invoke(text, guidance)
             if (!speaker.speak(guidance)) {
                 onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
             }
-            onProgress("Нужна модель ИИ — откройте вкладку «Модели»")
+            onProgress("Нужна модель ИИ — откройте «Модели» в настройках")
             return@withContext guidance
         }
 
@@ -433,10 +603,14 @@ class JarvisRuntimeController(context: Context) {
         onProgress("Джарвис думает…")
 
         llamaProvider.onTokenDelta = { partial ->
+            _generationWarning.value = null
             onTokenStream(partial)
         }
         llamaProvider.onStatusUpdate = { statusMsg ->
             onProgress(statusMsg)
+        }
+        llamaProvider.onStallWarning = { warning ->
+            _generationWarning.value = warning
         }
 
         val turn = KernelTurn(
@@ -475,8 +649,9 @@ class JarvisRuntimeController(context: Context) {
                 }
             }
 
-            memory.saveMessage("user", text, "user")
-            memory.saveMessage("assistant", result.answer, result.modelId)
+            memory.saveMessage("user", text, "user", _activeSessionId.value)
+            memory.saveMessage("assistant", result.answer, result.modelId, _activeSessionId.value)
+            refreshWorkspaceState()
             onTokenStream(result.answer)
             onCommandCompleted?.invoke(text, result.answer)
             if (!speaker.speak(result.answer)) {
@@ -491,15 +666,18 @@ class JarvisRuntimeController(context: Context) {
             val realMsg = error.message ?: error.javaClass.simpleName
             onOrbModeChanged?.invoke(JarvisOrbMode.ERROR)
             val failText = "Ошибка ИИ: $realMsg"
-            memory.saveMessage("user", text, "user")
-            memory.saveMessage("assistant", failText, "error")
+            memory.saveMessage("user", text, "user", _activeSessionId.value)
+            memory.saveMessage("assistant", failText, "error", _activeSessionId.value)
+            refreshWorkspaceState()
             onTokenStream(failText)
             onCommandCompleted?.invoke(text, failText)
             onProgress(failText)
             failText
         } finally {
+            _generationWarning.value = null
             llamaProvider.onTokenDelta = null
             llamaProvider.onStatusUpdate = null
+            llamaProvider.onStallWarning = null
         }
     }
 
@@ -522,13 +700,13 @@ class JarvisRuntimeController(context: Context) {
             return "Сегодня $dateStr."
         }
 
-        // Explicit Memory Save
+        // Explicit Memory Save (enforces Memory Pause + SecretGuard)
         val rememberMatch = Regex("""^запомни[,:\s]+(?:что\s+)?(.+)$""", RegexOption.IGNORE_CASE).find(text.trim())
         if (rememberMatch != null) {
             val fact = rememberMatch.groupValues[1].trim()
             if (fact.isNotEmpty()) {
-                memory.rememberFact("user_${System.currentTimeMillis()}", fact)
-                return "Запомнил: $fact."
+                val (saved, feedback) = addMemoryFact("user_${System.currentTimeMillis()}", fact)
+                return if (saved) "Запомнил: $fact." else feedback
             }
         }
 
@@ -576,7 +754,7 @@ class JarvisRuntimeController(context: Context) {
             }
         }
 
-        // App Tab Navigation
+        // App Section Navigation
         if (lower.contains("студи") && (lower.contains("открой") || lower.contains("покажи"))) {
             onNavigateTab?.invoke("STUDIO")
             return "Открываю Студию ИИ."
@@ -592,6 +770,32 @@ class JarvisRuntimeController(context: Context) {
         if (lower.contains("модел") && (lower.contains("открой") || lower.contains("настрой") || lower.contains("скачай"))) {
             onNavigateTab?.invoke("MODELS")
             return "Открываю раздел моделей ИИ."
+        }
+        if ((lower.contains("документ") || lower.contains("баз знаний") || lower.contains("база знаний")) &&
+            (lower.contains("открой") || lower.contains("покажи"))
+        ) {
+            onNavigateTab?.invoke("DOCUMENTS")
+            return "Открываю документы и базу знаний."
+        }
+        if (lower.contains("управля") && lower.contains("память") || (lower.contains("памят") && lower.contains("открой"))) {
+            onNavigateTab?.invoke("MEMORY")
+            return "Открываю память Джарвиса."
+        }
+        if ((lower.contains("инструмент") || lower.contains("mcp")) && (lower.contains("открой") || lower.contains("покажи"))) {
+            onNavigateTab?.invoke("TOOLS_MCP")
+            return "Открываю инструменты и MCP."
+        }
+        if (lower.contains("настройки джарвис") || lower == "настройки") {
+            onNavigateTab?.invoke("SETTINGS")
+            return "Открываю настройки Jarvis Ai."
+        }
+
+        // Safe Deterministic Phone Actions (Timer, Alarm, Torch, System Settings, Calculator, Safe URL, Share)
+        JarvisPhoneActions.parseCommand(text)?.let { phoneAction ->
+            return phoneActionExecutor.execute(phoneAction).fold(
+                onSuccess = { message -> message },
+                onFailure = { err -> "Не удалось выполнить действие: ${err.message ?: err.javaClass.simpleName}" },
+            )
         }
 
         // Existing Deterministic Android Intents
@@ -674,5 +878,6 @@ class JarvisRuntimeController(context: Context) {
         runCatching { vad.close() }
         asr.close()
         memory.close()
+        documentStore.close()
     }
 }

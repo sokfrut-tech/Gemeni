@@ -7,73 +7,49 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.provider.OpenableColumns
-import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Grain
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -81,13 +57,11 @@ import com.jarvis.breeno.assistant.JarvisApp
 import com.jarvis.breeno.assistant.control.JarvisControlCenterStore
 import com.jarvis.breeno.assistant.control.JarvisEventLevel
 import com.jarvis.breeno.assistant.core.AndroidRuntimeSignalsSource
-import com.jarvis.breeno.assistant.core.ExternalAiMode
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenConfigStore
-import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
 import kotlinx.coroutines.CancellationException
@@ -97,20 +71,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Background = Color(0xFF04070F)
-private val NavBarBg = Color(0xFF080E1A)
-private val PanelCard = Color(0xCC0C1628)
-private val Cyan = Color(0xFF00E5FF)
-private val Gold = Color(0xFFFFB300)
-private val Muted = Color(0xFF9AAABD)
-
-private enum class JarvisTab(val title: String) {
-    CORE("Ядро"),
-    MODELS("Модели"),
-    STUDIO("Студия"),
-    SAVEVIDEO("Видео"),
-    CONTROL("Центр"),
-}
+private val RootBackground = Color(0xFF0A0D14)
+private val TopHeaderBg = Color(0xFF10141D)
+private val HeaderText = Color(0xFFF3F6FA)
 
 class MainActivity : ComponentActivity() {
     private lateinit var jarvisApp: JarvisApp
@@ -126,10 +89,9 @@ class MainActivity : ComponentActivity() {
     private var statusSink: ((String) -> Unit)? = null
     private var busySink: ((Boolean) -> Unit)? = null
     private var replySink: ((String?) -> Unit)? = null
-    private var dialogueSink: ((List<DialogueMessage>) -> Unit)? = null
     private var audioRmsSink: ((Float) -> Unit)? = null
     private var orbModeSink: ((JarvisOrbMode) -> Unit)? = null
-    private var tabSink: ((JarvisTab) -> Unit)? = null
+    private var sectionSink: ((JarvisSection) -> Unit)? = null
     private var stackStatusSink: ((AiStackStatus) -> Unit)? = null
     private var pendingStudioSink: ((Pair<GeneratedMediaType, String>) -> Unit)? = null
     private var autoResumeCheck: (() -> Boolean)? = null
@@ -150,7 +112,7 @@ class MainActivity : ComponentActivity() {
 
     private val importGgufLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@registerForActivityResult
-        val displayName = resolveDocumentDisplayName(uri)
+        val displayName = resolveDocumentDisplayName(uri, fallback = "custom_model.gguf")
         jarvisApp.downloads.start("Импорт $displayName") { update ->
             runtime.importCustomGguf(uri, displayName) { pct ->
                 update("Импорт $displayName: $pct%", pct)
@@ -158,7 +120,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun resolveDocumentDisplayName(uri: Uri): String {
+    private val importRagDocumentLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        val displayName = resolveDocumentDisplayName(uri, fallback = "document.txt")
+        val mimeType = contentResolver.getType(uri).orEmpty()
+        lifecycleScope.launch {
+            statusSink?.invoke("Индексирую документ «$displayName»…")
+            runtime.importDocument(uri, displayName, mimeType).fold(
+                onSuccess = { doc ->
+                    controlCenter.logEvent("ДОКУМЕНТЫ", "Добавлен файл RAG", "${doc.name} (${doc.chunkCount} фрагм.)", JarvisEventLevel.INFO)
+                    statusSink?.invoke("Документ «${doc.name}» добавлен в базу знаний")
+                },
+                onFailure = { err ->
+                    val msg = err.message ?: err.javaClass.simpleName
+                    controlCenter.logEvent("ДОКУМЕНТЫ", "Ошибка импорта", msg, JarvisEventLevel.ERROR)
+                    statusSink?.invoke("Ошибка документа: $msg")
+                },
+            )
+        }
+    }
+
+    private fun resolveDocumentDisplayName(uri: Uri, fallback: String): String {
         val queried = runCatching {
             contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                 val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
@@ -167,7 +149,7 @@ class MainActivity : ComponentActivity() {
         }.getOrNull()
         return queried?.takeIf { it.isNotBlank() }
             ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-            ?: "custom_model.gguf"
+            ?: fallback
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -237,8 +219,7 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshDialogueFeed() {
         lifecycleScope.launch(Dispatchers.IO) {
-            val recent = runCatching { runtime.recentDialogue(10) }.getOrDefault(emptyList())
-            runOnUiThread { dialogueSink?.invoke(recent) }
+            runCatching { runtime.refreshWorkspaceState() }
         }
     }
 
@@ -376,18 +357,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openSettings() = startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-
     override fun onDestroy() {
         jarvisApp.onDownloadStateUpdated = null
         statusSink = null
         busySink = null
         replySink = null
-        dialogueSink = null
         modelConsentSink = null
         audioRmsSink = null
         orbModeSink = null
-        tabSink = null
+        sectionSink = null
         stackStatusSink = null
         pendingStudioSink = null
         autoResumeCheck = null
@@ -402,7 +380,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun JarvisAppRoot() {
-        var activeTab by remember { mutableStateOf(JarvisTab.CORE) }
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val uiScope = rememberCoroutineScope()
+        var currentSection by remember { mutableStateOf(JarvisSection.HOME) }
         var orbMode by remember { mutableStateOf(JarvisOrbMode.IDLE) }
         var audioRms by remember { mutableStateOf(0f) }
         var listening by remember { mutableStateOf(false) }
@@ -412,27 +392,55 @@ class MainActivity : ComponentActivity() {
         var continuousDialogue by remember { mutableStateOf(false) }
         var showModelConsent by remember { mutableStateOf(false) }
         var streamingReply by remember { mutableStateOf<String?>(null) }
-        var dialogueFeed by remember { mutableStateOf(emptyList<DialogueMessage>()) }
         var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
         var stackStatus by remember { mutableStateOf(runtime.currentStackStatus()) }
         var pendingStudioRequest by remember { mutableStateOf<Pair<GeneratedMediaType, String>?>(null) }
+
+        val sessions by runtime.sessions.collectAsState()
+        val activeSessionId by runtime.activeSessionId.collectAsState()
+        val dialogueFeed by runtime.dialogueMessages.collectAsState()
+        val memoryFacts by runtime.memoryFacts.collectAsState()
+        val memoryPaused by runtime.memoryPaused.collectAsState()
+        val lastDeletedFact by runtime.lastDeletedFact.collectAsState()
+        val indexedDocuments by runtime.documents.collectAsState()
+        val mcpServers by runtime.mcpServers.collectAsState()
+        val generationWarning by runtime.generationWarning.collectAsState()
 
         val saveVideoTasks by saveVideoManager.tasks.collectAsState()
         val studioItems by mediaGenerator.items.collectAsState()
         val controlSnapshot by controlCenter.snapshot.collectAsState()
         val downloadState by jarvisApp.downloads.state.collectAsState()
 
+        fun navigateTo(section: JarvisSection) {
+            currentSection = section
+            if (section == JarvisSection.MODELS || section == JarvisSection.CONTROL || section == JarvisSection.SETTINGS) {
+                refreshTelemetry()
+            }
+            if (section == JarvisSection.MEMORY || section == JarvisSection.DOCUMENTS || section == JarvisSection.TOOLS_MCP || section == JarvisSection.HOME) {
+                refreshDialogueFeed()
+            }
+        }
+
+        BackHandler(enabled = drawerState.isOpen || currentSection != JarvisSection.HOME) {
+            if (drawerState.isOpen) {
+                uiScope.launch { drawerState.close() }
+            } else if (currentSection == JarvisSection.MODELS) {
+                navigateTo(JarvisSection.SETTINGS)
+            } else {
+                navigateTo(JarvisSection.HOME)
+            }
+        }
+
         DisposableEffect(Unit) {
             modelConsentSink = { showModelConsent = true }
             audioRmsSink = { rms -> audioRms = rms }
             orbModeSink = { mode -> orbMode = mode }
-            tabSink = { tab -> activeTab = tab }
+            sectionSink = { sec -> navigateTo(sec) }
             stackStatusSink = { next -> stackStatus = next }
             busySink = { isBusy -> busy = isBusy }
             replySink = { text -> streamingReply = text }
-            dialogueSink = { list -> dialogueFeed = list }
             pendingStudioSink = { req -> pendingStudioRequest = req }
-            autoResumeCheck = { continuousDialogue && activeTab == JarvisTab.CORE }
+            autoResumeCheck = { continuousDialogue && currentSection == JarvisSection.HOME }
 
             runtime.onAudioLevelChanged = { rms -> runOnUiThread { audioRmsSink?.invoke(rms) } }
             runtime.onOrbModeChanged = { mode -> runOnUiThread { orbModeSink?.invoke(mode) } }
@@ -450,18 +458,23 @@ class MainActivity : ComponentActivity() {
                 runOnUiThread {
                     val mediaType = if (type == "VIDEO") GeneratedMediaType.VIDEO else GeneratedMediaType.IMAGE
                     pendingStudioSink?.invoke(mediaType to prompt)
-                    tabSink?.invoke(JarvisTab.STUDIO)
+                    sectionSink?.invoke(JarvisSection.STUDIO)
                 }
             }
             runtime.onNavigateTab = { target ->
                 runOnUiThread {
-                    when (target) {
-                        "SAVEVIDEO" -> tabSink?.invoke(JarvisTab.SAVEVIDEO)
-                        "CONTROL" -> tabSink?.invoke(JarvisTab.CONTROL)
-                        "MODELS" -> tabSink?.invoke(JarvisTab.MODELS)
-                        "STUDIO" -> tabSink?.invoke(JarvisTab.STUDIO)
-                        else -> tabSink?.invoke(JarvisTab.CORE)
+                    val next = when (target) {
+                        "SAVEVIDEO" -> JarvisSection.SAVE_VIDEO
+                        "CONTROL" -> JarvisSection.CONTROL
+                        "MODELS" -> JarvisSection.MODELS
+                        "STUDIO" -> JarvisSection.STUDIO
+                        "DOCUMENTS" -> JarvisSection.DOCUMENTS
+                        "MEMORY" -> JarvisSection.MEMORY
+                        "TOOLS_MCP" -> JarvisSection.TOOLS_MCP
+                        "SETTINGS" -> JarvisSection.SETTINGS
+                        else -> JarvisSection.HOME
                     }
+                    sectionSink?.invoke(next)
                 }
             }
             runtime.onCommandCompleted = { spoken, response ->
@@ -485,6 +498,12 @@ class MainActivity : ComponentActivity() {
                         value.startsWith("Распознано:") ||
                         value.startsWith("Открываю") ||
                         value.startsWith("Запомнил:") ||
+                        value.startsWith("Документ ") ||
+                        value.startsWith("Фонарик ") ||
+                        value.startsWith("Результат:") ||
+                        value.startsWith("Память на паузе") ||
+                        value.startsWith("Обнаружен ") ||
+                        value.startsWith("Не удалось ") ||
                         value.startsWith("Сейчас ") ||
                         value.startsWith("Сегодня ") ||
                         value.startsWith("Вот что") ||
@@ -496,11 +515,10 @@ class MainActivity : ComponentActivity() {
                 statusSink = null
                 busySink = null
                 replySink = null
-                dialogueSink = null
                 modelConsentSink = null
                 audioRmsSink = null
                 orbModeSink = null
-                tabSink = null
+                sectionSink = null
                 stackStatusSink = null
                 pendingStudioSink = null
                 autoResumeCheck = null
@@ -537,60 +555,43 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        Scaffold(
-            containerColor = Background,
-            bottomBar = {
-                NavigationBar(containerColor = NavBarBg) {
-                    NavigationBarItem(
-                        selected = activeTab == JarvisTab.CORE,
-                        onClick = { activeTab = JarvisTab.CORE },
-                        icon = { Icon(Icons.Default.Grain, contentDescription = JarvisTab.CORE.title) },
-                        label = { Text(JarvisTab.CORE.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
-                    )
-                    NavigationBarItem(
-                        selected = activeTab == JarvisTab.MODELS,
-                        onClick = {
-                            activeTab = JarvisTab.MODELS
-                            refreshTelemetry()
-                        },
-                        icon = { Icon(Icons.Default.Memory, contentDescription = JarvisTab.MODELS.title) },
-                        label = { Text(JarvisTab.MODELS.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
-                    )
-                    NavigationBarItem(
-                        selected = activeTab == JarvisTab.STUDIO,
-                        onClick = { activeTab = JarvisTab.STUDIO },
-                        icon = { Icon(Icons.Default.AutoAwesome, contentDescription = JarvisTab.STUDIO.title) },
-                        label = { Text(JarvisTab.STUDIO.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
-                    )
-                    NavigationBarItem(
-                        selected = activeTab == JarvisTab.SAVEVIDEO,
-                        onClick = { activeTab = JarvisTab.SAVEVIDEO },
-                        icon = { Icon(Icons.Default.Download, contentDescription = JarvisTab.SAVEVIDEO.title) },
-                        label = {
-                            val badge = if (controlSnapshot.videosInQueue > 0) "(${controlSnapshot.videosInQueue})" else ""
-                            Text("${JarvisTab.SAVEVIDEO.title}$badge", fontSize = 11.sp, maxLines = 1, softWrap = false)
-                        },
-                    )
-                    NavigationBarItem(
-                        selected = activeTab == JarvisTab.CONTROL,
-                        onClick = {
-                            activeTab = JarvisTab.CONTROL
-                            refreshTelemetry()
-                        },
-                        icon = { Icon(Icons.Default.Dashboard, contentDescription = JarvisTab.CONTROL.title) },
-                        label = { Text(JarvisTab.CONTROL.title, fontSize = 11.sp, maxLines = 1, softWrap = false) },
-                    )
-                }
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                JarvisNavigationDrawerSheet(
+                    currentSection = currentSection,
+                    activeSessionId = activeSessionId,
+                    sessions = sessions,
+                    stackStatus = stackStatus,
+                    documentsCount = indexedDocuments.size,
+                    factsCount = memoryFacts.size,
+                    videosInQueue = controlSnapshot.videosInQueue,
+                    onSelectSection = { target ->
+                        uiScope.launch { drawerState.close() }
+                        navigateTo(target)
+                    },
+                    onSelectSession = { sessionId ->
+                        lifecycleScope.launch(Dispatchers.IO) { runtime.selectSession(sessionId) }
+                        uiScope.launch { drawerState.close() }
+                        navigateTo(JarvisSection.HOME)
+                    },
+                    onNewSession = {
+                        lifecycleScope.launch(Dispatchers.IO) { runtime.startNewSession() }
+                        uiScope.launch { drawerState.close() }
+                        navigateTo(JarvisSection.HOME)
+                    },
+                    onDeleteSession = { sessionId ->
+                        lifecycleScope.launch(Dispatchers.IO) { runtime.deleteSession(sessionId) }
+                    },
+                )
             },
-        ) { innerPadding ->
+        ) {
             Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                color = Background,
+                modifier = Modifier.fillMaxSize(),
+                color = RootBackground,
             ) {
-                when (activeTab) {
-                    JarvisTab.CORE -> JarvisCoreHomeTab(
+                when (currentSection) {
+                    JarvisSection.HOME -> JarvisHomeScreen(
                         orbMode = orbMode,
                         audioRms = audioRms,
                         listening = listening,
@@ -600,10 +601,12 @@ class MainActivity : ComponentActivity() {
                         continuousDialogue = continuousDialogue,
                         status = status,
                         streamingReply = streamingReply,
+                        generationWarning = generationWarning,
                         dialogueFeed = dialogueFeed,
                         stackStatus = stackStatus,
                         downloadState = downloadState,
                         activeTasksCount = controlSnapshot.activeTasks,
+                        onOpenDrawer = { uiScope.launch { drawerState.open() } },
                         onOrbClick = {
                             if (listeningJob != null || modelCheckJob != null || busy || listening || speaking) {
                                 stopListening()
@@ -612,357 +615,225 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onSendText = { query -> submitTextQuery(query) },
+                        onSpeakText = { text -> runtime.speakerSpeakDirect(text) },
                         onStopWork = { stopListening() },
+                        onNewDialogue = {
+                            lifecycleScope.launch(Dispatchers.IO) { runtime.startNewSession() }
+                        },
                         onToggleMute = {
                             muted = !muted
                             runtime.setMuted(muted)
                         },
                         onToggleContinuous = { continuousDialogue = !continuousDialogue },
-                        onOpenModels = {
-                            activeTab = JarvisTab.MODELS
-                            refreshTelemetry()
-                        },
-                        onOpenSettings = { openSettings() },
+                        onOpenModels = { navigateTo(JarvisSection.MODELS) },
+                        onOpenSettings = { navigateTo(JarvisSection.SETTINGS) },
+                        onAttachDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
+                        onOpenSection = { sec -> navigateTo(sec) },
                     )
 
-                    JarvisTab.MODELS -> AiModelsScreen(
-                        status = stackStatus,
-                        downloadState = downloadState,
-                        llmCatalog = stackStatus.allLlmPacks,
-                        voiceCatalog = runtime.ttsModels.catalog(),
-                        onDownloadStarterBundle = {
-                            jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
-                                runtime.downloadOfflineStarterBundle { stage, pct -> update(stage, pct) }
-                            }
+                    JarvisSection.SETTINGS -> JarvisSettingsScreen(
+                        stackStatus = stackStatus,
+                        continuousDialogue = continuousDialogue,
+                        muted = muted,
+                        memoryPaused = memoryPaused,
+                        factsCount = memoryFacts.size,
+                        documentsCount = indexedDocuments.size,
+                        mcpCount = mcpServers.size,
+                        cacheBytes = runtime.calculateAppCacheBytes(),
+                        onBack = { navigateTo(JarvisSection.HOME) },
+                        onToggleContinuous = { continuousDialogue = it },
+                        onToggleMuted = { enable ->
+                            muted = enable
+                            runtime.setMuted(enable)
                         },
-                        onDownloadAsr = {
-                            jarvisApp.downloads.start("Русский слух (ASR)") { update ->
-                                runtime.downloadAsr { pct -> update(null, pct) }
-                            }
-                        },
-                        onDownloadVad = {
-                            jarvisApp.downloads.start("Silero VAD") { update ->
-                                runtime.downloadVad { pct -> update(null, pct) }
-                            }
-                        },
-                        onDownloadVoice = { id ->
-                            val title = runtime.ttsModels.findVoice(id)?.title ?: id
-                            jarvisApp.downloads.start(title) { update ->
-                                runtime.downloadTtsVoice(id) { pct -> update(null, pct) }
-                            }
-                        },
-                        onCancelDownload = { jarvisApp.downloads.cancel() },
-                        onSelectVoice = { id -> runtime.selectTtsVoice(id) },
                         onSetSpeechSpeed = { speed -> runtime.setSpeechSpeed(speed) },
-                        onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
                         onTestVoice = { runtime.testRussianVoice() },
-                        onDownloadLlm = { id ->
-                            val title = runtime.llmModels.findPack(id)?.title ?: id
-                            jarvisApp.downloads.start(title) { update ->
-                                runtime.downloadLlmPack(id) { pct, dl, total ->
-                                    val dlMb = dl / (1024 * 1024)
-                                    val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
-                                    update("$title: $dlMb/$totalMb МБ ($pct%)", pct)
-                                }
-                            }
+                        onToggleMemoryPaused = { paused ->
+                            lifecycleScope.launch(Dispatchers.IO) { runtime.setMemoryPaused(paused) }
                         },
-                        onSelectLlm = { id -> runtime.selectLlmPack(id) },
-                        onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
+                        onClearCache = { runtime.clearAppCache() },
+                        onNavigateSection = { sec -> navigateTo(sec) },
                         onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
-                        onSelectPersona = { persona -> runtime.selectPersona(persona) },
-                        onSelectPromptTemplate = { fmt -> runtime.selectPromptTemplate(fmt) },
-                        onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
                     )
 
-                    JarvisTab.STUDIO -> MediaStudioScreen(
-                        items = studioItems,
-                        initialConfig = mediaGenerator.currentConfig(),
-                        pendingPromptRequest = pendingStudioRequest,
-                        onClearPendingRequest = { pendingStudioRequest = null },
-                        onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
-                        onGenerateVideo = { p, s, w, h, mp, cb -> mediaGenerator.generateVideo(p, s, w, h, mp, cb) },
-                        onOpenItem = { item -> openGeneratedMedia(item) },
-                        onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
-                        onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
-                    )
-
-                    JarvisTab.SAVEVIDEO -> SaveVideoScreen(
-                        tasks = saveVideoTasks,
-                        onInspect = { url -> saveVideoManager.inspectMetadata(url) },
-                        onEnqueue = { url, quality -> saveVideoManager.enqueue(url, quality) },
-                        onCancel = { id -> saveVideoManager.cancelTask(id) },
-                        onRetry = { id -> saveVideoManager.startTask(id) },
-                        onDelete = { id -> saveVideoManager.deleteTask(id) },
-                    )
-
-                    JarvisTab.CONTROL -> ControlCenterScreen(
-                        snapshot = controlSnapshot,
-                        onRefreshTelemetry = { refreshTelemetry() },
-                        onClearEvents = { controlCenter.clearEvents() },
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun JarvisCoreHomeTab(
-        orbMode: JarvisOrbMode,
-        audioRms: Float,
-        listening: Boolean,
-        speaking: Boolean,
-        busy: Boolean,
-        muted: Boolean,
-        continuousDialogue: Boolean,
-        status: String,
-        streamingReply: String?,
-        dialogueFeed: List<DialogueMessage>,
-        stackStatus: AiStackStatus,
-        downloadState: com.jarvis.breeno.assistant.DownloadTaskState,
-        activeTasksCount: Int,
-        onOrbClick: () -> Unit,
-        onSendText: (String) -> Unit,
-        onStopWork: () -> Unit,
-        onToggleMute: () -> Unit,
-        onToggleContinuous: () -> Unit,
-        onOpenModels: () -> Unit,
-        onOpenSettings: () -> Unit,
-    ) {
-        var textQuery by remember { mutableStateOf("") }
-        val dialogueScroll = rememberScrollState()
-
-        LaunchedEffect(dialogueFeed.size, streamingReply) {
-            dialogueScroll.animateScrollTo(dialogueScroll.maxValue)
-        }
-
-        val activeLlm = stackStatus.activeLlmId
-        val brainBadge = when {
-            activeLlm?.startsWith("l3-8b-stheno") == true -> "STHENO 8B"
-            activeLlm?.startsWith("dolphin") == true -> "DOLPHIN ОФЛАЙН"
-            activeLlm?.startsWith("hermes") == true -> "HERMES ОФЛАЙН"
-            activeLlm?.startsWith("custom_") == true -> "СВОЙ GGUF"
-            activeLlm != null -> "QWEN ОФЛАЙН"
-            stackStatus.externalAiConfig.enabled -> "ВНЕШНИЙ ИИ"
-            else -> "НАСТРОИТЬ ИИ"
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val compact = maxHeight < 660.dp
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = if (compact) 4.dp else 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (activeTasksCount > 0) "ЗАДАЧ: $activeTasksCount • $brainBadge" else brainBadge,
-                        color = if (stackStatus.activeLlmId != null || stackStatus.externalAiConfig.enabled) {
-                            Color(0xFF34D399)
-                        } else {
-                            Gold
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable(onClick = onOpenModels),
-                    )
-                    Row {
-                        IconButton(onClick = onToggleContinuous) {
-                            Icon(
-                                imageVector = Icons.Default.RecordVoiceOver,
-                                contentDescription = if (continuousDialogue) "Выключить живой диалог" else "Включить живой диалог",
-                                tint = if (continuousDialogue) Gold else Muted,
-                            )
-                        }
-                        IconButton(onClick = onToggleMute) {
-                            Icon(
-                                imageVector = if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
-                                contentDescription = if (muted) "Включить звук" else "Выключить звук",
-                                tint = if (muted) Color(0xFFFF9C9C) else Muted,
-                            )
-                        }
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = Muted)
-                        }
-                    }
-                }
-
-                if (downloadState.active) {
-                    Column(
+                    else -> Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onOpenModels)
-                            .padding(bottom = 2.dp),
+                            .fillMaxSize()
+                            .background(RootBackground)
+                            .statusBarsPadding()
+                            .navigationBarsPadding(),
                     ) {
-                        Text(
-                            text = "${downloadState.label} (${downloadState.percent}%)",
-                            color = Cyan,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        LinearProgressIndicator(
-                            progress = { (downloadState.percent / 100f).coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clickable(
-                            onClickLabel = if (busy || listening) "Остановить Джарвиса" else "Активировать Джарвиса",
-                            onClick = onOrbClick,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    JarvisInteractiveOrb(
-                        mode = when {
-                            listening -> JarvisOrbMode.LISTENING
-                            speaking -> JarvisOrbMode.SPEAKING
-                            orbMode != JarvisOrbMode.IDLE -> orbMode
-                            busy -> JarvisOrbMode.THINKING
-                            else -> JarvisOrbMode.IDLE
-                        },
-                        audioRms = audioRms,
-                        orbSize = if (compact) 152.dp else 204.dp,
-                    )
-                }
-
-                Text(
-                    text = when {
-                        listening -> "Я СЛУШАЮ"
-                        speaking -> "Я ОТВЕЧАЮ"
-                        orbMode == JarvisOrbMode.ERROR -> "ОШИБКА ЯДРА"
-                        orbMode == JarvisOrbMode.EXECUTING -> "ВЫПОЛНЯЮ"
-                        busy -> "Я ДУМАЮ"
-                        else -> "Я РЯДОМ"
-                    },
-                    color = if (listening) Cyan else if (speaking) Gold else Color(0xFFE5F3FF),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Text(
-                    text = status,
-                    color = if (status.startsWith("ОШИБКА") || status.startsWith("РУССКИЙ ГОЛОС")) Color(0xFFFF9C9C) else Cyan,
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp),
-                )
-
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = PanelCard),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp, bottom = 4.dp)
-                        .heightIn(min = 44.dp, max = if (compact) 74.dp else 118.dp),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(dialogueScroll)
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (dialogueFeed.isEmpty() && streamingReply.isNullOrBlank()) {
-                            Text(
-                                text = "J.A.R.V.I.S. готов. Коснитесь сферы или напишите запрос ниже.",
-                                color = Muted,
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            dialogueFeed.takeLast(4).forEach { msg ->
-                                val isUser = msg.role == "user"
-                                Text(
-                                    text = buildAnnotatedString {
-                                        withStyle(
-                                            SpanStyle(
-                                                color = if (isUser) Gold else Cyan,
-                                                fontWeight = FontWeight.SemiBold,
-                                            )
-                                        ) {
-                                            append(if (isUser) "Вы: " else "Джарвис: ")
-                                        }
-                                        withStyle(SpanStyle(color = Color(0xFFDCE7F2))) {
-                                            append(msg.content)
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                            if (!streamingReply.isNullOrBlank()) {
-                                Text(
-                                    text = buildAnnotatedString {
-                                        withStyle(SpanStyle(color = Cyan, fontWeight = FontWeight.SemiBold)) {
-                                            append("Джарвис: ")
-                                        }
-                                        withStyle(SpanStyle(color = Color.White)) {
-                                            append(streamingReply)
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Text(
-                    text = if (busy || listening) "КОСНИТЕСЬ ЯДРА, ЧТОБЫ ОСТАНОВИТЬ" else "КОСНИТЕСЬ ЯДРА, ЧТОБЫ ГОВОРИТЬ",
-                    color = Color(0xFF71879B),
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-
-                OutlinedTextField(
-                    value = textQuery,
-                    onValueChange = { textQuery = it },
-                    placeholder = { Text("Спросите Джарвиса…") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = {
-                        val q = textQuery.trim()
-                        if (q.isNotEmpty()) {
-                            textQuery = ""
-                            onSendText(q)
-                        }
-                    }),
-                    trailingIcon = {
-                        if (busy || listening) {
-                            IconButton(onClick = onStopWork) {
-                                Icon(Icons.Default.Close, contentDescription = "Остановить", tint = Color(0xFFFF9C9C))
-                            }
-                        } else {
-                            IconButton(onClick = {
-                                val q = textQuery.trim()
-                                if (q.isNotEmpty()) {
-                                    textQuery = ""
-                                    onSendText(q)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(TopHeaderBg)
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                IconButton(onClick = {
+                                    if (currentSection == JarvisSection.MODELS) {
+                                        navigateTo(JarvisSection.SETTINGS)
+                                    } else {
+                                        navigateTo(JarvisSection.HOME)
+                                    }
+                                }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = HeaderText)
                                 }
-                            }) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Отправить", tint = Cyan)
+                                IconButton(onClick = { uiScope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Меню возможностей", tint = HeaderText)
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = currentSection.title,
+                                    color = HeaderText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            IconButton(onClick = { navigateTo(JarvisSection.SETTINGS) }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = HeaderText)
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 2.dp),
-                )
+
+                        when (currentSection) {
+                            JarvisSection.DOCUMENTS -> DocumentsScreen(
+                                documents = indexedDocuments,
+                                onImportDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
+                                onDeleteDocument = { docId ->
+                                    lifecycleScope.launch(Dispatchers.IO) { runtime.deleteDocument(docId) }
+                                },
+                                onSearchDocuments = { q -> runtime.documentStore.searchMatches(q, limit = 5) },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.STUDIO -> MediaStudioScreen(
+                                items = studioItems,
+                                initialConfig = mediaGenerator.currentConfig(),
+                                pendingPromptRequest = pendingStudioRequest,
+                                onClearPendingRequest = { pendingStudioRequest = null },
+                                onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
+                                onGenerateVideo = { p, s, w, h, mp, cb -> mediaGenerator.generateVideo(p, s, w, h, mp, cb) },
+                                onOpenItem = { item -> openGeneratedMedia(item) },
+                                onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
+                                onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.SAVE_VIDEO -> SaveVideoScreen(
+                                tasks = saveVideoTasks,
+                                onInspect = { url -> saveVideoManager.inspectMetadata(url) },
+                                onEnqueue = { url, quality -> saveVideoManager.enqueue(url, quality) },
+                                onCancel = { id -> saveVideoManager.cancelTask(id) },
+                                onRetry = { id -> saveVideoManager.startTask(id) },
+                                onDelete = { id -> saveVideoManager.deleteTask(id) },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.MEMORY -> MemoryManagerScreen(
+                                facts = memoryFacts,
+                                memoryPaused = memoryPaused,
+                                lastDeletedFact = lastDeletedFact,
+                                onTogglePaused = { paused ->
+                                    lifecycleScope.launch(Dispatchers.IO) { runtime.setMemoryPaused(paused) }
+                                },
+                                onAddFact = { key, content -> runtime.addMemoryFact(key, content) },
+                                onDeleteFact = { id ->
+                                    lifecycleScope.launch(Dispatchers.IO) { runtime.deleteMemoryFact(id) }
+                                },
+                                onUndoDelete = {
+                                    lifecycleScope.launch(Dispatchers.IO) { runtime.undoDeleteMemoryFact() }
+                                },
+                                onDismissUndo = { runtime.clearLastDeletedFact() },
+                                onExportJson = { runtime.exportMemoryJson() },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.TOOLS_MCP -> ToolsAndMcpScreen(
+                                servers = mcpServers,
+                                onSaveServers = { updated ->
+                                    lifecycleScope.launch(Dispatchers.IO) { runtime.saveMcpServers(updated) }
+                                },
+                                onExecutePhoneAction = { action -> runtime.executePhoneAction(action) },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.CONTROL -> ControlCenterScreen(
+                                snapshot = controlSnapshot,
+                                onRefreshTelemetry = { refreshTelemetry() },
+                                onClearEvents = { controlCenter.clearEvents() },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.MODELS -> AiModelsScreen(
+                                status = stackStatus,
+                                downloadState = downloadState,
+                                llmCatalog = stackStatus.allLlmPacks,
+                                voiceCatalog = runtime.ttsModels.catalog(),
+                                onDownloadStarterBundle = {
+                                    jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
+                                        runtime.downloadOfflineStarterBundle { stage, pct -> update(stage, pct) }
+                                    }
+                                },
+                                onDownloadAsr = {
+                                    jarvisApp.downloads.start("Русский слух (ASR)") { update ->
+                                        runtime.downloadAsr { pct -> update(null, pct) }
+                                    }
+                                },
+                                onDownloadVad = {
+                                    jarvisApp.downloads.start("Silero VAD") { update ->
+                                        runtime.downloadVad { pct -> update(null, pct) }
+                                    }
+                                },
+                                onDownloadVoice = { id ->
+                                    val title = runtime.ttsModels.findVoice(id)?.title ?: id
+                                    jarvisApp.downloads.start(title) { update ->
+                                        runtime.downloadTtsVoice(id) { pct -> update(null, pct) }
+                                    }
+                                },
+                                onCancelDownload = { jarvisApp.downloads.cancel() },
+                                onSelectVoice = { id -> runtime.selectTtsVoice(id) },
+                                onSetSpeechSpeed = { speed -> runtime.setSpeechSpeed(speed) },
+                                onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
+                                onTestVoice = { runtime.testRussianVoice() },
+                                onDownloadLlm = { id ->
+                                    val title = runtime.llmModels.findPack(id)?.title ?: id
+                                    jarvisApp.downloads.start(title) { update ->
+                                        runtime.downloadLlmPack(id) { pct, dl, total ->
+                                            val dlMb = dl / (1024 * 1024)
+                                            val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
+                                            update("$title: $dlMb/$totalMb МБ ($pct%)", pct)
+                                        }
+                                    }
+                                },
+                                onSelectLlm = { id -> runtime.selectLlmPack(id) },
+                                onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
+                                onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
+                                onSelectPersona = { persona -> runtime.selectPersona(persona) },
+                                onSelectPromptTemplate = { fmt -> runtime.selectPromptTemplate(fmt) },
+                                onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
+                                onDownloadHfGguf = { url, fileName, sizeBytes ->
+                                    jarvisApp.downloads.start(fileName) { update ->
+                                        runtime.downloadCustomHfGguf(url, fileName, sizeBytes) { pct, dl, total ->
+                                            val dlMb = dl / (1024 * 1024)
+                                            val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
+                                            update("$fileName: $dlMb/$totalMb МБ ($pct%)", pct)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+
+                            JarvisSection.HOME, JarvisSection.SETTINGS -> Unit
+                        }
+                    }
+                }
             }
         }
     }

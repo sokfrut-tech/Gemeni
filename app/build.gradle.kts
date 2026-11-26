@@ -13,8 +13,8 @@ android {
         applicationId = "com.jarvis.breeno.assistant"
         minSdk = 29
         targetSdk = 35
-        versionCode = 53
-        versionName = "0.53-runtime-diagnostics"
+        versionCode = 54
+        versionName = "0.54-jarvis-unified-ui"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

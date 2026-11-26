@@ -85,16 +85,32 @@ object JarvisChatPromptBuilder {
         recalledFacts: List<String> = emptyList(),
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+        documentSnippets: List<String> = emptyList(),
     ): String = when (format) {
-        PromptTemplateFormat.LLAMA3 -> buildLlama3Prompt(userText, recentTurns, recalledFacts, systemInfoNote, persona)
+        PromptTemplateFormat.LLAMA3 -> buildLlama3Prompt(
+            userText = userText,
+            recentTurns = recentTurns,
+            recalledFacts = recalledFacts,
+            systemInfoNote = systemInfoNote,
+            persona = persona,
+            documentSnippets = documentSnippets,
+        )
         PromptTemplateFormat.AUTO, PromptTemplateFormat.CHATML ->
-            buildQwenChatMlPrompt(userText, recentTurns, recalledFacts, systemInfoNote, persona)
+            buildQwenChatMlPrompt(
+                userText = userText,
+                recentTurns = recentTurns,
+                recalledFacts = recalledFacts,
+                systemInfoNote = systemInfoNote,
+                persona = persona,
+                documentSnippets = documentSnippets,
+            )
     }
 
     private fun buildSystemText(
         recalledFacts: List<String>,
         systemInfoNote: String,
         persona: JarvisPersona,
+        documentSnippets: List<String> = emptyList(),
     ): String {
         val systemBuilder = StringBuilder(persona.systemPrompt)
         if (recalledFacts.isNotEmpty()) {
@@ -103,6 +119,15 @@ object JarvisChatPromptBuilder {
                 val cleanFact = fact.trim()
                 if (cleanFact.isNotEmpty()) {
                     systemBuilder.append("\n- ").append(cleanFact)
+                }
+            }
+        }
+        if (documentSnippets.isNotEmpty()) {
+            systemBuilder.append("\n\nФрагменты из документов пользователя:")
+            documentSnippets.forEach { snippet ->
+                val cleanSnippet = snippet.trim()
+                if (cleanSnippet.isNotEmpty()) {
+                    systemBuilder.append("\n- ").append(cleanSnippet)
                 }
             }
         }
@@ -124,10 +149,11 @@ object JarvisChatPromptBuilder {
         recalledFacts: List<String> = emptyList(),
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+        documentSnippets: List<String> = emptyList(),
     ): String {
         val sb = StringBuilder()
         sb.append("<|im_start|>system\n")
-        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona))
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets))
         sb.append("<|im_end|>\n")
 
         recentTurns.takeLast(6).forEach { turn ->
@@ -152,11 +178,12 @@ object JarvisChatPromptBuilder {
         recalledFacts: List<String> = emptyList(),
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
+        documentSnippets: List<String> = emptyList(),
     ): String {
         val sb = StringBuilder()
         sb.append("<|begin_of_text|>")
         sb.append("<|start_header_id|>system<|end_header_id|>\n\n")
-        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona))
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets))
         sb.append("<|eot_id|>")
 
         recentTurns.takeLast(6).forEach { turn ->

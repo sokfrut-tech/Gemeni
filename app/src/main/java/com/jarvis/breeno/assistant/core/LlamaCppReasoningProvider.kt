@@ -2,20 +2,31 @@ package com.jarvis.breeno.assistant.core
 
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Real offline LLM provider backed by pinned llama.cpp JNI and verified Qwen2.5 GGUF packs.
- * Never returns fabricated answers when the native runtime or model weights are absent.
+ * Real offline LLM provider backed by pinned llama.cpp JNI and verified GGUF packs.
+ * Includes a non-destructive 45s generation stall watchdog and local document RAG injection.
  */
 class LlamaCppReasoningProvider(
     private val modelManager: LocalLlmModelManager,
     private val historyProvider: () -> List<ChatTurn> = { emptyList() },
     private val memorySearchProvider: (String) -> List<String> = { emptyList() },
+    private val documentSearchProvider: (String) -> List<String> = { emptyList() },
     var onTokenDelta: ((String) -> Unit)? = null,
     var onStatusUpdate: ((String) -> Unit)? = null,
+    var onStallWarning: ((String?) -> Unit)? = null,
+    private val stallWarnDelayMs: Long = 45_000L,
 ) : ManagedLocalReasoningProvider {
 
     override val id: String = "llama-cpp-local"
@@ -25,6 +36,8 @@ class LlamaCppReasoningProvider(
         Thread(runnable, "JarvisLlamaInference").apply { isDaemon = true }
     }
     private val inferenceDispatcher = inferenceExecutor.asCoroutineDispatcher()
+    private val watchdogSupervisor = SupervisorJob()
+    private val watchdogScope = CoroutineScope(watchdogSupervisor + Dispatchers.Default)
 
     @Volatile private var loadedHandle: Long = 0L
     @Volatile private var loadedPackId: String? = null
@@ -77,8 +90,10 @@ class LlamaCppReasoningProvider(
                 }
 
                 onStatusUpdate?.invoke("Джарвис генерирует ответ…")
+                onStallWarning?.invoke(null)
                 val recentTurns = runCatching { historyProvider() }.getOrDefault(emptyList())
                 val recalledFacts = runCatching { memorySearchProvider(turn.userText) }.getOrDefault(emptyList())
+                val documentSnippets = runCatching { documentSearchProvider(turn.userText) }.getOrDefault(emptyList())
                 val template = JarvisChatPromptBuilder.resolveTemplate(
                     selected = modelManager.selectedPromptTemplate(),
                     packId = pack.id,
@@ -91,23 +106,45 @@ class LlamaCppReasoningProvider(
                     recentTurns = recentTurns,
                     recalledFacts = recalledFacts,
                     persona = modelManager.selectedPersona(),
+                    documentSnippets = documentSnippets,
                 )
 
                 val streamedBuffer = StringBuilder()
-                val rawOutput = LlamaNativeBridge.nativeGenerate(
-                    handle = loadedHandle,
-                    prompt = prompt,
-                    maxTokens = turn.budget.maxOutputTokens.coerceIn(64, 512),
-                    temperature = 0.65f,
-                    topP = 0.90f,
-                    callback = TokenCallback { piece ->
-                        streamedBuffer.append(piece)
-                        val cleanSoFar = JarvisChatPromptBuilder.sanitizeOutput(streamedBuffer.toString())
-                        if (cleanSoFar.isNotEmpty()) {
-                            onTokenDelta?.invoke(cleanSoFar)
+                val lastTokenAtMs = AtomicLong(System.currentTimeMillis())
+                val warnedAboutStall = AtomicBoolean(false)
+                val watchdogJob = watchdogScope.launch {
+                    val thresholdMs = stallWarnDelayMs.coerceAtLeast(10_000L)
+                    while (isActive) {
+                        delay(5_000L)
+                        val silentMs = System.currentTimeMillis() - lastTokenAtMs.get()
+                        if (silentMs >= thresholdMs && warnedAboutStall.compareAndSet(false, true)) {
+                            onStallWarning?.invoke("Модель долго обдумывает запрос (>45 с). Можно подождать или нажать «Остановить».")
                         }
-                    },
-                )
+                    }
+                }
+                val rawOutput = try {
+                    LlamaNativeBridge.nativeGenerate(
+                        handle = loadedHandle,
+                        prompt = prompt,
+                        maxTokens = turn.budget.maxOutputTokens.coerceIn(64, 512),
+                        temperature = 0.65f,
+                        topP = 0.90f,
+                        callback = TokenCallback { piece ->
+                            lastTokenAtMs.set(System.currentTimeMillis())
+                            if (warnedAboutStall.compareAndSet(true, false)) {
+                                onStallWarning?.invoke(null)
+                            }
+                            streamedBuffer.append(piece)
+                            val cleanSoFar = JarvisChatPromptBuilder.sanitizeOutput(streamedBuffer.toString())
+                            if (cleanSoFar.isNotEmpty()) {
+                                onTokenDelta?.invoke(cleanSoFar)
+                            }
+                        },
+                    )
+                } finally {
+                    watchdogJob.cancel()
+                    onStallWarning?.invoke(null)
+                }
 
                 val cleanAnswer = JarvisChatPromptBuilder.sanitizeOutput(rawOutput)
                 check(cleanAnswer.isNotBlank()) {
@@ -145,6 +182,7 @@ class LlamaCppReasoningProvider(
     }
 
     fun close() {
+        watchdogSupervisor.cancel()
         val handle = loadedHandle
         if (handle != 0L && LlamaNativeBridge.isNativeLibraryLoaded) {
             LlamaNativeBridge.nativeCancel(handle)

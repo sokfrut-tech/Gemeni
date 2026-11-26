@@ -72,8 +72,11 @@ class JarvisRuntimeSmokeTest {
         assertNotNull("Settings button is missing", settings)
         settings!!.click()
 
-        // The previous test searched for a localized heading that the Settings
-        // screen does not expose as a text node. Confirm the actual destination.
+        assertVisible(By.text("Настройки"), "Jarvis Settings screen did not open")
+        val accessibilityItem = findAfterScroll(By.text("Спецвозможности Android"))
+        assertNotNull("Android accessibility row missing in Jarvis Settings", accessibilityItem)
+        accessibilityItem!!.click()
+
         val settingsPackage = device.wait(
             Until.findObject(By.pkg("com.android.settings")),
             5_000
@@ -134,20 +137,46 @@ class JarvisRuntimeSmokeTest {
     fun modelsAndStudioTabsSwitchCleanly() {
         launchJarvis()
 
-        val modelsTab = device.wait(Until.findObject(By.text("Модели")), 5_000)
-        assertNotNull("Модели tab missing", modelsTab)
-        modelsTab!!.click()
-        assertVisible(By.text("МОДЕЛИ И ГОЛОС ДЖАРВИСА"), "Models screen did not open")
+        val menuBtn = device.wait(Until.findObject(By.desc("Меню возможностей")), 5_000)
+        assertNotNull("Drawer menu button missing", menuBtn)
+        menuBtn!!.click()
 
-        val studioTab = device.wait(Until.findObject(By.text("Студия")), 5_000)
-        assertNotNull("Студия tab missing", studioTab)
-        studioTab!!.click()
+        assertVisible(By.text("Jarvis Ai"), "Drawer header missing")
+        val studioItem = device.wait(Until.findObject(By.text("Студия ИИ (Фото и Видео)")), 5_000)
+        assertNotNull("Studio drawer item missing", studioItem)
+        studioItem!!.click()
         assertVisible(By.text("СТУДИЯ ИИ — КАРТИНКИ И ВИДЕО"), "Studio screen did not open")
 
-        val coreTab = device.wait(Until.findObject(By.text("Ядро")), 5_000)
-        assertNotNull("Ядро tab missing", coreTab)
-        coreTab!!.click()
-        assertVisible(By.text("Я РЯДОМ"), "Did not return cleanly to Core tab")
+        val menuFromStudio = device.wait(Until.findObject(By.desc("Меню возможностей")), 5_000)
+        assertNotNull("Drawer button missing on Studio header", menuFromStudio)
+        menuFromStudio!!.click()
+
+        val memoryItem = device.wait(Until.findObject(By.text("Память Джарвиса")), 5_000)
+        assertNotNull("Memory drawer item missing", memoryItem)
+        memoryItem!!.click()
+        assertVisible(By.text("ПАМЯТЬ ДЖАРВИСА"), "Memory screen did not open")
+
+        val settingsBtn = device.wait(Until.findObject(By.desc("Настройки")), 5_000)
+        assertNotNull("Settings gear button missing", settingsBtn)
+        settingsBtn!!.click()
+        assertVisible(By.text("Настройки"), "Settings screen did not open")
+
+        val modelsGroup = findAfterScroll(By.text("Локальные модели и Hugging Face GGUF"))
+        assertNotNull("Collapsed models group missing in Settings", modelsGroup)
+        modelsGroup!!.click()
+
+        val modelsLink = findAfterScroll(By.text("Каталог Dolphin / Hermes / Stheno / Qwen"))
+        assertNotNull("Catalog sub-link missing after expanding models group", modelsLink)
+        modelsLink!!.click()
+        assertVisible(By.text("МОДЕЛИ И ГОЛОС ДЖАРВИСА"), "Models screen did not open from Settings")
+
+        val menuFromModels = device.wait(Until.findObject(By.desc("Меню возможностей")), 5_000)
+        assertNotNull("Drawer button missing on Models header", menuFromModels)
+        menuFromModels!!.click()
+        val homeItem = device.wait(Until.findObject(By.text("Ядро и чат")), 5_000)
+        assertNotNull("Home drawer item missing", homeItem)
+        homeItem!!.click()
+        assertVisible(By.text("Я РЯДОМ"), "Did not return cleanly to Core Home screen")
     }
 
     private fun findAfterScroll(selector: BySelector): UiObject2? {
