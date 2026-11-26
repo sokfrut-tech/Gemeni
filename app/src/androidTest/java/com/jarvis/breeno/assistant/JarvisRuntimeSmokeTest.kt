@@ -75,12 +75,15 @@ class JarvisRuntimeSmokeTest {
         assertVisible(By.text("Настройки"), "Jarvis Settings screen did not open")
         val accessibilityItem = findAfterScroll(By.text("Спецвозможности Android"))
         assertNotNull("Android accessibility row missing in Jarvis Settings", accessibilityItem)
-        accessibilityItem!!.click()
+        clickSafely(accessibilityItem!!)
 
         val settingsPackage = device.wait(
             Until.findObject(By.pkg("com.android.settings")),
             5_000
         )
+        if (settingsPackage == null) {
+            saveUiEvidence("accessibility-settings-failed")
+        }
         assertNotNull("Android Settings package did not become the foreground UI", settingsPackage)
         saveUiEvidence("accessibility-settings")
     }
@@ -163,12 +166,16 @@ class JarvisRuntimeSmokeTest {
 
         val modelsGroup = findAfterScroll(By.text("Локальные модели и Hugging Face GGUF"))
         assertNotNull("Collapsed models group missing in Settings", modelsGroup)
-        modelsGroup!!.click()
+        clickSafely(modelsGroup!!)
         device.waitForIdle()
+        Thread.sleep(300)
 
         val modelsLink = findAfterScroll(By.text("Каталог Dolphin / Hermes / Stheno / Qwen"))
+        if (modelsLink == null) {
+            saveUiEvidence("models-group-expand-failed")
+        }
         assertNotNull("Catalog sub-link missing after expanding models group", modelsLink)
-        modelsLink!!.click()
+        clickSafely(modelsLink!!)
         assertVisible(By.text("МОДЕЛИ И ГОЛОС ДЖАРВИСА"), "Models screen did not open from Settings")
 
         val menuFromModels = device.wait(Until.findObject(By.desc("Меню возможностей")), 5_000)
@@ -189,6 +196,16 @@ class JarvisRuntimeSmokeTest {
             bounds.bottom <= (height * 0.84f).toInt()
     }
 
+    private fun clickSafely(obj: UiObject2) {
+        var target: UiObject2? = obj
+        var hops = 0
+        while (target != null && !target.isClickable && hops < 3) {
+            target = target.parent
+            hops++
+        }
+        (target ?: obj).click()
+    }
+
     private fun findAfterScroll(selector: BySelector): UiObject2? {
         var found = device.wait(Until.findObject(selector), 750)
         var attempts = 0
@@ -197,13 +214,14 @@ class JarvisRuntimeSmokeTest {
             val height = device.displayHeight
             device.swipe(
                 width / 2,
-                (height * 0.72f).toInt(),
+                (height * 0.70f).toInt(),
                 width / 2,
-                (height * 0.34f).toInt(),
-                22
+                (height * 0.38f).toInt(),
+                80
             )
             device.waitForIdle()
-            found = device.wait(Until.findObject(selector), 750)
+            Thread.sleep(300)
+            found = device.findObject(selector) ?: device.wait(Until.findObject(selector), 750)
             attempts++
         }
         return if (found != null && isSafelyOnScreen(found)) found else null

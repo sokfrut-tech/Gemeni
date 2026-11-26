@@ -3,7 +3,6 @@ package com.jarvis.breeno.assistant.ui
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -194,24 +193,20 @@ fun JarvisSettingsScreen(
                 SectionHeader("Настройки активации и голоса")
             }
             item(key = "row_continuous") {
-                RowCard {
-                    SettingsSwitchRow(
-                        title = "Непрерывные беседы",
-                        subtitle = "После ответа Jarvis Ai автоматически продолжает слушать следующую команду.",
-                        checked = continuousDialogue,
-                        onCheckedChange = onToggleContinuous,
-                    )
-                }
+                SettingsSwitchRow(
+                    title = "Непрерывные беседы",
+                    subtitle = "После ответа Jarvis Ai автоматически продолжает слушать следующую команду.",
+                    checked = continuousDialogue,
+                    onCheckedChange = onToggleContinuous,
+                )
             }
             item(key = "row_voice_mute") {
-                RowCard {
-                    SettingsSwitchRow(
-                        title = "Озвучивать ответы голосом",
-                        subtitle = "Локальный голос Piper TTS на русском языке.",
-                        checked = !muted,
-                        onCheckedChange = { enabled -> onToggleMuted(!enabled) },
-                    )
-                }
+                SettingsSwitchRow(
+                    title = "Озвучивать ответы голосом",
+                    subtitle = "Локальный голос Piper TTS на русском языке.",
+                    checked = !muted,
+                    onCheckedChange = { enabled -> onToggleMuted(!enabled) },
+                )
             }
             item(key = "row_tts_header") {
                 RowCard {
@@ -221,6 +216,7 @@ fun JarvisSettingsScreen(
                             summary = "${stackStatus.speakerLabel} • ${"%.2fx".format(Locale.US, stackStatus.speechSpeed)}",
                             expanded = voiceExpanded,
                             onClick = { voiceExpanded = !voiceExpanded },
+                            standaloneCard = false,
                         )
                         if (voiceExpanded) {
                             Column(
@@ -266,6 +262,7 @@ fun JarvisSettingsScreen(
                             summary = if (stackStatus.asrReady) "Установлено" else "Требуется загрузка",
                             expanded = asrExpanded,
                             onClick = { asrExpanded = !asrExpanded },
+                            standaloneCard = false,
                         )
                         if (asrExpanded) {
                             Column(
@@ -288,27 +285,23 @@ fun JarvisSettingsScreen(
                 }
             }
             item(key = "row_accessibility") {
-                RowCard {
-                    SettingsLinkRow(
-                        title = "Спецвозможности Android",
-                        valueText = "Открыть",
-                        onClick = { launchSystemAction(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
-                    )
-                }
+                SettingsLinkRow(
+                    title = "Спецвозможности Android",
+                    valueText = "Открыть",
+                    onClick = { launchSystemAction(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
+                )
             }
             item(key = "row_default_assistant") {
-                RowCard {
-                    SettingsLinkRow(
-                        title = "Ассистент по умолчанию",
-                        valueText = "Настроить",
-                        onClick = {
-                            launchSystemAction(
-                                Settings.ACTION_VOICE_INPUT_SETTINGS,
-                                Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS,
-                            )
-                        },
-                    )
-                }
+                SettingsLinkRow(
+                    title = "Ассистент по умолчанию",
+                    valueText = "Настроить",
+                    onClick = {
+                        launchSystemAction(
+                            Settings.ACTION_VOICE_INPUT_SETTINGS,
+                            Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS,
+                        )
+                    },
+                )
             }
 
             // Section 2: AI Models & Engines (collapsed by default, each child link is an independent item when expanded)
@@ -316,81 +309,65 @@ fun JarvisSettingsScreen(
                 SectionHeader("Модели ИИ и движки")
             }
             item(key = "row_models_group") {
-                RowCard {
-                    CollapsibleRowHeader(
-                        title = "Локальные модели и Hugging Face GGUF",
-                        summary = stackStatus.activeLlmTitle ?: "Не выбрана",
-                        expanded = modelsExpanded,
-                        onClick = { modelsExpanded = !modelsExpanded },
-                    )
-                }
+                CollapsibleRowHeader(
+                    title = "Локальные модели и Hugging Face GGUF",
+                    summary = stackStatus.activeLlmTitle ?: "Не выбрана",
+                    expanded = modelsExpanded,
+                    onClick = { modelsExpanded = !modelsExpanded },
+                )
             }
             if (modelsExpanded) {
                 item(key = "row_models_catalog") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Каталог Dolphin / Hermes / Stheno / Qwen",
-                            valueText = "${stackStatus.readyLlmIds.size} уст.",
-                            onClick = { onNavigateSection(JarvisSection.MODELS) },
-                        )
-                    }
+                    SettingsLinkRow(
+                        title = "Каталог Dolphin / Hermes / Stheno / Qwen",
+                        valueText = "${stackStatus.readyLlmIds.size} уст.",
+                        onClick = { onNavigateSection(JarvisSection.MODELS) },
+                    )
                 }
                 item(key = "row_models_hf") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Поиск и загрузка с Hugging Face",
-                            valueText = "GGUF",
-                            onClick = { onNavigateSection(JarvisSection.MODELS) },
-                        )
-                    }
+                    SettingsLinkRow(
+                        title = "Поиск и загрузка с Hugging Face",
+                        valueText = "GGUF",
+                        onClick = { onNavigateSection(JarvisSection.MODELS) },
+                    )
                 }
                 item(key = "row_models_import") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Импортировать свой .gguf с телефона",
-                            valueText = "Файл",
-                            onClick = onImportCustomGguf,
-                        )
-                    }
-                }
-            }
-            item(key = "row_engines_group") {
-                RowCard {
-                    CollapsibleRowHeader(
-                        title = "Внешние серверы и Студия ИИ",
-                        summary = if (stackStatus.externalAiConfig.enabled) "Вкл." else "Автономно",
-                        expanded = enginesExpanded,
-                        onClick = { enginesExpanded = !enginesExpanded },
+                    SettingsLinkRow(
+                        title = "Импортировать свой .gguf с телефона",
+                        valueText = "Файл",
+                        onClick = onImportCustomGguf,
                     )
                 }
             }
+            item(key = "row_engines_group") {
+                CollapsibleRowHeader(
+                    title = "Внешние серверы и Студия ИИ",
+                    summary = if (stackStatus.externalAiConfig.enabled) "Вкл." else "Автономно",
+                    expanded = enginesExpanded,
+                    onClick = { enginesExpanded = !enginesExpanded },
+                )
+            }
             if (enginesExpanded) {
                 item(key = "row_engines_ext") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Свой сервер / Ollama / Gemini API",
-                            valueText = if (stackStatus.externalAiConfig.enabled) "Вкл." else "Выкл.",
-                            onClick = { onNavigateSection(JarvisSection.MODELS) },
-                        )
-                    }
+                    SettingsLinkRow(
+                        title = "Свой сервер / Ollama / Gemini API",
+                        valueText = if (stackStatus.externalAiConfig.enabled) "Вкл." else "Выкл.",
+                        onClick = { onNavigateSection(JarvisSection.MODELS) },
+                    )
                 }
                 item(key = "row_engines_studio") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Студия ИИ (Local Dream / ComfyUI / Horde)",
-                            valueText = "Открыть",
-                            onClick = { onNavigateSection(JarvisSection.STUDIO) },
-                        )
-                    }
+                    SettingsLinkRow(
+                        title = "Студия ИИ (Local Dream / ComfyUI / Horde)",
+                        valueText = "Открыть",
+                        onClick = { onNavigateSection(JarvisSection.STUDIO) },
+                    )
                 }
                 item(key = "row_engines_mcp") {
-                    RowCard {
-                        SettingsLinkRow(
-                            title = "Инструменты телефона и MCP-серверы",
-                            valueText = if (mcpCount > 0) "$mcpCount MCP" else "Открыть",
-                            onClick = { onNavigateSection(JarvisSection.TOOLS_MCP) },
-                        )
-                    }
+                    SettingsLinkRow(
+                        title = "Инструменты телефона и MCP-серверы",
+                        valueText = if (mcpCount > 0) "$mcpCount MCP" else "Открыть",
+                        onClick = { onNavigateSection(JarvisSection.TOOLS_MCP) },
+                    )
                 }
             }
 
@@ -399,32 +376,26 @@ fun JarvisSettingsScreen(
                 SectionHeader("Память, документы и приватность")
             }
             item(key = "row_memory_pause") {
-                RowCard {
-                    SettingsSwitchRow(
-                        title = "Пауза записи в память",
-                        subtitle = "Временно не сохранять новые факты о вас (SecretGuard всегда активен).",
-                        checked = memoryPaused,
-                        onCheckedChange = onToggleMemoryPaused,
-                    )
-                }
+                SettingsSwitchRow(
+                    title = "Пауза записи в память",
+                    subtitle = "Временно не сохранять новые факты о вас (SecretGuard всегда активен).",
+                    checked = memoryPaused,
+                    onCheckedChange = onToggleMemoryPaused,
+                )
             }
             item(key = "row_memory_mgr") {
-                RowCard {
-                    SettingsLinkRow(
-                        title = "Память Джарвиса и SecretGuard",
-                        valueText = "$factsCount факт.",
-                        onClick = { onNavigateSection(JarvisSection.MEMORY) },
-                    )
-                }
+                SettingsLinkRow(
+                    title = "Память Джарвиса и SecretGuard",
+                    valueText = "$factsCount факт.",
+                    onClick = { onNavigateSection(JarvisSection.MEMORY) },
+                )
             }
             item(key = "row_documents_mgr") {
-                RowCard {
-                    SettingsLinkRow(
-                        title = "Документы и База знаний (RAG)",
-                        valueText = "$documentsCount файл.",
-                        onClick = { onNavigateSection(JarvisSection.DOCUMENTS) },
-                    )
-                }
+                SettingsLinkRow(
+                    title = "Документы и База знаний (RAG)",
+                    valueText = "$documentsCount файл.",
+                    onClick = { onNavigateSection(JarvisSection.DOCUMENTS) },
+                )
             }
 
             // Section 4: System & About
@@ -432,24 +403,26 @@ fun JarvisSettingsScreen(
                 SectionHeader("Другое")
             }
             item(key = "row_control_center") {
-                RowCard {
-                    SettingsLinkRow(
-                        title = "Центр управления и телеметрия",
-                        valueText = "Открыть",
-                        onClick = { onNavigateSection(JarvisSection.CONTROL) },
-                    )
-                }
+                SettingsLinkRow(
+                    title = "Центр управления и телеметрия",
+                    valueText = "Открыть",
+                    onClick = { onNavigateSection(JarvisSection.CONTROL) },
+                )
             }
             item(key = "row_cache_clear") {
-                RowCard {
+                Surface(
+                    onClick = {
+                        val freed = onClearCache()
+                        currentCacheBytes = 0L
+                        cacheFeedback = "Очищено %.2f МБ".format(Locale("ru", "RU"), freed / (1024f * 1024f))
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    color = SettingsCardBg,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                val freed = onClearCache()
-                                currentCacheBytes = 0L
-                                cacheFeedback = "Очищено %.2f МБ".format(Locale("ru", "RU"), freed / (1024f * 1024f))
-                            }
                             .padding(horizontal = 14.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
@@ -474,6 +447,7 @@ fun JarvisSettingsScreen(
                             summary = BuildConfig.VERSION_NAME,
                             expanded = aboutExpanded,
                             onClick = { aboutExpanded = !aboutExpanded },
+                            standaloneCard = false,
                         )
                         if (aboutExpanded) {
                             HorizontalDivider(color = SettingsDivider, modifier = Modifier.padding(horizontal = 14.dp))
@@ -537,20 +511,26 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = { onCheckedChange(!checked) },
+        shape = RoundedCornerShape(16.dp),
+        color = SettingsCardBg,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-            Text(title, color = SettingsText, style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(2.dp))
-            Text(subtitle, color = SettingsMuted, style = MaterialTheme.typography.bodySmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                Text(title, color = SettingsText, style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, color = SettingsMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -560,34 +540,40 @@ private fun SettingsLinkRow(
     valueText: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = SettingsCardBg,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = title,
-            color = SettingsText,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = valueText,
-                color = SettingsMuted,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = title,
+                color = SettingsText,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
             )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = SettingsMuted,
-            )
+            Spacer(Modifier.width(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = valueText,
+                    color = SettingsMuted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = SettingsMuted,
+                )
+            }
         }
     }
 }
@@ -598,36 +584,43 @@ private fun CollapsibleRowHeader(
     summary: String,
     expanded: Boolean,
     onClick: () -> Unit,
+    standaloneCard: Boolean = true,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = if (standaloneCard) SettingsCardBg else Color.Transparent,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = title,
-            color = SettingsText,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = summary,
-                color = SettingsMuted,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = title,
+                color = SettingsText,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(4.dp))
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = SettingsMuted,
-            )
+            Spacer(Modifier.width(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = summary,
+                    color = SettingsMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = SettingsMuted,
+                )
+            }
         }
     }
 }
