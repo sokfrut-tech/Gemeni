@@ -180,24 +180,33 @@ class JarvisRuntimeSmokeTest {
         assertVisible(By.text("Я РЯДОМ"), "Did not return cleanly to Core Home screen")
     }
 
+    private fun isSafelyOnScreen(obj: UiObject2): Boolean {
+        val bounds = obj.visibleBounds
+        val height = device.displayHeight
+        return bounds.width() > 8 &&
+            bounds.height() > 8 &&
+            bounds.top >= (height * 0.10f).toInt() &&
+            bounds.bottom <= (height * 0.84f).toInt()
+    }
+
     private fun findAfterScroll(selector: BySelector): UiObject2? {
         var found = device.wait(Until.findObject(selector), 750)
         var attempts = 0
-        while (found == null && attempts < 7) {
+        while ((found == null || !isSafelyOnScreen(found)) && attempts < 10) {
             val width = device.displayWidth
             val height = device.displayHeight
             device.swipe(
                 width / 2,
-                (height * 0.82f).toInt(),
+                (height * 0.72f).toInt(),
                 width / 2,
-                (height * 0.30f).toInt(),
-                24
+                (height * 0.34f).toInt(),
+                22
             )
             device.waitForIdle()
             found = device.wait(Until.findObject(selector), 750)
             attempts++
         }
-        return found
+        return if (found != null && isSafelyOnScreen(found)) found else null
     }
 
     private fun assertVisible(selector: BySelector, message: String) {
