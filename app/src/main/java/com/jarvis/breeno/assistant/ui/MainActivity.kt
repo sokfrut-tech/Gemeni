@@ -61,7 +61,10 @@ import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
+import com.jarvis.breeno.assistant.media.LocalStudioFileSlot
+import com.jarvis.breeno.assistant.media.MediaGenBackend
 import com.jarvis.breeno.assistant.media.MediaGenConfigStore
+import com.jarvis.breeno.assistant.media.StableDiffusionNativeBridge
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
 import com.jarvis.breeno.assistant.ui.theme.Jarvis3DStageBackground
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
@@ -97,6 +100,7 @@ class MainActivity : ComponentActivity() {
     private var autoResumeCheck: (() -> Boolean)? = null
     private var listeningJob: Job? = null
     private var modelCheckJob: Job? = null
+    private var pendingStudioSlot: LocalStudioFileSlot = LocalStudioFileSlot.MODEL
 
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && pendingListen) {
@@ -117,6 +121,50 @@ class MainActivity : ComponentActivity() {
             runtime.importCustomGguf(uri, displayName) { pct ->
                 update("Импорт $displayName: $pct%", pct)
             }
+        }
+    }
+
+    private val importStudioFileLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        val slot = pendingStudioSlot
+        val displayName = resolveDocumentDisplayName(uri, fallback = "${slot.folder}_file.safetensors")
+        jarvisApp.downloads.start("Студия: $displayName") { update ->
+            val saved = StableDiffusionNativeBridge.importLocalStudioFile(
+                context = this@MainActivity,
+                uri = uri,
+                displayName = displayName,
+                slot = slot,
+            ) { pct ->
+                update("Копирую $displayName: $pct%", pct)
+            }
+            val cur = mediaGenerator.currentConfig()
+            val updatedPaths = when (slot) {
+                LocalStudioFileSlot.MODEL -> cur.copy(
+                    backend = MediaGenBackend.ON_DEVICE_SD_CPP,
+                    localSdModelPath = saved.absolutePath,
+                )
+                LocalStudioFileSlot.VAE -> cur.copy(localSdVaePath = saved.absolutePath)
+                LocalStudioFileSlot.CLIP1 -> cur.copy(localSdClip1Path = saved.absolutePath)
+                LocalStudioFileSlot.CLIP2 -> cur.copy(localSdClip2Path = saved.absolutePath)
+            }
+            val finalCfg = if (updatedPaths.localSdModelPath.isNotBlank()) {
+                val spec = StableDiffusionNativeBridge.resolveLocalModelSpec(
+                    modelPath = updatedPaths.localSdModelPath,
+                    vaePath = updatedPaths.localSdVaePath,
+                    clip1Path = updatedPaths.localSdClip1Path,
+                    clip2Path = updatedPaths.localSdClip2Path,
+                )
+                updatedPaths.copy(
+                    steps = spec.recommendedSteps,
+                    cfgScale = spec.recommendedCfg,
+                    negativePrompt = spec.recommendedNegative,
+                    uncensoredMode = true,
+                )
+            } else {
+                updatedPaths
+            }
+            mediaGenerator.saveConfig(finalCfg)
+            controlCenter.logEvent("СТУДИЯ", "Добавлен файл (${slot.labelRu})", saved.name, JarvisEventLevel.INFO)
         }
     }
 
@@ -468,6 +516,7 @@ class MainActivity : ComponentActivity() {
 
         val saveVideoTasks by saveVideoManager.tasks.collectAsState()
         val studioItems by mediaGenerator.items.collectAsState()
+        val studioConfig by mediaGenerator.config.collectAsState()
         val controlSnapshot by controlCenter.snapshot.collectAsState()
         val downloadState by jarvisApp.downloads.state.collectAsState()
 
@@ -807,7 +856,7 @@ class MainActivity : ComponentActivity() {
 
                                 JarvisSection.STUDIO -> MediaStudioScreen(
                                     items = studioItems,
-                                    initialConfig = mediaGenerator.currentConfig(),
+                                    initialConfig = studioConfig,
                                     pendingPromptRequest = pendingStudioRequest,
                                     onClearPendingRequest = { pendingStudioRequest = null },
                                     onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
@@ -816,6 +865,10 @@ class MainActivity : ComponentActivity() {
                                     onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
                                     onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
                                     onAutoDiscoverComfy = { url, key -> mediaGenerator.autoDiscoverComfyModels(url, key) },
+                                    onPickLocalStudioFile = { slot ->
+                                        pendingStudioSlot = slot
+                                        importStudioFileLauncher.launch(arrayOf("*/*"))
+                                    },
                                     modifier = Modifier.weight(1f),
                                 )
 

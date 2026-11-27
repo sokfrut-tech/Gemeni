@@ -1,6 +1,8 @@
 .gradle/
 .idea/
 .llama.cpp/
+.stable-diffusion.cpp/
+.sd_build_*/
 .sherpa-onnx/
 build/
 app/build/

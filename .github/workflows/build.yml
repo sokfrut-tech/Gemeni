@@ -40,6 +40,17 @@ jobs:
         run: bash scripts/setup_sherpa_onnx.sh
       - name: Install pinned llama.cpp Android source
         run: bash scripts/setup_llama_cpp.sh
+      - name: Cache compiled stable-diffusion.cpp JNI library
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/src/main/jniLibs/arm64-v8a/libjarvis_sd.so
+            app/src/main/jniLibs/x86_64/libjarvis_sd.so
+          key: jarvis-sd-cpp-${{ hashFiles('scripts/build_stable_diffusion_android.sh', 'app/src/main/sd_cpp/**') }}
+      - name: Build pinned stable-diffusion.cpp Android library
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: bash scripts/build_stable_diffusion_android.sh
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -67,6 +78,7 @@ jobs:
           done
           for abi in arm64-v8a x86_64; do
             unzip -l "$APK" "lib/$abi/libjarvis_llama.so" | grep -q 'libjarvis_llama.so'
+            unzip -l "$APK" "lib/$abi/libjarvis_sd.so" | grep -q 'libjarvis_sd.so'
           done
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 -v 4 "$APK"
       - name: Inspect APK manifest, services and native ABIs

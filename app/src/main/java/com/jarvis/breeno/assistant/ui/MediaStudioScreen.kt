@@ -58,8 +58,10 @@ import com.jarvis.breeno.assistant.media.ComfyAutoWireResult
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
+import com.jarvis.breeno.assistant.media.LocalStudioFileSlot
 import com.jarvis.breeno.assistant.media.MediaGenBackend
 import com.jarvis.breeno.assistant.media.MediaGenConfig
+import com.jarvis.breeno.assistant.media.StableDiffusionNativeBridge
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -84,6 +86,7 @@ fun MediaStudioScreen(
     onDeleteItem: (String) -> Unit,
     onSaveConfig: (MediaGenConfig) -> Unit,
     onAutoDiscoverComfy: (suspend (rawUrl: String, apiKey: String) -> Result<ComfyAutoWireResult>)? = null,
+    onPickLocalStudioFile: ((LocalStudioFileSlot) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -108,6 +111,10 @@ fun MediaStudioScreen(
     var cfgComfyVae by remember(initialConfig) { mutableStateOf(initialConfig.comfyVaeName) }
     var cfgComfyClip1 by remember(initialConfig) { mutableStateOf(initialConfig.comfyClip1Name) }
     var cfgComfyClip2 by remember(initialConfig) { mutableStateOf(initialConfig.comfyClip2Name) }
+    var cfgLocalSdModel by remember(initialConfig) { mutableStateOf(initialConfig.localSdModelPath) }
+    var cfgLocalSdVae by remember(initialConfig) { mutableStateOf(initialConfig.localSdVaePath) }
+    var cfgLocalSdClip1 by remember(initialConfig) { mutableStateOf(initialConfig.localSdClip1Path) }
+    var cfgLocalSdClip2 by remember(initialConfig) { mutableStateOf(initialConfig.localSdClip2Path) }
     var cfgUncensored by remember(initialConfig) { mutableStateOf(initialConfig.uncensoredMode) }
     var autoWireStatus by remember { mutableStateOf<String?>(null) }
     var cfgPonyClipSkip2 by remember(initialConfig) { mutableStateOf(initialConfig.comfyPonyClipSkip2) }
@@ -121,6 +128,11 @@ fun MediaStudioScreen(
     var cfgLocalDreamUrl by remember(initialConfig) { mutableStateOf(initialConfig.localDreamUrl) }
 
     fun imageDimensions(): Pair<Int, Int> = when {
+        cfgBackend == MediaGenBackend.ON_DEVICE_SD_CPP -> when (selectedAspect) {
+            "16:9" -> 640 to 384
+            "9:16" -> 384 to 640
+            else -> 512 to 512
+        }
         cfgBackend == MediaGenBackend.AI_HORDE_FREE -> when (selectedAspect) {
             "16:9" -> 640 to 384
             "9:16" -> 384 to 640
@@ -248,6 +260,11 @@ fun MediaStudioScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             FilterChip(
+                                selected = cfgBackend == MediaGenBackend.ON_DEVICE_SD_CPP,
+                                onClick = { cfgBackend = MediaGenBackend.ON_DEVICE_SD_CPP },
+                                label = { Text("Локально (GGUF/SD)") },
+                            )
+                            FilterChip(
                                 selected = cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE,
                                 onClick = { cfgBackend = MediaGenBackend.POLLINATIONS_ONLINE },
                                 label = { Text("Встроенный") },
@@ -277,6 +294,98 @@ fun MediaStudioScreen(
                                 onClick = { cfgBackend = MediaGenBackend.CUSTOM_OPENAI_IMAGES },
                                 label = { Text("OpenAI API") },
                             )
+                        }
+                        if (cfgBackend == MediaGenBackend.ON_DEVICE_SD_CPP) {
+                            val sdReadyLabel = if (StableDiffusionNativeBridge.isNativeLibraryLoaded) {
+                                "Встроенный движок stable-diffusion.cpp готов • Без API • Без интернета • Без цензуры"
+                            } else {
+                                "Движок stable-diffusion.cpp: ${StableDiffusionNativeBridge.loadError ?: "не загружен"}"
+                            }
+                            Text(
+                                text = sdReadyLabel,
+                                color = if (StableDiffusionNativeBridge.isNativeLibraryLoaded) Color(0xFF34D399) else Color(0xFFFBBF24),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                            fun formatPickedFile(path: String): String {
+                                if (path.isBlank()) return "Не выбрано"
+                                val f = File(path)
+                                return if (f.isFile) "${f.name} (${f.length() / (1024 * 1024)} МБ)" else f.name
+                            }
+                            if (onPickLocalStudioFile != null) {
+                                JarvisOutlinedButton(
+                                    onClick = { onPickLocalStudioFile(LocalStudioFileSlot.MODEL) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(
+                                        text = if (cfgLocalSdModel.isBlank()) "Выбрать модель (.gguf / .safetensors)" else "Модель: ${formatPickedFile(cfgLocalSdModel)}",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    JarvisOutlinedButton(
+                                        onClick = { onPickLocalStudioFile(LocalStudioFileSlot.VAE) },
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Text(
+                                            text = if (cfgLocalSdVae.isBlank()) "Выбрать VAE" else "VAE: ${File(cfgLocalSdVae).name}",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (cfgLocalSdVae.isNotBlank()) {
+                                        TextButton(onClick = { cfgLocalSdVae = "" }) { Text("Убрать") }
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    JarvisOutlinedButton(
+                                        onClick = { onPickLocalStudioFile(LocalStudioFileSlot.CLIP1) },
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Text(
+                                            text = if (cfgLocalSdClip1.isBlank()) "CLIP 1 (clip_l)" else File(cfgLocalSdClip1).name,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    JarvisOutlinedButton(
+                                        onClick = { onPickLocalStudioFile(LocalStudioFileSlot.CLIP2) },
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Text(
+                                            text = if (cfgLocalSdClip2.isBlank()) "CLIP 2 (t5 / clip_g)" else File(cfgLocalSdClip2).name,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                                if (cfgLocalSdClip1.isNotBlank() || cfgLocalSdClip2.isNotBlank()) {
+                                    TextButton(onClick = { cfgLocalSdClip1 = ""; cfgLocalSdClip2 = "" }) {
+                                        Text("Очистить CLIP / T5")
+                                    }
+                                }
+                            }
+                            if (cfgLocalSdModel.isNotBlank()) {
+                                val resolved = remember(cfgLocalSdModel, cfgLocalSdVae, cfgLocalSdClip1, cfgLocalSdClip2) {
+                                    StableDiffusionNativeBridge.resolveLocalModelSpec(
+                                        modelPath = cfgLocalSdModel,
+                                        vaePath = cfgLocalSdVae,
+                                        clip1Path = cfgLocalSdClip1,
+                                        clip2Path = cfgLocalSdClip2,
+                                    )
+                                }
+                                Text(
+                                    text = resolved.summaryRu,
+                                    color = StudioCyan,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                         if (cfgBackend == MediaGenBackend.AI_HORDE_FREE) {
                             Text(
@@ -310,7 +419,8 @@ fun MediaStudioScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        if (cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE &&
+                        if (cfgBackend != MediaGenBackend.ON_DEVICE_SD_CPP &&
+                            cfgBackend != MediaGenBackend.POLLINATIONS_ONLINE &&
                             cfgBackend != MediaGenBackend.AI_HORDE_FREE &&
                             cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU
                         ) {
@@ -511,7 +621,8 @@ fun MediaStudioScreen(
                                 )
                             }
                         }
-                        if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI ||
+                        if (cfgBackend == MediaGenBackend.ON_DEVICE_SD_CPP ||
+                            cfgBackend == MediaGenBackend.CUSTOM_COMFYUI ||
                             cfgBackend == MediaGenBackend.CUSTOM_A1111_SD ||
                             cfgBackend == MediaGenBackend.LOCAL_DREAM_NPU ||
                             cfgBackend == MediaGenBackend.AI_HORDE_FREE
@@ -545,7 +656,9 @@ fun MediaStudioScreen(
                                 )
                             }
                         }
-                        if (cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU) {
+                        if (cfgBackend != MediaGenBackend.LOCAL_DREAM_NPU &&
+                            cfgBackend != MediaGenBackend.ON_DEVICE_SD_CPP
+                        ) {
                             OutlinedTextField(
                                 value = cfgKey,
                                 onValueChange = { cfgKey = it },
@@ -563,13 +676,15 @@ fun MediaStudioScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        OutlinedTextField(
-                            value = cfgVidUrl,
-                            onValueChange = { cfgVidUrl = it },
-                            label = { Text("URL видео-API (пусто = встроенный MP4)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        if (cfgBackend != MediaGenBackend.ON_DEVICE_SD_CPP) {
+                            OutlinedTextField(
+                                value = cfgVidUrl,
+                                onValueChange = { cfgVidUrl = it },
+                                label = { Text("URL видео-API (пусто = встроенный MP4)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                         if (cfgBackend == MediaGenBackend.POLLINATIONS_ONLINE ||
                             cfgBackend == MediaGenBackend.AI_HORDE_FREE ||
                             cfgBackend == MediaGenBackend.CUSTOM_OPENAI_IMAGES
@@ -603,6 +718,10 @@ fun MediaStudioScreen(
                                         comfyVaeName = cfgComfyVae,
                                         comfyClip1Name = cfgComfyClip1,
                                         comfyClip2Name = cfgComfyClip2,
+                                        localSdModelPath = cfgLocalSdModel,
+                                        localSdVaePath = cfgLocalSdVae,
+                                        localSdClip1Path = cfgLocalSdClip1,
+                                        localSdClip2Path = cfgLocalSdClip2,
                                         uncensoredMode = cfgUncensored,
                                         comfyPonyClipSkip2 = cfgPonyClipSkip2,
                                         comfyWanI2vEnabled = cfgWanEnabled,

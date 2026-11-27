@@ -32,6 +32,7 @@ import java.util.UUID
 import kotlin.random.Random
 
 enum class MediaGenBackend(val title: String) {
+    ON_DEVICE_SD_CPP("Локально на телефоне (GGUF / Safetensors)"),
     POLLINATIONS_ONLINE("Встроенный онлайн (Pollinations + AI Horde)"),
     AI_HORDE_FREE("AI Horde онлайн (бесплатно, без HTTP 402)"),
     LOCAL_DREAM_NPU("Офлайн на телефоне (Local Dream NPU)"),
@@ -53,6 +54,10 @@ data class MediaGenConfig(
     val comfyVaeName: String = "",
     val comfyClip1Name: String = "",
     val comfyClip2Name: String = "",
+    val localSdModelPath: String = "",
+    val localSdVaePath: String = "",
+    val localSdClip1Path: String = "",
+    val localSdClip2Path: String = "",
     val uncensoredMode: Boolean = true,
     val comfyPonyClipSkip2: Boolean = true,
     val comfyWanI2vEnabled: Boolean = true,
@@ -112,6 +117,10 @@ class MediaGenConfigStore(context: Context) {
             comfyVaeName = prefs.getString(KEY_COMFY_VAE, "") ?: "",
             comfyClip1Name = prefs.getString(KEY_COMFY_CLIP1, "") ?: "",
             comfyClip2Name = prefs.getString(KEY_COMFY_CLIP2, "") ?: "",
+            localSdModelPath = prefs.getString(KEY_LOCAL_SD_MODEL, "") ?: "",
+            localSdVaePath = prefs.getString(KEY_LOCAL_SD_VAE, "") ?: "",
+            localSdClip1Path = prefs.getString(KEY_LOCAL_SD_CLIP1, "") ?: "",
+            localSdClip2Path = prefs.getString(KEY_LOCAL_SD_CLIP2, "") ?: "",
             uncensoredMode = prefs.getBoolean(KEY_UNCENSORED_MODE, true),
             comfyPonyClipSkip2 = prefs.getBoolean(KEY_COMFY_PONY_CLIP_SKIP2, true),
             comfyWanI2vEnabled = prefs.getBoolean(KEY_COMFY_WAN_I2V_ENABLED, true),
@@ -144,6 +153,10 @@ class MediaGenConfigStore(context: Context) {
             .putString(KEY_COMFY_VAE, config.comfyVaeName.trim())
             .putString(KEY_COMFY_CLIP1, config.comfyClip1Name.trim())
             .putString(KEY_COMFY_CLIP2, config.comfyClip2Name.trim())
+            .putString(KEY_LOCAL_SD_MODEL, config.localSdModelPath.trim())
+            .putString(KEY_LOCAL_SD_VAE, config.localSdVaePath.trim())
+            .putString(KEY_LOCAL_SD_CLIP1, config.localSdClip1Path.trim())
+            .putString(KEY_LOCAL_SD_CLIP2, config.localSdClip2Path.trim())
             .putBoolean(KEY_UNCENSORED_MODE, config.uncensoredMode)
             .putBoolean(KEY_COMFY_PONY_CLIP_SKIP2, config.comfyPonyClipSkip2)
             .putBoolean(KEY_COMFY_WAN_I2V_ENABLED, config.comfyWanI2vEnabled)
@@ -170,6 +183,10 @@ class MediaGenConfigStore(context: Context) {
         private const val KEY_COMFY_VAE = "media_comfy_vae"
         private const val KEY_COMFY_CLIP1 = "media_comfy_clip1"
         private const val KEY_COMFY_CLIP2 = "media_comfy_clip2"
+        private const val KEY_LOCAL_SD_MODEL = "media_local_sd_model"
+        private const val KEY_LOCAL_SD_VAE = "media_local_sd_vae"
+        private const val KEY_LOCAL_SD_CLIP1 = "media_local_sd_clip1"
+        private const val KEY_LOCAL_SD_CLIP2 = "media_local_sd_clip2"
         private const val KEY_UNCENSORED_MODE = "media_uncensored_mode"
         private const val KEY_COMFY_PONY_CLIP_SKIP2 = "media_comfy_pony_clip_skip2"
         private const val KEY_COMFY_WAN_I2V_ENABLED = "media_comfy_wan_i2v_enabled"
@@ -253,6 +270,8 @@ class JarvisMediaGenerator(
     private val gson = Gson()
     private val _items = MutableStateFlow(loadHistory())
     val items: StateFlow<List<GeneratedMediaItem>> = _items.asStateFlow()
+    private val _config = MutableStateFlow(configStore.load())
+    val config: StateFlow<MediaGenConfig> = _config.asStateFlow()
 
     @Volatile
     private var pollinationsCooldownUntilMs: Long = 0L
@@ -266,6 +285,7 @@ class JarvisMediaGenerator(
 
     fun saveConfig(config: MediaGenConfig) {
         configStore.save(config)
+        _config.value = configStore.load()
     }
 
     suspend fun generateImage(
@@ -462,6 +482,16 @@ class JarvisMediaGenerator(
                 val b64 = parseA1111Base64Image(resp.toString(Charsets.UTF_8))
                 Base64.decode(b64, Base64.DEFAULT)
             }
+            MediaGenBackend.ON_DEVICE_SD_CPP -> fetchFromOnDeviceSdCpp(
+                cfg = cfg,
+                prompt = prompt,
+                style = style,
+                width = width,
+                height = height,
+                seed = seed,
+                onProgress = onProgress,
+            )
+
             MediaGenBackend.CUSTOM_OPENAI_IMAGES -> {
                 val url = cfg.customImageUrl.trim().ifBlank { "https://api.openai.com/v1/images/generations" }
                 val reqJson = buildOpenAiImageRequestJson(cfg.modelName.ifBlank { "gpt-image-1" }, prompt, style, width, height)
@@ -472,6 +502,62 @@ class JarvisMediaGenerator(
                     is OpenAiImagePayload.RemoteUrl -> getBytes(payload.url, emptyMap(), readTimeoutMs = 45_000, expectImage = true)
                 }
             }
+        }
+    }
+
+    private suspend fun fetchFromOnDeviceSdCpp(
+        cfg: MediaGenConfig,
+        prompt: String,
+        style: String,
+        width: Int,
+        height: Int,
+        seed: Int,
+        onProgress: (String) -> Unit,
+    ): ByteArray {
+        val modelPath = cfg.localSdModelPath.trim()
+        require(modelPath.isNotEmpty() && File(modelPath).isFile) {
+            "Выберите локальный файл модели (.gguf или .safetensors) в настройках Студии ИИ"
+        }
+        val vaePath = cfg.localSdVaePath.trim().takeIf { it.isNotEmpty() && File(it).isFile }.orEmpty()
+        val clip1Path = cfg.localSdClip1Path.trim().takeIf { it.isNotEmpty() && File(it).isFile }.orEmpty()
+        val clip2Path = cfg.localSdClip2Path.trim().takeIf { it.isNotEmpty() && File(it).isFile }.orEmpty()
+
+        val spec = StableDiffusionNativeBridge.resolveLocalModelSpec(
+            modelPath = modelPath,
+            vaePath = vaePath,
+            clip1Path = clip1Path,
+            clip2Path = clip2Path,
+        )
+
+        onProgress("Освобождаю RAM под локальный рендер…")
+        beforeHeavyOnDeviceGen?.invoke()
+
+        val styledPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
+        val safeW = ((width.coerceIn(256, 1024) + 32) / 64) * 64
+        val safeH = ((height.coerceIn(256, 1024) + 32) / 64) * 64
+        val steps = cfg.steps.coerceIn(1, 60)
+        val cfgScale = cfg.cfgScale.coerceIn(1.0f, 20.0f)
+
+        onProgress("Загружаю ${File(modelPath).name} (stable-diffusion.cpp)…")
+        return try {
+            StableDiffusionNativeBridge.generateJpegBytes(
+                spec = spec,
+                prompt = styledPrompt,
+                negativePrompt = cfg.negativePrompt.trim(),
+                width = safeW,
+                height = safeH,
+                steps = steps,
+                cfgScale = cfgScale,
+                clipSkip = spec.recommendedClipSkip,
+                seed = seed.toLong(),
+                nThreads = 4,
+                onStepProgress = { step, total ->
+                    onProgress("Локальный рендер: шаг $step/$total…")
+                },
+            )
+        } catch (cancelled: CancellationException) {
+            StableDiffusionNativeBridge.nativeCancel()
+            throw cancelled
         }
     }
 

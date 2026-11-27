@@ -387,5 +387,23 @@ class JarvisMediaGeneratorTest {
         )
         assertTrue(uncensoredHorde.contains("\"nsfw\":true"))
         assertTrue(uncensoredHorde.contains("\"censor_nsfw\":false"))
+
+        val localFlux = StableDiffusionNativeBridge.resolveLocalModelSpec(
+            modelPath = "/data/user/0/app/files/studio_models/model/flux1-dev-Q4_K_S.gguf",
+            vaePath = "/data/user/0/app/files/studio_models/vae/ae.safetensors",
+            clip1Path = "/data/user/0/app/files/studio_models/clip1/clip_l.safetensors",
+            clip2Path = "/data/user/0/app/files/studio_models/clip2/t5xxl_fp8_e4m3fn.safetensors",
+        )
+        assertTrue(localFlux.isStandaloneDiffusion)
+        assertEquals("/data/user/0/app/files/studio_models/clip1/clip_l.safetensors", localFlux.clipLPath)
+        assertEquals("/data/user/0/app/files/studio_models/clip2/t5xxl_fp8_e4m3fn.safetensors", localFlux.t5xxlPath)
+        assertEquals(1.0f, localFlux.recommendedCfg)
+
+        val localPony = StableDiffusionNativeBridge.resolveLocalModelSpec(
+            modelPath = "/data/user/0/app/files/studio_models/model/CyberRealisticPony_V18.safetensors",
+        )
+        assertFalse(localPony.isStandaloneDiffusion)
+        assertEquals(2, localPony.recommendedClipSkip)
+        assertEquals(5.5f, localPony.recommendedCfg)
     }
 }
