@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -57,8 +58,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.BuildConfig
 import com.jarvis.breeno.assistant.core.LlamaNativeBridge
+import com.jarvis.breeno.assistant.ui.theme.Jarvis3DCardSurface
+import com.jarvis.breeno.assistant.ui.theme.Jarvis3DStageBackground
 import com.jarvis.breeno.assistant.ui.theme.JarvisAppearanceConfig
 import com.jarvis.breeno.assistant.ui.theme.JarvisFontStyle
+import com.jarvis.breeno.assistant.ui.theme.JarvisTheme3DPreviewScene
 import com.jarvis.breeno.assistant.ui.theme.JarvisThemePreset
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
@@ -115,13 +119,17 @@ fun JarvisSettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(jarvisScreenBackground(palette))
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Jarvis3DStageBackground(
+            showGrid = false,
+            showHudFrame = true,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -414,50 +422,69 @@ fun JarvisSettingsScreen(
                                     pair.forEach { preset ->
                                         val preview = paletteForTheme(preset)
                                         val active = appearance.theme == preset
+                                        val shape = jarvisTileShape(preview, 12.dp)
                                         Surface(
                                             onClick = { onUpdateAppearance(appearance.copy(theme = preset)) },
-                                            shape = jarvisTileShape(preview, 12.dp),
+                                            shape = shape,
                                             color = Color.Transparent,
                                             border = BorderStroke(
-                                                width = if (active) 2.dp else 1.dp,
-                                                color = if (active) preview.primaryAccent else preview.tileBorder.copy(alpha = 0.45f),
+                                                width = if (active) 1.8.dp else 1.dp,
+                                                color = if (active) preview.primaryAccent else preview.tileBorder.copy(alpha = 0.50f),
                                             ),
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .shadow(
+                                                    elevation = if (active) 10.dp else 5.dp,
+                                                    shape = shape,
+                                                    clip = false,
+                                                    ambientColor = preview.primaryAccent.copy(alpha = if (active) 0.75f else 0.35f),
+                                                    spotColor = preview.primaryAccent.copy(alpha = if (active) 0.90f else 0.45f),
+                                                ),
                                         ) {
                                             Column(
                                                 modifier = Modifier
-                                                    .background(Brush.verticalGradient(colors = listOf(preview.bgMid, preview.bgTop)))
-                                                    .padding(10.dp),
-                                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                                    .background(Brush.verticalGradient(colors = listOf(preview.bgMid, preview.bgTop))),
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically,
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(52.dp),
                                                 ) {
-                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                        Box(Modifier.size(10.dp).clip(CircleShape).background(preview.primaryAccent))
-                                                        Box(Modifier.size(10.dp).clip(CircleShape).background(preview.secondaryAccent))
-                                                    }
+                                                    JarvisTheme3DPreviewScene(
+                                                        preset = preset,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                    )
                                                     if (active) {
-                                                        Text("✓", color = preview.primaryAccent, fontWeight = FontWeight.Bold)
+                                                        Text(
+                                                            text = "✓",
+                                                            color = preview.primaryAccent,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        )
                                                     }
                                                 }
-                                                Text(
-                                                    text = preset.title,
-                                                    color = preview.textPrimary,
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                                Text(
-                                                    text = preset.subtitle,
-                                                    color = preview.textSecondary,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
+                                                Column(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                                ) {
+                                                    Text(
+                                                        text = preset.title,
+                                                        color = preview.textPrimary,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                    Text(
+                                                        text = preset.subtitle,
+                                                        color = preview.textSecondary,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -616,16 +643,15 @@ fun JarvisSettingsScreen(
 
             item(key = "footer_spacer") { Spacer(Modifier.height(24.dp)) }
         }
+        }
     }
 }
 
 @Composable
 private fun RowCard(content: @Composable () -> Unit) {
-    val palette = LocalJarvisPalette.current
-    Surface(
-        shape = jarvisTileShape(palette, 14.dp),
-        color = palette.tileBg,
-        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
+    Jarvis3DCardSurface(
+        cornerDp = 14.dp,
+        elevationDp = 7.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
         content()
@@ -652,11 +678,10 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val palette = LocalJarvisPalette.current
-    Surface(
+    Jarvis3DCardSurface(
+        cornerDp = 14.dp,
+        elevationDp = 6.dp,
         onClick = { onCheckedChange(!checked) },
-        shape = jarvisTileShape(palette, 14.dp),
-        color = palette.tileBg,
-        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -683,17 +708,16 @@ private fun SettingsLinkRow(
     onClick: () -> Unit,
 ) {
     val palette = LocalJarvisPalette.current
-    Surface(
+    Jarvis3DCardSurface(
+        cornerDp = 14.dp,
+        elevationDp = 6.dp,
         onClick = onClick,
-        shape = jarvisTileShape(palette, 14.dp),
-        color = palette.tileBg,
-        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 13.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -731,17 +755,11 @@ private fun CollapsibleRowHeader(
     standaloneCard: Boolean = true,
 ) {
     val palette = LocalJarvisPalette.current
-    Surface(
-        onClick = onClick,
-        shape = jarvisTileShape(palette, 14.dp),
-        color = if (standaloneCard) palette.tileBg else Color.Transparent,
-        border = if (standaloneCard) BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)) else null,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    val rowContent: @Composable () -> Unit = {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 13.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -767,6 +785,25 @@ private fun CollapsibleRowHeader(
                     tint = palette.textSecondary,
                 )
             }
+        }
+    }
+    if (standaloneCard) {
+        Jarvis3DCardSurface(
+            cornerDp = 14.dp,
+            elevationDp = 6.dp,
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            rowContent()
+        }
+    } else {
+        Surface(
+            onClick = onClick,
+            shape = jarvisTileShape(palette, 14.dp),
+            color = Color.Transparent,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            rowContent()
         }
     }
 }

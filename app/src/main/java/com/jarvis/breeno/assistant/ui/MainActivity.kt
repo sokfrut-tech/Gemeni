@@ -63,6 +63,7 @@ import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenConfigStore
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
+import com.jarvis.breeno.assistant.ui.theme.Jarvis3DStageBackground
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
@@ -711,10 +712,12 @@ class MainActivity : ComponentActivity() {
                     )
 
                     else -> Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(jarvisScreenBackground(palette)),
+                        modifier = Modifier.fillMaxSize(),
                     ) {
+                        Jarvis3DStageBackground(
+                            showGrid = false,
+                            showHudFrame = true,
+                        )
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()

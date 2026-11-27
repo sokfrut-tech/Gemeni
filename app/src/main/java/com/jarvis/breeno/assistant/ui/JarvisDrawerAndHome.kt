@@ -97,7 +97,10 @@ import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.memory.ChatSession
 import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
+import com.jarvis.breeno.assistant.ui.theme.Jarvis3DCardSurface
+import com.jarvis.breeno.assistant.ui.theme.Jarvis3DStageBackground
 import com.jarvis.breeno.assistant.ui.theme.JarvisGlassTile
+import com.jarvis.breeno.assistant.ui.theme.JarvisHoloPedestal
 import com.jarvis.breeno.assistant.ui.theme.JarvisHudChip
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
@@ -633,16 +636,18 @@ fun JarvisHomeScreen(
     val hasMessages = dialogueFeed.isNotEmpty() || !streamingReply.isNullOrBlank()
 
     BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(jarvisScreenBackground(palette))
-            .statusBarsPadding()
-            .navigationBarsPadding(),
+        modifier = Modifier.fillMaxSize(),
     ) {
+        Jarvis3DStageBackground(
+            showGrid = !hasMessages,
+            showHudFrame = true,
+        )
         val compact = maxHeight < 660.dp
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -753,17 +758,28 @@ fun JarvisHomeScreen(
                             .padding(horizontal = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
-                            modifier = Modifier.clickable(
-                                onClickLabel = if (busy || listening) "Остановить Джарвиса" else "Активировать Джарвиса",
-                                onClick = onOrbClick,
-                            ),
-                            contentAlignment = Alignment.Center,
+                        val orbSize = if (compact) 132.dp else 172.dp
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            JarvisInteractiveOrb(
-                                mode = resolvedOrbMode,
-                                audioRms = audioRms,
-                                orbSize = if (compact) 136.dp else 176.dp,
+                            Box(
+                                modifier = Modifier.clickable(
+                                    onClickLabel = if (busy || listening) "Остановить Джарвиса" else "Активировать Джарвиса",
+                                    onClick = onOrbClick,
+                                ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                JarvisInteractiveOrb(
+                                    mode = resolvedOrbMode,
+                                    audioRms = audioRms,
+                                    orbSize = orbSize,
+                                )
+                            }
+                            JarvisHoloPedestal(
+                                accent = if (listening) palette.primaryAccent else if (speaking) palette.secondaryAccent else palette.primaryAccent,
+                                modifier = Modifier
+                                    .width(orbSize * 0.92f)
+                                    .height(if (compact) 20.dp else 28.dp),
                             )
                         }
 
@@ -804,10 +820,9 @@ fun JarvisHomeScreen(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             ideas.forEach { suggestion ->
-                                Surface(
-                                    shape = jarvisTileShape(palette, 14.dp),
-                                    color = palette.tileBg,
-                                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.45f)),
+                                Jarvis3DCardSurface(
+                                    cornerDp = 12.dp,
+                                    elevationDp = 6.dp,
                                     onClick = { onSendText(suggestion) },
                                 ) {
                                     Text(
@@ -999,11 +1014,10 @@ fun JarvisHomeScreen(
                 }
             }
 
-            // Bottom Glass Capsule Input Bar
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = palette.tileBg,
-                border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.65f)),
+            // Bottom 3D Glass Capsule Input Bar
+            Jarvis3DCardSurface(
+                cornerDp = 22.dp,
+                elevationDp = 10.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp, bottom = 2.dp),
@@ -1136,13 +1150,10 @@ private fun DialogueBubbleRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
-        Surface(
-            shape = jarvisTileShape(palette, 15.dp),
-            color = if (isUser) palette.bubbleUser else palette.bubbleAssistant,
-            border = BorderStroke(
-                1.dp,
-                if (isUser) palette.primaryAccent.copy(alpha = 0.50f) else palette.tileBorder.copy(alpha = 0.45f),
-            ),
+        Jarvis3DCardSurface(
+            cornerDp = 15.dp,
+            accent = if (isUser) palette.primaryAccent else palette.secondaryAccent,
+            elevationDp = 7.dp,
             modifier = Modifier.widthIn(max = 315.dp),
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
