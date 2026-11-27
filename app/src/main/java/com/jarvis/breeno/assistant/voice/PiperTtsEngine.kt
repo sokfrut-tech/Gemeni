@@ -225,17 +225,6 @@ class PiperTtsEngine {
                 text[index - 1].isDigit() && text[index + 1].isDigit()
             ) return true
 
-            var tokenStart = index - 1
-            while (tokenStart >= 0 && !text[tokenStart].isWhitespace()) tokenStart--
-            tokenStart++
-
-            val rawToken = text.substring(tokenStart, index)
-            val cleanedToken = rawToken
-                .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
-                .trimEnd(',', ')', ']', '}', '"', '\'', '»', '”', '’')
-                .lowercase(Locale.ROOT)
-            if (cleanedToken in ABBREVIATIONS) return true
-
             val prefix = text.substring(0, index)
             val suffix = text.substring(index + 1)
             val lastWord = prefix.trim()
@@ -251,10 +240,19 @@ class PiperTtsEngine {
             }
             if (SPACED_ABBR_PREFIX.containsMatchIn(prefix)) {
                 val nextNonWs = suffix.firstOrNull { !it.isWhitespace() }
-                if (nextNonWs != null && !nextNonWs.isUpperCase()) {
-                    return true
-                }
+                return nextNonWs != null && !nextNonWs.isUpperCase()
             }
+
+            var tokenStart = index - 1
+            while (tokenStart >= 0 && !text[tokenStart].isWhitespace()) tokenStart--
+            tokenStart++
+
+            val rawToken = text.substring(tokenStart, index)
+            val cleanedToken = rawToken
+                .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
+                .trimEnd(',', ')', ']', '}', '"', '\'', '»', '”', '’')
+                .lowercase(Locale.ROOT)
+            if (cleanedToken in ABBREVIATIONS) return true
 
             // Preserve initials like "А. С. Пушкин" or "И. Петров" inside the sentence.
             val singleLetter = cleanedToken.length == 1 && cleanedToken[0].isLetter()
