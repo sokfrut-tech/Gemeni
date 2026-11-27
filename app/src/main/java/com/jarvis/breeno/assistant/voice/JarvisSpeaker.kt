@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -49,6 +50,9 @@ class JarvisSpeaker(
     @Volatile private var systemEngine: TextToSpeech? = null
     @Volatile private var activeSpeakJob: Job? = null
     @Volatile private var activeTrack: AudioTrack? = null
+    @Volatile private var streamSessionSeq: Long = 0L
+    @Volatile private var activeStreamSessionId: Long = 0L
+    @Volatile private var activeStreamChannel: Channel<String>? = null
 
     init {
         systemEngine = runCatching {
@@ -94,116 +98,175 @@ class JarvisSpeaker(
         }
     }
 
+    /**
+     * Opens an incremental Piper TTS playback session so the assistant begins speaking
+     * as soon as the first sentence is streamed. Returns null if muted or no Piper voice is ready.
+     */
+    fun beginStreamingSession(): Long? {
+        if (isMuted) return null
+        val piperDir = runCatching { piperModelDirProvider() }.getOrNull() ?: return null
+        stop()
+
+        val sessionId = ++streamSessionSeq
+        val channel = Channel<String>(Channel.UNLIMITED)
+        activeStreamSessionId = sessionId
+        activeStreamChannel = channel
+        activeSpeakJob = scope.launch {
+            try {
+                playPiperQueue(piperDir, fallbackFullText = null) {
+                    channel.receiveCatching().getOrNull()
+                }
+            } finally {
+                if (activeStreamChannel === channel) {
+                    activeStreamChannel = null
+                    activeStreamSessionId = 0L
+                }
+                channel.close()
+            }
+        }
+        return sessionId
+    }
+
+    /** Queues one completed sentence into the active streaming session. */
+    fun enqueueStreamingSentence(sessionId: Long, sentence: String): Boolean {
+        if (isMuted || sessionId <= 0L || sessionId != activeStreamSessionId) return false
+        val trimmed = sentence.trim()
+        if (trimmed.isEmpty()) return false
+        return activeStreamChannel?.trySend(trimmed)?.isSuccess == true
+    }
+
+    /** Closes the sentence channel so queued sentences finish playing cleanly and release audio focus. */
+    fun finishStreamingSession(sessionId: Long) {
+        if (sessionId > 0L && sessionId == activeStreamSessionId) {
+            activeStreamChannel?.close()
+        }
+    }
+
     private fun speakWithPiper(modelDir: File, text: String) {
         val chunks = PiperTtsEngine.splitForTts(text)
         if (chunks.isEmpty()) return
+        val iter = chunks.iterator()
 
         activeSpeakJob = scope.launch {
-            val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                .build()
+            playPiperQueue(modelDir, fallbackFullText = text) {
+                if (iter.hasNext()) iter.next() else null
+            }
+        }
+    }
 
-            var focusGranted = false
-            var track: AudioTrack? = null
-            var startedPlayback = false
-            var completedNormally = false
-
-            try {
-                piperEngine.load(modelDir)
-                val sampleRate = piperEngine.sampleRate()
-                val minBufferBytes = AudioTrack.getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                ).coerceAtLeast(sampleRate)
-                val bufferBytes = (minBufferBytes * 2).coerceAtLeast(sampleRate * 2)
-
-                track = AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(sampleRate)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build()
-                    )
-                    .setBufferSizeInBytes(bufferBytes)
-                    .setTransferMode(AudioTrack.MODE_STREAM)
+    private suspend fun playPiperQueue(
+        modelDir: File,
+        fallbackFullText: String?,
+        nextChunk: suspend () -> String?,
+    ) {
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
+            )
+            .build()
 
-                activeTrack = track
-                val speed = speechSpeedProvider().coerceIn(0.65f, 1.25f)
-                val sliceSamples = (sampleRate / 10).coerceAtLeast(1600)
-                val interChunkSilence = ShortArray((sampleRate * 0.20f).toInt())
+        var focusGranted = false
+        var track: AudioTrack? = null
+        var startedPlayback = false
+        var completedNormally = false
 
-                for ((index, chunk) in chunks.withIndex()) {
+        try {
+            piperEngine.load(modelDir)
+            val sampleRate = piperEngine.sampleRate()
+            val speed = speechSpeedProvider().coerceIn(0.65f, 1.25f)
+            val sliceSamples = (sampleRate / 10).coerceAtLeast(1600)
+            val interChunkSilence = ShortArray((sampleRate * 0.20f).toInt())
+
+            while (true) {
+                val chunk = nextChunk() ?: break
+                currentCoroutineContext().ensureActive()
+                val trimmed = chunk.trim()
+                if (trimmed.isEmpty()) continue
+                val floats = piperEngine.synthesize(trimmed, speakerId = 0, speed = speed)
+                if (floats.isEmpty()) continue
+
+                if (!startedPlayback) {
+                    val minBufferBytes = AudioTrack.getMinBufferSize(
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                    ).coerceAtLeast(sampleRate)
+                    val bufferBytes = (minBufferBytes * 2).coerceAtLeast(sampleRate * 2)
+
+                    val createdTrack = AudioTrack.Builder()
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build()
+                        )
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(sampleRate)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(bufferBytes)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
+                        .build()
+
+                    track = createdTrack
+                    activeTrack = createdTrack
+                    focusGranted = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+                    createdTrack.play()
+                    startedPlayback = true
+                    onSpeakingChanged?.invoke(true)
+                } else {
                     currentCoroutineContext().ensureActive()
-                    val floats = piperEngine.synthesize(chunk, speakerId = 0, speed = speed)
-                    if (floats.isEmpty()) continue
-
-                    if (!startedPlayback) {
-                        focusGranted = audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-                        track.play()
-                        startedPlayback = true
-                        onSpeakingChanged?.invoke(true)
-                    }
-
-                    val pcm16 = ShortArray(floats.size) { idx ->
-                        (floats[idx].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
-                    }
-                    var offset = 0
-                    while (offset < pcm16.size) {
-                        currentCoroutineContext().ensureActive()
-                        val count = minOf(sliceSamples, pcm16.size - offset)
-                        val written = track.write(pcm16, offset, count, AudioTrack.WRITE_BLOCKING)
-                        if (written < 0) break
-                        offset += written
-                    }
-
-                    if (index < chunks.lastIndex) {
-                        currentCoroutineContext().ensureActive()
-                        track.write(interChunkSilence, 0, interChunkSilence.size, AudioTrack.WRITE_BLOCKING)
-                    }
+                    track?.write(interChunkSilence, 0, interChunkSilence.size, AudioTrack.WRITE_BLOCKING)
                 }
 
-                if (startedPlayback && currentCoroutineContext().isActive) {
-                    val tailSilence = ShortArray((sampleRate * 0.25f).toInt())
-                    track.write(tailSilence, 0, tailSilence.size, AudioTrack.WRITE_BLOCKING)
-                    track.stop()
-                    delay(250)
+                val activeOut = track ?: break
+                val pcm16 = ShortArray(floats.size) { idx ->
+                    (floats[idx].coerceIn(-1f, 1f) * 32767f).toInt().toShort()
+                }
+                var offset = 0
+                while (offset < pcm16.size) {
                     currentCoroutineContext().ensureActive()
-                    completedNormally = true
+                    val count = minOf(sliceSamples, pcm16.size - offset)
+                    val written = activeOut.write(pcm16, offset, count, AudioTrack.WRITE_BLOCKING)
+                    if (written < 0) break
+                    offset += written
                 }
-            } catch (_: CancellationException) {
-                // Barge-in or user stop requested.
-            } catch (err: Throwable) {
-                onError?.invoke("Ошибка Piper TTS: ${err.message ?: err.javaClass.simpleName}")
-                // Fallback to system TTS only if Russian Android TTS is actually available.
-                if (systemTtsInitialized) {
-                    speakWithSystemTts(text)
+            }
+
+            if (startedPlayback && currentCoroutineContext().isActive) {
+                val tailSilence = ShortArray((sampleRate * 0.25f).toInt())
+                track?.write(tailSilence, 0, tailSilence.size, AudioTrack.WRITE_BLOCKING)
+                track?.stop()
+                delay(250)
+                currentCoroutineContext().ensureActive()
+                completedNormally = true
+            }
+        } catch (_: CancellationException) {
+            // Barge-in or user stop requested.
+        } catch (err: Throwable) {
+            onError?.invoke("Ошибка Piper TTS: ${err.message ?: err.javaClass.simpleName}")
+            if (fallbackFullText != null && systemTtsInitialized) {
+                speakWithSystemTts(fallbackFullText)
+            }
+        } finally {
+            activeTrack = null
+            runCatching {
+                if (!completedNormally) {
+                    track?.pause()
+                    track?.flush()
                 }
-            } finally {
-                activeTrack = null
-                runCatching {
-                    if (!completedNormally) {
-                        track?.pause()
-                        track?.flush()
-                    }
-                    track?.release()
-                }
-                if (focusGranted) {
-                    runCatching { audioManager.abandonAudioFocusRequest(focusRequest) }
-                }
+                track?.release()
+            }
+            if (focusGranted) {
+                runCatching { audioManager.abandonAudioFocusRequest(focusRequest) }
+            }
+            if (startedPlayback) {
                 onSpeakingChanged?.invoke(false)
             }
         }
@@ -240,6 +303,10 @@ class JarvisSpeaker(
     }
 
     fun stop() {
+        streamSessionSeq++
+        activeStreamSessionId = 0L
+        activeStreamChannel?.close()
+        activeStreamChannel = null
         pendingSystemText = null
         activeSpeakJob?.cancel()
         activeSpeakJob = null

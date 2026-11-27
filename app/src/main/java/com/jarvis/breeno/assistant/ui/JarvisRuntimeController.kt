@@ -40,6 +40,8 @@ import com.jarvis.breeno.assistant.updater.SileroVadModelManager
 import com.jarvis.breeno.assistant.voice.AudioCaptureCoordinator
 import com.jarvis.breeno.assistant.voice.AudioRecordPipeline
 import com.jarvis.breeno.assistant.voice.JarvisSpeaker
+import com.jarvis.breeno.assistant.voice.PiperTtsEngine
+import com.jarvis.breeno.assistant.voice.RussianStreamingSpeechChunker
 import com.jarvis.breeno.assistant.voice.SherpaRussianAsrEngine
 import com.jarvis.breeno.assistant.voice.SileroVadEngine
 import kotlinx.coroutines.CancellationException
@@ -602,9 +604,29 @@ class JarvisRuntimeController(context: Context) {
         onOrbModeChanged?.invoke(JarvisOrbMode.THINKING)
         onProgress("Джарвис думает…")
 
+        val streamSessionId = speaker.beginStreamingSession()
+        val speechChunker = if (streamSessionId != null) RussianStreamingSpeechChunker(maxChunkChars = 160) else null
+        var streamedRawPrefix = ""
+        var streamedSentences = 0
+
         llamaProvider.onTokenDelta = { partial ->
             _generationWarning.value = null
             onTokenStream(partial)
+            if (streamSessionId != null &&
+                speechChunker != null &&
+                partial.length > streamedRawPrefix.length &&
+                partial.startsWith(streamedRawPrefix)
+            ) {
+                val delta = partial.substring(streamedRawPrefix.length)
+                if (!delta.contains("<|")) {
+                    streamedRawPrefix = partial
+                    for (sentence in speechChunker.append(delta)) {
+                        if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
+                            streamedSentences++
+                        }
+                    }
+                }
+            }
         }
         llamaProvider.onStatusUpdate = { statusMsg ->
             onProgress(statusMsg)
@@ -654,15 +676,38 @@ class JarvisRuntimeController(context: Context) {
             refreshWorkspaceState()
             onTokenStream(result.answer)
             onCommandCompleted?.invoke(text, result.answer)
-            if (!speaker.speak(result.answer)) {
+            if (streamSessionId != null && speechChunker != null) {
+                if (streamedSentences > 0 && result.answer.startsWith(streamedRawPrefix)) {
+                    val tail = result.answer.substring(streamedRawPrefix.length)
+                    for (sentence in speechChunker.append(tail) + speechChunker.flush()) {
+                        if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
+                            streamedSentences++
+                        }
+                    }
+                } else if (streamedSentences == 0) {
+                    for (sentence in PiperTtsEngine.splitForTts(result.answer)) {
+                        if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
+                            streamedSentences++
+                        }
+                    }
+                }
+                speaker.finishStreamingSession(streamSessionId)
+                if (streamedSentences == 0) {
+                    onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                }
+            } else if (!speaker.speak(result.answer)) {
                 onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
             }
             onProgress("Ответ готов (${result.modelId})")
             result.answer
         } catch (cancelled: CancellationException) {
+            speechChunker?.reset()
+            if (streamSessionId != null) speaker.stop()
             llamaProvider.cancelActiveGeneration()
             throw cancelled
         } catch (error: Throwable) {
+            speechChunker?.reset()
+            if (streamSessionId != null) speaker.stop()
             val realMsg = error.message ?: error.javaClass.simpleName
             onOrbModeChanged?.invoke(JarvisOrbMode.ERROR)
             val failText = "Ошибка ИИ: $realMsg"

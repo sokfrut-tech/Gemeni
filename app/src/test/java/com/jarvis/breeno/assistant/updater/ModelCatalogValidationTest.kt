@@ -1,6 +1,7 @@
 package com.jarvis.breeno.assistant.updater
 
 import com.jarvis.breeno.assistant.voice.PiperTtsEngine
+import com.jarvis.breeno.assistant.voice.RussianStreamingSpeechChunker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -114,5 +115,47 @@ class ModelCatalogValidationTest {
         val bounded = PiperTtsEngine.splitForTts(longUrl, maxChunkChars = 40)
         assertTrue(bounded.isNotEmpty())
         assertTrue(bounded.all { it.length <= 40 })
+    }
+
+    @Test
+    fun streamingSpeechChunkerHandlesRussianFragmentsAbbreviationsAndBargeInReset() {
+        val chunker = RussianStreamingSpeechChunker(maxChunkChars = 160)
+        val emitted = mutableListOf<String>()
+
+        // Hold across token deltas containing spaced abbreviations and decimals
+        assertTrue(chunker.append("Взяли всё, и т. ").isEmpty())
+        emitted += chunker.append("д. Завтра ")
+        assertEquals(listOf("Взяли всё, и т. д."), emitted)
+
+        assertTrue(chunker.append("продолжим в (г. ").isEmpty())
+        assertTrue(chunker.append("Москва) по **3.").isEmpty())
+        emitted += chunker.append("14** балла! А. ")
+        assertEquals(
+            listOf("Взяли всё, и т. д.", "Завтра продолжим в (г. Москва) по 3.14 балла!"),
+            emitted,
+        )
+
+        assertTrue(chunker.append("С. ").isEmpty())
+        assertTrue(chunker.append("Пушкин писал.").isEmpty())
+        emitted += chunker.flush()
+        assertEquals(
+            listOf(
+                "Взяли всё, и т. д.",
+                "Завтра продолжим в (г. Москва) по 3.14 балла!",
+                "А. С. Пушкин писал.",
+            ),
+            emitted,
+        )
+
+        // Barge-in reset discards unfinished stale buffer
+        chunker.append("Старый оборванный текст без")
+        chunker.reset()
+        assertEquals(listOf("Новый чистый ответ."), chunker.append("Новый чистый ответ.") + chunker.flush())
+
+        // Long token enforcement
+        val tight = RussianStreamingSpeechChunker(maxChunkChars = 40)
+        val urlOut = tight.append("Откройте https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf пожалуйста!") + tight.flush()
+        assertTrue(urlOut.size >= 2)
+        assertTrue(urlOut.all { it.length <= 40 })
     }
 }

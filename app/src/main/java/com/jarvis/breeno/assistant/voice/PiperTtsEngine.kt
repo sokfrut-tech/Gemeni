@@ -110,6 +110,12 @@ class PiperTtsEngine {
             }.getOrDefault(fallback)
         }
 
+        internal fun cleanForSpeech(text: String): String = text
+            .replace(MARKDOWN_NOISE, " ")
+            .replace(Regex("""\[(.*?)]\([^)]*\)"""), "$1")
+            .replace(Regex("""[ \t]+"""), " ")
+            .trim()
+
         /**
          * Strips markdown formatting and splits Russian response text into
          * low-latency chunks suitable for streaming Piper TTS playback without
@@ -117,11 +123,7 @@ class PiperTtsEngine {
          */
         fun splitForTts(text: String, maxChunkChars: Int = 160): List<String> {
             val safeLimit = maxChunkChars.coerceAtLeast(1)
-            val cleaned = text
-                .replace(MARKDOWN_NOISE, " ")
-                .replace(Regex("""\[(.*?)]\([^)]*\)"""), "$1")
-                .replace(Regex("""[ \t]+"""), " ")
-                .trim()
+            val cleaned = cleanForSpeech(text)
             if (cleaned.isBlank()) return emptyList()
 
             val rawParts = splitSentencesPreservingRussianSyntax(cleaned)
@@ -137,25 +139,7 @@ class PiperTtsEngine {
                         chunks.add(current.toString().trim())
                         current.clear()
                     }
-                    // Split overly long sentence by words, slicing rare over-limit tokens (e.g. URLs).
-                    var buf = StringBuilder()
-                    for (word in part.split(Regex("\\s+"))) {
-                        if (word.length > safeLimit) {
-                            if (buf.isNotEmpty()) {
-                                chunks.add(buf.toString())
-                                buf = StringBuilder()
-                            }
-                            chunks.addAll(word.chunked(safeLimit))
-                            continue
-                        }
-                        if (buf.isNotEmpty() && buf.length + 1 + word.length > safeLimit) {
-                            chunks.add(buf.toString())
-                            buf = StringBuilder()
-                        }
-                        if (buf.isNotEmpty()) buf.append(' ')
-                        buf.append(word)
-                    }
-                    if (buf.isNotEmpty()) chunks.add(buf.toString())
+                    appendBoundedWords(chunks, part, safeLimit)
                     continue
                 }
 
@@ -172,46 +156,44 @@ class PiperTtsEngine {
             return chunks
         }
 
+        internal fun appendBoundedWords(target: MutableList<String>, text: String, safeLimit: Int) {
+            var buf = StringBuilder()
+            for (word in text.split(Regex("\\s+"))) {
+                if (word.isEmpty()) continue
+                if (word.length > safeLimit) {
+                    if (buf.isNotEmpty()) {
+                        target.add(buf.toString())
+                        buf = StringBuilder()
+                    }
+                    target.addAll(word.chunked(safeLimit))
+                    continue
+                }
+                if (buf.isNotEmpty() && buf.length + 1 + word.length > safeLimit) {
+                    target.add(buf.toString())
+                    buf = StringBuilder()
+                }
+                if (buf.isNotEmpty()) buf.append(' ')
+                buf.append(word)
+            }
+            if (buf.isNotEmpty()) target.add(buf.toString())
+        }
+
         private fun splitSentencesPreservingRussianSyntax(text: String): List<String> {
             val parts = mutableListOf<String>()
             var start = 0
             var index = 0
             while (index < text.length) {
-                val ch = text[index]
-                if (ch == '\n' || ch == '\r') {
-                    var end = index + 1
-                    while (end < text.length && (text[end] == '\n' || text[end] == '\r')) end++
-                    val segment = text.substring(start, index).trim()
-                    if (segment.isNotEmpty()) parts.add(segment)
-                    while (end < text.length && text[end].isWhitespace()) end++
-                    start = end
-                    index = end
-                    continue
-                }
-
-                if (ch != '.' && ch != '!' && ch != '?' && ch != '…') {
+                val end = findTerminalBoundaryAt(text, index, force = true)
+                if (end < 0) {
                     index++
                     continue
                 }
-
-                var end = index + 1
-                while (end < text.length && (text[end] == '!' || text[end] == '?' || text[end] == '…')) end++
-                while (end < text.length && text[end] in CLOSING_QUOTES_AND_BRACKETS) end++
-
-                if (end < text.length && !text[end].isWhitespace()) {
-                    index++
-                    continue
-                }
-                if (ch == '.' && isNonTerminalPeriod(text, index)) {
-                    index++
-                    continue
-                }
-
                 val segment = text.substring(start, end).trim()
                 if (segment.isNotEmpty()) parts.add(segment)
-                while (end < text.length && text[end].isWhitespace()) end++
-                start = end
-                index = end
+                var nextStart = end
+                while (nextStart < text.length && text[nextStart].isWhitespace()) nextStart++
+                start = nextStart
+                index = nextStart
             }
             if (start < text.length) {
                 val tail = text.substring(start).trim()
@@ -220,34 +202,59 @@ class PiperTtsEngine {
             return parts
         }
 
-        private fun isNonTerminalPeriod(text: String, index: Int): Boolean {
+        internal fun findTerminalBoundaryAt(text: CharSequence, index: Int, force: Boolean): Int {
+            val ch = text[index]
+            if (ch == '\n' || ch == '\r') {
+                var end = index + 1
+                while (end < text.length && (text[end] == '\n' || text[end] == '\r')) end++
+                return index
+            }
+
+            if (ch != '.' && ch != '!' && ch != '?' && ch != '…') return -1
+
+            var end = index + 1
+            while (end < text.length && (text[end] == '!' || text[end] == '?' || text[end] == '…')) end++
+            while (end < text.length && text[end] in CLOSING_QUOTES_AND_BRACKETS) end++
+
+            if (end == text.length && !force) return -1
+            if (end < text.length && !text[end].isWhitespace()) return -1
+            if (ch == '.' && isNonTerminalPeriod(text, index, force)) return -1
+            return end
+        }
+
+        internal fun isNonTerminalPeriod(text: CharSequence, index: Int, force: Boolean = true): Boolean {
             if (index > 0 && index + 1 < text.length &&
                 text[index - 1].isDigit() && text[index + 1].isDigit()
             ) return true
 
-            val prefix = text.substring(0, index)
-            val suffix = text.substring(index + 1)
+            val prefix = text.subSequence(0, index).toString()
+            val suffix = text.subSequence(index + 1, text.length).toString()
             val lastWord = prefix.trim()
                 .split(Regex("\\s+"))
                 .lastOrNull()
                 .orEmpty()
                 .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
-            if (lastWord.equals("т", ignoreCase = true) && SPACED_ABBR_SUFFIX_NEXT.containsMatchIn(suffix)) {
-                return true
+            if (lastWord.equals("т", ignoreCase = true)) {
+                if (SPACED_ABBR_SUFFIX_NEXT.containsMatchIn(suffix) || (!force && suffix.isBlank())) {
+                    return true
+                }
             }
-            if (lastWord.equals("и", ignoreCase = true) && SPACED_ABBR_AND_NEXT.containsMatchIn(suffix)) {
-                return true
+            if (lastWord.equals("и", ignoreCase = true)) {
+                if (SPACED_ABBR_AND_NEXT.containsMatchIn(suffix) || (!force && suffix.isBlank())) {
+                    return true
+                }
             }
             if (SPACED_ABBR_PREFIX.containsMatchIn(prefix)) {
                 val nextNonWs = suffix.firstOrNull { !it.isWhitespace() }
-                return nextNonWs != null && !nextNonWs.isUpperCase()
+                if (nextNonWs == null) return !force
+                return !nextNonWs.isUpperCase()
             }
 
             var tokenStart = index - 1
             while (tokenStart >= 0 && !text[tokenStart].isWhitespace()) tokenStart--
             tokenStart++
 
-            val rawToken = text.substring(tokenStart, index)
+            val rawToken = text.subSequence(tokenStart, index).toString()
             val cleanedToken = rawToken
                 .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
                 .trimEnd(',', ')', ']', '}', '"', '\'', '»', '”', '’')
@@ -259,11 +266,92 @@ class PiperTtsEngine {
             if (singleLetter) {
                 var nextIdx = index + 1
                 while (nextIdx < text.length && text[nextIdx].isWhitespace()) nextIdx++
-                if (nextIdx < text.length && text[nextIdx].isLetter() && text[nextIdx].isUpperCase()) {
+                if (nextIdx >= text.length) return !force
+                if (text[nextIdx].isLetter() && text[nextIdx].isUpperCase()) {
                     return true
                 }
             }
             return false
+        }
+    }
+}
+
+/**
+ * Incremental Russian sentence chunker for LLM token-delta streams.
+ * Delays trailing punctuation/spaced abbreviations until the next fragment or flush
+ * so Piper TTS starts speaking from the very first completed sentence.
+ */
+class RussianStreamingSpeechChunker(
+    private val maxChunkChars: Int = 160,
+) {
+    private val safeLimit = maxChunkChars.coerceAtLeast(20)
+    private val pending = StringBuilder()
+
+    fun append(fragment: String): List<String> {
+        if (fragment.isNotEmpty()) pending.append(fragment)
+        return drain(force = false)
+    }
+
+    fun flush(): List<String> = drain(force = true)
+
+    fun reset() {
+        pending.clear()
+    }
+
+    private fun drain(force: Boolean): List<String> {
+        val ready = mutableListOf<String>()
+        while (pending.isNotEmpty()) {
+            val boundary = findBoundary(force)
+            if (boundary >= 0) {
+                if (boundary > 0) {
+                    emitSpan(boundary, ready)
+                } else {
+                    while (pending.isNotEmpty() && pending[0].isWhitespace()) {
+                        pending.deleteCharAt(0)
+                    }
+                }
+                continue
+            }
+            if (pending.length > safeLimit) {
+                val split = findLengthSplit()
+                if (split > 0) {
+                    emitSpan(split, ready)
+                    continue
+                }
+            }
+            break
+        }
+        if (force && pending.isNotEmpty()) {
+            emitSpan(pending.length, ready)
+        }
+        return ready
+    }
+
+    private fun findBoundary(force: Boolean): Int {
+        for (index in pending.indices) {
+            val end = PiperTtsEngine.findTerminalBoundaryAt(pending, index, force)
+            if (end >= 0) return end
+        }
+        return -1
+    }
+
+    private fun findLengthSplit(): Int {
+        var lastWs = -1
+        for (index in 0 until minOf(safeLimit, pending.length)) {
+            if (pending[index].isWhitespace()) lastWs = index
+        }
+        return if (lastWs > 0) lastWs else safeLimit
+    }
+
+    private fun emitSpan(endExclusive: Int, output: MutableList<String>) {
+        val raw = pending.substring(0, endExclusive)
+        pending.delete(0, endExclusive)
+        while (pending.isNotEmpty() && pending[0].isWhitespace()) {
+            pending.deleteCharAt(0)
+        }
+        val cleaned = PiperTtsEngine.cleanForSpeech(raw)
+        if (cleaned.isNotEmpty()) {
+            PiperTtsEngine.appendBoundedWords(output, cleaned, safeLimit)
         }
     }
 }
