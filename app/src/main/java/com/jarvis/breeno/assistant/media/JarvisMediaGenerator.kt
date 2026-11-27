@@ -50,6 +50,10 @@ data class MediaGenConfig(
     val steps: Int = 24,
     val cfgScale: Float = 7.0f,
     val checkpointName: String = "",
+    val comfyVaeName: String = "",
+    val comfyClip1Name: String = "",
+    val comfyClip2Name: String = "",
+    val uncensoredMode: Boolean = true,
     val comfyPonyClipSkip2: Boolean = true,
     val comfyWanI2vEnabled: Boolean = true,
     val comfyWanHighNoiseModel: String = JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL,
@@ -59,6 +63,19 @@ data class MediaGenConfig(
     val comfyWanTurboLora: Boolean = true,
     val comfyVideoFrames: Int = 49,
     val localDreamUrl: String = JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL,
+)
+
+data class ComfyAutoWireResult(
+    val architecture: String,
+    val modelName: String,
+    val vaeName: String,
+    val clip1Name: String,
+    val clip2Name: String,
+    val steps: Int,
+    val cfgScale: Float,
+    val usePonyClipSkip2: Boolean,
+    val negativePrompt: String,
+    val summaryRu: String,
 )
 
 data class ComfyImageRef(
@@ -92,6 +109,10 @@ class MediaGenConfigStore(context: Context) {
             steps = prefs.getInt(KEY_STEPS, 24).coerceIn(1, 100),
             cfgScale = prefs.getFloat(KEY_CFG_SCALE, 7.0f).coerceIn(1.0f, 30.0f),
             checkpointName = prefs.getString(KEY_CHECKPOINT, "") ?: "",
+            comfyVaeName = prefs.getString(KEY_COMFY_VAE, "") ?: "",
+            comfyClip1Name = prefs.getString(KEY_COMFY_CLIP1, "") ?: "",
+            comfyClip2Name = prefs.getString(KEY_COMFY_CLIP2, "") ?: "",
+            uncensoredMode = prefs.getBoolean(KEY_UNCENSORED_MODE, true),
             comfyPonyClipSkip2 = prefs.getBoolean(KEY_COMFY_PONY_CLIP_SKIP2, true),
             comfyWanI2vEnabled = prefs.getBoolean(KEY_COMFY_WAN_I2V_ENABLED, true),
             comfyWanHighNoiseModel = prefs.getString(KEY_COMFY_WAN_HIGH, JarvisMediaGenerator.DEFAULT_WAN_HIGH_MODEL)
@@ -120,6 +141,10 @@ class MediaGenConfigStore(context: Context) {
             .putInt(KEY_STEPS, config.steps.coerceIn(1, 100))
             .putFloat(KEY_CFG_SCALE, config.cfgScale.coerceIn(1.0f, 30.0f))
             .putString(KEY_CHECKPOINT, config.checkpointName.trim())
+            .putString(KEY_COMFY_VAE, config.comfyVaeName.trim())
+            .putString(KEY_COMFY_CLIP1, config.comfyClip1Name.trim())
+            .putString(KEY_COMFY_CLIP2, config.comfyClip2Name.trim())
+            .putBoolean(KEY_UNCENSORED_MODE, config.uncensoredMode)
             .putBoolean(KEY_COMFY_PONY_CLIP_SKIP2, config.comfyPonyClipSkip2)
             .putBoolean(KEY_COMFY_WAN_I2V_ENABLED, config.comfyWanI2vEnabled)
             .putString(KEY_COMFY_WAN_HIGH, config.comfyWanHighNoiseModel.trim())
@@ -142,6 +167,10 @@ class MediaGenConfigStore(context: Context) {
         private const val KEY_STEPS = "media_steps"
         private const val KEY_CFG_SCALE = "media_cfg_scale"
         private const val KEY_CHECKPOINT = "media_checkpoint"
+        private const val KEY_COMFY_VAE = "media_comfy_vae"
+        private const val KEY_COMFY_CLIP1 = "media_comfy_clip1"
+        private const val KEY_COMFY_CLIP2 = "media_comfy_clip2"
+        private const val KEY_UNCENSORED_MODE = "media_uncensored_mode"
         private const val KEY_COMFY_PONY_CLIP_SKIP2 = "media_comfy_pony_clip_skip2"
         private const val KEY_COMFY_WAN_I2V_ENABLED = "media_comfy_wan_i2v_enabled"
         private const val KEY_COMFY_WAN_HIGH = "media_comfy_wan_high"
@@ -641,6 +670,7 @@ class JarvisMediaGenerator(
                 seed = seed,
                 customModel = modelName,
                 includeModels = withModels,
+                uncensoredMode = cfg.uncensoredMode,
             )
             val resp = postBytes("$AI_HORDE_BASE_URL/generate/async", reqJson, headers, readTimeoutMs = 20_000)
                 .toString(Charsets.UTF_8)
@@ -815,17 +845,72 @@ class JarvisMediaGenerator(
         }
     }
 
+    suspend fun autoDiscoverComfyModels(
+        rawUrl: String,
+        apiKey: String = "",
+    ): Result<ComfyAutoWireResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val clean = rawUrl.trim()
+            require(clean.startsWith("http://", true) || clean.startsWith("https://", true)) {
+                "Укажите URL ComfyUI (например, http://192.168.1.10:8188)"
+            }
+            val baseUrl = normalizeComfyBaseUrl(clean)
+            val headers = buildAuthHeaders(apiKey)
+
+            val ggufModels = runCatching {
+                val json = getBytes("$baseUrl/object_info/UnetLoaderGGUF", headers, readTimeoutMs = 12_000)
+                    .toString(Charsets.UTF_8)
+                parseComfyNodeChoices(json, "UnetLoaderGGUF", "unet_name")
+            }.getOrDefault(emptyList())
+
+            val checkpoints = runCatching {
+                val json = getBytes("$baseUrl/object_info/CheckpointLoaderSimple", headers, readTimeoutMs = 12_000)
+                    .toString(Charsets.UTF_8)
+                parseComfyNodeChoices(json, "CheckpointLoaderSimple", "ckpt_name")
+            }.getOrDefault(emptyList())
+
+            val vaes = runCatching {
+                val json = getBytes("$baseUrl/object_info/VAELoader", headers, readTimeoutMs = 12_000)
+                    .toString(Charsets.UTF_8)
+                parseComfyNodeChoices(json, "VAELoader", "vae_name")
+            }.getOrDefault(emptyList())
+
+            val clips = runCatching {
+                val json = getBytes("$baseUrl/object_info/DualCLIPLoader", headers, readTimeoutMs = 12_000)
+                    .toString(Charsets.UTF_8)
+                parseComfyNodeChoices(json, "DualCLIPLoader", "clip_name1")
+            }.getOrDefault(emptyList())
+
+            val pickedModel = ggufModels.firstOrNull()
+                ?: checkpoints.firstOrNull()
+                ?: error("На сервере ComfyUI не найдено моделей (.gguf или .safetensors)")
+
+            autoConfigureComfyModel(
+                modelName = pickedModel,
+                availableVaes = vaes,
+                availableClips = clips,
+            )
+        }
+    }
+
     private suspend fun resolveComfyCheckpoint(
         baseUrl: String,
         cfg: MediaGenConfig,
         headers: Map<String, String>,
         onProgress: (String) -> Unit,
     ): String = cfg.checkpointName.trim().ifBlank {
-        onProgress("Определяю чекпоинт ComfyUI…")
+        onProgress("Определяю модель ComfyUI…")
+        val ggufFirst = runCatching {
+            val infoJson = getBytes("$baseUrl/object_info/UnetLoaderGGUF", headers, readTimeoutMs = 12_000)
+                .toString(Charsets.UTF_8)
+            parseComfyNodeChoices(infoJson, "UnetLoaderGGUF", "unet_name").firstOrNull()
+        }.getOrNull()
+        if (!ggufFirst.isNullOrBlank()) return ggufFirst
+
         val infoJson = getBytes("$baseUrl/object_info/CheckpointLoaderSimple", headers, readTimeoutMs = 15_000)
             .toString(Charsets.UTF_8)
         parseComfyFirstCheckpoint(infoJson)
-            ?: error("Не найден чекпоинт в ComfyUI: укажите имя .safetensors в настройках")
+            ?: error("Не найден чекпоинт в ComfyUI: укажите имя .gguf или .safetensors в настройках")
     }
 
     private suspend fun fetchFromComfyUi(
@@ -844,9 +929,19 @@ class JarvisMediaGenerator(
         val baseUrl = normalizeComfyBaseUrl(rawUrl)
         val headers = buildAuthHeaders(cfg.apiKey)
         val ckpt = resolveComfyCheckpoint(baseUrl, cfg, headers, onProgress)
+        val autoPreset = autoConfigureComfyModel(ckpt)
         val isPony = cfg.comfyPonyClipSkip2 ||
             ckpt.contains("pony", ignoreCase = true) ||
             ckpt.contains("cyberrealistic", ignoreCase = true)
+        val resolvedVae = cfg.comfyVaeName.trim().ifBlank {
+            if (ckpt.endsWith(".gguf", ignoreCase = true)) autoPreset.vaeName else ""
+        }
+        val resolvedClip1 = cfg.comfyClip1Name.trim().ifBlank {
+            if (ckpt.endsWith(".gguf", ignoreCase = true)) autoPreset.clip1Name else ""
+        }
+        val resolvedClip2 = cfg.comfyClip2Name.trim().ifBlank {
+            if (ckpt.endsWith(".gguf", ignoreCase = true)) autoPreset.clip2Name else ""
+        }
 
         val workflowJson = buildComfyUiWorkflowJson(
             prompt = prompt,
@@ -858,7 +953,10 @@ class JarvisMediaGenerator(
             cfgScale = cfg.cfgScale,
             seed = seed,
             checkpointName = ckpt,
-            usePonyClipSkip2 = isPony,
+            usePonyClipSkip2 = isPony && !ckpt.contains("flux", ignoreCase = true),
+            vaeName = resolvedVae,
+            clip1Name = resolvedClip1,
+            clip2Name = resolvedClip2,
         )
 
         onProgress("Отправляю задачу в ComfyUI ($ckpt)…")
@@ -1208,17 +1306,146 @@ class JarvisMediaGenerator(
             }
         }
 
-        fun parseComfyFirstCheckpoint(objectInfoJson: String): String? {
+        fun parseComfyNodeChoices(objectInfoJson: String, nodeClass: String, inputField: String): List<String> {
             return runCatching {
                 val root = JsonParser.parseString(objectInfoJson).asJsonObject
-                val ckptArray = root.getAsJsonObject("CheckpointLoaderSimple")
+                val arr = root.getAsJsonObject(nodeClass)
                     ?.getAsJsonObject("input")
                     ?.getAsJsonObject("required")
-                    ?.getAsJsonArray("ckpt_name")
-                    ?: return null
-                val choices = ckptArray.get(0)?.asJsonArray ?: return null
-                if (choices.size() > 0) choices[0].asString else null
-            }.getOrNull()
+                    ?.getAsJsonArray(inputField)
+                    ?: return emptyList()
+                val choices = arr.get(0)?.asJsonArray ?: return emptyList()
+                buildList {
+                    for (idx in 0 until choices.size()) {
+                        choices[idx]?.asString?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    }
+                }
+            }.getOrDefault(emptyList())
+        }
+
+        fun parseComfyFirstCheckpoint(objectInfoJson: String): String? =
+            parseComfyNodeChoices(objectInfoJson, "CheckpointLoaderSimple", "ckpt_name").firstOrNull()
+
+        /**
+         * Automatically detects diffusion architecture from a GGUF/safetensors filename
+         * and wires compatible VAE, CLIP/T5 encoders, steps, CFG scale, and negative prompt.
+         */
+        fun autoConfigureComfyModel(
+            modelName: String,
+            availableVaes: List<String> = emptyList(),
+            availableClips: List<String> = emptyList(),
+        ): ComfyAutoWireResult {
+            val cleanModel = modelName.trim()
+            val lower = cleanModel.lowercase()
+            val isGguf = lower.endsWith(".gguf")
+
+            fun pickMatching(list: List<String>, keywords: List<String>, fallback: String): String {
+                for (kw in keywords) {
+                    list.firstOrNull { it.lowercase().contains(kw) }?.let { return it }
+                }
+                return list.firstOrNull() ?: fallback
+            }
+
+            return when {
+                lower.contains("flux") -> {
+                    val vae = pickMatching(availableVaes, listOf("ae.safetensors", "flux", "ae."), "ae.safetensors")
+                    val clip1 = pickMatching(availableClips, listOf("clip_l", "clipl"), "clip_l.safetensors")
+                    val clip2 = pickMatching(availableClips, listOf("t5xxl", "t5_xxl", "t5-"), "t5xxl_fp8_e4m3fn.safetensors")
+                    val isSchnell = lower.contains("schnell")
+                    ComfyAutoWireResult(
+                        architecture = if (isGguf) "FLUX_GGUF" else "FLUX",
+                        modelName = cleanModel,
+                        vaeName = vae,
+                        clip1Name = clip1,
+                        clip2Name = clip2,
+                        steps = if (isSchnell) 4 else 20,
+                        cfgScale = 1.0f,
+                        usePonyClipSkip2 = false,
+                        negativePrompt = "",
+                        summaryRu = "Автонастройка FLUX${if (isGguf) " GGUF" else ""}: VAE=$vae, CLIP=$clip1 + $clip2, CFG=1.0",
+                    )
+                }
+
+                lower.contains("sd3") -> {
+                    val vae = pickMatching(availableVaes, listOf("sd3", "ae.safetensors"), "sd3_vae.safetensors")
+                    val clip1 = pickMatching(availableClips, listOf("clip_l"), "clip_l.safetensors")
+                    val clip2 = pickMatching(availableClips, listOf("clip_g", "t5xxl"), "clip_g.safetensors")
+                    ComfyAutoWireResult(
+                        architecture = if (isGguf) "SD3_GGUF" else "SD3",
+                        modelName = cleanModel,
+                        vaeName = vae,
+                        clip1Name = clip1,
+                        clip2Name = clip2,
+                        steps = 28,
+                        cfgScale = 4.5f,
+                        usePonyClipSkip2 = false,
+                        negativePrompt = "lowres, blurry, deformed",
+                        summaryRu = "Автонастройка SD3${if (isGguf) " GGUF" else ""}: VAE=$vae, CFG=4.5",
+                    )
+                }
+
+                lower.contains("pony") || lower.contains("cyberrealistic") -> {
+                    val vae = if (isGguf || availableVaes.any { it.lowercase().contains("sdxl") }) {
+                        pickMatching(availableVaes, listOf("sdxl_vae", "sdxl", "pony"), if (isGguf) "sdxl_vae.safetensors" else "")
+                    } else ""
+                    val clip1 = if (isGguf) pickMatching(availableClips, listOf("clip_l"), "clip_l.safetensors") else ""
+                    val clip2 = if (isGguf) pickMatching(availableClips, listOf("clip_g"), "clip_g.safetensors") else ""
+                    ComfyAutoWireResult(
+                        architecture = if (isGguf) "PONY_GGUF" else "PONY_XL",
+                        modelName = cleanModel,
+                        vaeName = vae,
+                        clip1Name = clip1,
+                        clip2Name = clip2,
+                        steps = 30,
+                        cfgScale = 5.5f,
+                        usePonyClipSkip2 = true,
+                        negativePrompt = DEFAULT_PONY_NEGATIVE,
+                        summaryRu = "Автонастройка Pony XL: Clip Skip 2, 30 шагов, CFG=5.5${if (vae.isNotBlank()) ", VAE=$vae" else ""}",
+                    )
+                }
+
+                lower.contains("xl") || lower.contains("juggernaut") || lower.contains("illustrious") -> {
+                    val vae = if (isGguf || availableVaes.any { it.lowercase().contains("sdxl") }) {
+                        pickMatching(availableVaes, listOf("sdxl_vae", "sdxl"), if (isGguf) "sdxl_vae.safetensors" else "")
+                    } else ""
+                    val clip1 = if (isGguf) pickMatching(availableClips, listOf("clip_l"), "clip_l.safetensors") else ""
+                    val clip2 = if (isGguf) pickMatching(availableClips, listOf("clip_g"), "clip_g.safetensors") else ""
+                    ComfyAutoWireResult(
+                        architecture = if (isGguf) "SDXL_GGUF" else "SDXL",
+                        modelName = cleanModel,
+                        vaeName = vae,
+                        clip1Name = clip1,
+                        clip2Name = clip2,
+                        steps = 28,
+                        cfgScale = 6.5f,
+                        usePonyClipSkip2 = false,
+                        negativePrompt = "lowres, blurry, bad anatomy, watermark, text",
+                        summaryRu = "Автонастройка SDXL: 28 шагов, CFG=6.5${if (vae.isNotBlank()) ", VAE=$vae" else ""}",
+                    )
+                }
+
+                else -> {
+                    val vae = if (isGguf) {
+                        pickMatching(availableVaes, listOf("vae-ft-mse", "ae.safetensors", "sdxl_vae"), "ae.safetensors")
+                    } else {
+                        availableVaes.firstOrNull { it.lowercase().contains("vae-ft-mse") } ?: ""
+                    }
+                    val clip1 = if (isGguf) pickMatching(availableClips, listOf("clip_l"), "clip_l.safetensors") else ""
+                    val clip2 = if (isGguf) pickMatching(availableClips, listOf("t5xxl", "clip_g"), "") else ""
+                    ComfyAutoWireResult(
+                        architecture = if (isGguf) "GENERIC_GGUF" else "SD15",
+                        modelName = cleanModel,
+                        vaeName = vae,
+                        clip1Name = clip1,
+                        clip2Name = clip2,
+                        steps = 24,
+                        cfgScale = 7.0f,
+                        usePonyClipSkip2 = false,
+                        negativePrompt = "lowres, blurry, bad anatomy, watermark, text",
+                        summaryRu = "Автонастройка ${if (isGguf) "GGUF" else "SD 1.5"}: 24 шага, CFG=7.0${if (vae.isNotBlank()) ", VAE=$vae" else ""}",
+                    )
+                }
+            }
         }
 
         fun buildComfyUiWorkflowJson(
@@ -1232,28 +1459,89 @@ class JarvisMediaGenerator(
             seed: Int,
             checkpointName: String,
             usePonyClipSkip2: Boolean = false,
+            vaeName: String = "",
+            clip1Name: String = "",
+            clip2Name: String = "",
         ): String {
             val safeW = ((width.coerceIn(256, 1536) + 7) / 8) * 8
             val safeH = ((height.coerceIn(256, 1536) + 7) / 8) * 8
             val styledPrompt = "${prompt.trim()}, ${styleSuffix(style)}"
-            val finalPos = if (usePonyClipSkip2 && !styledPrompt.contains("score_9", ignoreCase = true)) {
+            val isGguf = checkpointName.trim().endsWith(".gguf", ignoreCase = true)
+            val isFlux = checkpointName.contains("flux", ignoreCase = true)
+            val effectivePony = usePonyClipSkip2 && !isFlux
+            val finalPos = if (effectivePony && !styledPrompt.contains("score_9", ignoreCase = true)) {
                 "score_9, score_8_up, score_7_up, $styledPrompt"
             } else {
                 styledPrompt
             }
-            val finalNeg = if (usePonyClipSkip2 && negativePrompt.isBlank()) DEFAULT_PONY_NEGATIVE else negativePrompt.trim()
-            val clipNodeRef = if (usePonyClipSkip2) nodeRef("11", 0) else nodeRef("4", 1)
+            val finalNeg = when {
+                isFlux -> ""
+                effectivePony && negativePrompt.isBlank() -> DEFAULT_PONY_NEGATIVE
+                else -> negativePrompt.trim()
+            }
 
             val graph = JsonObject().apply {
-                add("4", comfyNode("CheckpointLoaderSimple", JsonObject().apply {
-                    addProperty("ckpt_name", checkpointName)
-                }))
-                if (usePonyClipSkip2) {
+                val modelRef: JsonArray
+                val baseClipRef: JsonArray
+                val vaeRef: JsonArray
+
+                if (isGguf) {
+                    add("4", comfyNode("UnetLoaderGGUF", JsonObject().apply {
+                        addProperty("unet_name", checkpointName.trim())
+                    }))
+                    modelRef = nodeRef("4", 0)
+
+                    val resolvedVae = vaeName.trim().ifBlank { if (isFlux) "ae.safetensors" else "sdxl_vae.safetensors" }
+                    add("12", comfyNode("VAELoader", JsonObject().apply {
+                        addProperty("vae_name", resolvedVae)
+                    }))
+                    vaeRef = nodeRef("12", 0)
+
+                    val resolvedClip1 = clip1Name.trim().ifBlank { "clip_l.safetensors" }
+                    val resolvedClip2 = clip2Name.trim()
+                    if (resolvedClip2.isNotBlank()) {
+                        add("13", comfyNode("DualCLIPLoader", JsonObject().apply {
+                            addProperty("clip_name1", resolvedClip1)
+                            addProperty("clip_name2", resolvedClip2)
+                            addProperty("type", when {
+                                isFlux -> "flux"
+                                checkpointName.contains("sd3", ignoreCase = true) -> "sd3"
+                                else -> "sdxl"
+                            })
+                        }))
+                    } else {
+                        add("13", comfyNode("CLIPLoader", JsonObject().apply {
+                            addProperty("clip_name", resolvedClip1)
+                            addProperty("type", if (isFlux) "flux" else "stable_diffusion")
+                        }))
+                    }
+                    baseClipRef = nodeRef("13", 0)
+                } else {
+                    add("4", comfyNode("CheckpointLoaderSimple", JsonObject().apply {
+                        addProperty("ckpt_name", checkpointName)
+                    }))
+                    modelRef = nodeRef("4", 0)
+                    baseClipRef = nodeRef("4", 1)
+                    if (vaeName.trim().isNotBlank()) {
+                        add("12", comfyNode("VAELoader", JsonObject().apply {
+                            addProperty("vae_name", vaeName.trim())
+                        }))
+                        vaeRef = nodeRef("12", 0)
+                    } else {
+                        vaeRef = nodeRef("4", 2)
+                    }
+                }
+
+                val clipNodeRef = if (effectivePony) {
                     add("11", comfyNode("CLIPSetLastLayer", JsonObject().apply {
-                        add("clip", nodeRef("4", 1))
+                        add("clip", baseClipRef)
                         addProperty("stop_at_clip_layer", -2)
                     }))
+                    nodeRef("11", 0)
+                } else {
+                    baseClipRef
                 }
+
                 add("5", comfyNode("EmptyLatentImage", JsonObject().apply {
                     addProperty("width", safeW)
                     addProperty("height", safeH)
@@ -1270,21 +1558,33 @@ class JarvisMediaGenerator(
                 add("3", comfyNode("KSampler", JsonObject().apply {
                     addProperty("seed", seed.coerceAtLeast(1))
                     addProperty("steps", steps.coerceIn(1, 100))
-                    addProperty("cfg", cfgScale.coerceIn(1.0f, 30.0f))
-                    addProperty("sampler_name", if (usePonyClipSkip2) "dpmpp_2m" else "euler")
-                    addProperty("scheduler", if (usePonyClipSkip2) "karras" else "normal")
+                    addProperty("cfg", if (isFlux) 1.0f else cfgScale.coerceIn(1.0f, 30.0f))
+                    addProperty("sampler_name", when {
+                        isFlux -> "euler"
+                        effectivePony -> "dpmpp_2m"
+                        else -> "euler"
+                    })
+                    addProperty("scheduler", when {
+                        isFlux -> "simple"
+                        effectivePony -> "karras"
+                        else -> "normal"
+                    })
                     addProperty("denoise", 1.0)
-                    add("model", nodeRef("4", 0))
+                    add("model", modelRef)
                     add("positive", nodeRef("6", 0))
                     add("negative", nodeRef("7", 0))
                     add("latent_image", nodeRef("5", 0))
                 }))
                 add("8", comfyNode("VAEDecode", JsonObject().apply {
                     add("samples", nodeRef("3", 0))
-                    add("vae", nodeRef("4", 2))
+                    add("vae", vaeRef)
                 }))
                 add("9", comfyNode("SaveImage", JsonObject().apply {
-                    addProperty("filename_prefix", if (usePonyClipSkip2) "JarvisPony" else "JarvisStudio")
+                    addProperty("filename_prefix", when {
+                        isGguf -> "JarvisGguf"
+                        effectivePony -> "JarvisPony"
+                        else -> "JarvisStudio"
+                    })
                     add("images", nodeRef("8", 0))
                 }))
             }
@@ -1595,6 +1895,7 @@ class JarvisMediaGenerator(
             seed: Int = 42,
             customModel: String = "",
             includeModels: Boolean = true,
+            uncensoredMode: Boolean = false,
         ): String {
             val safeW = ((width.coerceIn(384, 768) + 32) / 64) * 64
             val safeH = ((height.coerceIn(384, 768) + 32) / 64) * 64
@@ -1615,7 +1916,7 @@ class JarvisMediaGenerator(
             val root = JsonObject().apply {
                 addProperty("prompt", combinedPrompt)
                 add("params", params)
-                addProperty("nsfw", false)
+                addProperty("nsfw", uncensoredMode)
                 addProperty("censor_nsfw", false)
                 addProperty("r2", true)
                 addProperty("shared", false)

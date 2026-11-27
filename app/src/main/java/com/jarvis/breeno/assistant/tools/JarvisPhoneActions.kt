@@ -44,20 +44,40 @@ sealed interface PhoneActionIntent {
 object JarvisPhoneActions {
     private val RU_LOCALE = Locale("ru", "RU")
 
+    // Russian Sherpa-ONNX ASR often transcribes "Джарвис" as "джервис", "жарюс", "жарвис", etc.
+    private val WAKE_WORD_TOKEN = """(?:джарвис|джервис|жарвис|жарюс|жарис|джарвес|джарвиз|чарвис|jarvis)"""
+    private val WAKE_WORD_PREFIX_REGEX = Regex(
+        """^(?:(?:эй|слушай|окей|ок|ал[её]|привет)[,\s]+)*$WAKE_WORD_TOKEN(?:[,\s!:.;?]+|$)""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val WAKE_WORD_ONLY_REGEX = Regex(
+        """^(?:(?:эй|слушай|окей|ок|ал[её])[,\s]+)*$WAKE_WORD_TOKEN[,\s!:.;?]*$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val STOP_LISTENING_REGEX = Regex(
+        """^(?:стоп|хватит|отбой|замолчи|выключи\s+микрофон|отключи\s+микрофон|не\s+слушай|пока|до\s+свидания)[,\s!.?]*$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val STANDALONE_TURN_OFF_REGEX = Regex(
+        """^(?:выключи|выключить|погаси|погасить|отключи|отключить|выруби|вырубить|убери)[,\s!.?]*(?:его|свет)?[,\s!.?]*$""",
+        RegexOption.IGNORE_CASE,
+    )
+
     private val TIMER_REGEX = Regex(
-        """^(?:(?:джарвис|пожалуйста|поставь|установи|заведи|засеки|включи)[,\s]+)*(?:таймер|обратный\s+отсч[её]т)\s*(?:на\s*)?(.+)$""",
+        """^(?:(?:пожалуйста|поставь|установи|заведи|засеки|включи)[,\s]+)*(?:таймер|обратный\s+отсч[её]т)\s*(?:на\s*)?(.+)$""",
         RegexOption.IGNORE_CASE,
     )
     private val HOUR_PART = Regex("""(\d+)\s*(?:ч(?:ас(?:а|ов)?)?|h)\b""", RegexOption.IGNORE_CASE)
     private val MIN_PART = Regex("""(\d+)\s*(?:мин(?:ут[ауы]?)?|m)\b""", RegexOption.IGNORE_CASE)
     private val SEC_PART = Regex("""(\d+)\s*(?:сек(?:унд[ауы]?)?|s)\b""", RegexOption.IGNORE_CASE)
 
+    private val DAY_QUALIFIER = """(?:(?:на\s+)?(?:завтра|сегодня|послезавтра|утром|вечером|дн[её]м|ночью)\s+)*"""
     private val ALARM_REGEX = Regex(
-        """^(?:(?:джарвис|пожалуйста|поставь|установи|заведи)[,\s]+)*(?:будильник(?:\s+на)?|разбуди(?:\s+меня)?(?:\s+в)?)\s*(\d{1,2})\s*[:.\sч]\s*(\d{2})(?:\s+(.+))?$""",
+        """^(?:(?:пожалуйста|можешь|мне|поставь|установи|заведи|включи)[,\s]+)*(?:будильник|разбуди(?:\s+меня)?)\s+${DAY_QUALIFIER}(?:(?:на|в)\s+)?(\d{1,2})\s*[:.\sч-]\s*(\d{2})(?:\s*(?:мин(?:ут[ауы]?)?)?)(?:\s+(утра|вечера|ночи|дня))?(?:\s+(.+))?$""",
         RegexOption.IGNORE_CASE,
     )
     private val ALARM_HOUR_ONLY_REGEX = Regex(
-        """^(?:(?:джарвис|пожалуйста|поставь|установи|заведи)[,\s]+)*(?:будильник(?:\s+на)?|разбуди(?:\s+меня)?(?:\s+в)?)\s*(\d{1,2})\s*(?:час(?:а|ов)?|утра|вечера)?(?:\s+(.+))?$""",
+        """^(?:(?:пожалуйста|можешь|мне|поставь|установи|заведи|включи)[,\s]+)*(?:будильник|разбуди(?:\s+меня)?)\s+${DAY_QUALIFIER}(?:(?:на|в)\s+)?(\d{1,2})\s*(?:час(?:а|ов)?\s*)?(утра|вечера|ночи|дня)?(?:\s+(.+))?$""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -68,8 +88,27 @@ object JarvisPhoneActions {
         RegexOption.IGNORE_CASE,
     )
 
+    fun isOnlyWakeWord(rawText: String): Boolean = WAKE_WORD_ONLY_REGEX.matches(rawText.trim())
+
+    fun stripWakeWordPrefix(rawText: String): String {
+        val trimmed = rawText.trim()
+        if (trimmed.isEmpty()) return ""
+        val stripped = WAKE_WORD_PREFIX_REGEX.replaceFirst(trimmed, "").trim()
+        return stripped.ifEmpty { trimmed }
+    }
+
+    fun isStopListeningCommand(rawText: String): Boolean {
+        val stripped = stripWakeWordPrefix(rawText)
+        return STOP_LISTENING_REGEX.matches(stripped)
+    }
+
+    fun isStandaloneTurnOffCommand(rawText: String): Boolean {
+        val stripped = stripWakeWordPrefix(rawText)
+        return STANDALONE_TURN_OFF_REGEX.matches(stripped)
+    }
+
     fun parseCommand(rawText: String): PhoneActionIntent? {
-        val clean = rawText.trim()
+        val clean = stripWakeWordPrefix(rawText)
         if (clean.isEmpty()) return null
         val lower = clean.lowercase(RU_LOCALE)
 
@@ -108,17 +147,22 @@ object JarvisPhoneActions {
         }
 
         // 3. Alarm
+        val defaultAlarmLabel = if (lower.contains("завтра")) "Будильник на завтра" else "Будильник Jarvis Ai"
         ALARM_REGEX.find(clean)?.let { m ->
-            val hour = m.groupValues[1].toIntOrNull()
+            val rawHour = m.groupValues[1].toIntOrNull()
             val minute = m.groupValues[2].toIntOrNull()
-            val label = m.groupValues[3].trim().ifBlank { "Будильник Jarvis Ai" }
+            val period = m.groupValues[3].lowercase(RU_LOCALE)
+            val label = m.groupValues[4].trim().ifBlank { defaultAlarmLabel }
+            val hour = adjustHourForPeriod(rawHour, period, lower)
             if (hour != null && minute != null && hour in 0..23 && minute in 0..59) {
                 return PhoneActionIntent.SetAlarm(hour, minute, label.take(60))
             }
         }
         ALARM_HOUR_ONLY_REGEX.find(clean)?.let { m ->
-            val hour = m.groupValues[1].toIntOrNull()
-            val label = m.groupValues[2].trim().ifBlank { "Будильник Jarvis Ai" }
+            val rawHour = m.groupValues[1].toIntOrNull()
+            val period = m.groupValues[2].lowercase(RU_LOCALE)
+            val label = m.groupValues[3].trim().ifBlank { defaultAlarmLabel }
+            val hour = adjustHourForPeriod(rawHour, period, lower)
             if (hour != null && hour in 0..23) {
                 return PhoneActionIntent.SetAlarm(hour, 0, label.take(60))
             }
@@ -179,6 +223,17 @@ object JarvisPhoneActions {
         }
 
         return null
+    }
+
+    private fun adjustHourForPeriod(rawHour: Int?, period: String, fullLower: String): Int? {
+        if (rawHour == null) return null
+        val isEvening = period == "вечера" || fullLower.contains("вечером")
+        val isDay = period == "дня" || fullLower.contains("днём") || fullLower.contains("днем")
+        return when {
+            isEvening && rawHour in 1..11 -> rawHour + 12
+            isDay && rawHour in 1..5 -> rawHour + 12
+            else -> rawHour
+        }
     }
 
     fun validateSafeHttpUrl(raw: String): String? {

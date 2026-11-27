@@ -60,9 +60,10 @@ class PiperTtsEngine {
 
     @Synchronized
     fun synthesize(text: String, speakerId: Int = 0, speed: Float = 1.0f): FloatArray {
-        require(text.isNotBlank()) { "TTS text must not be blank" }
+        val prepared = ensureTerminalPunctuation(text)
+        require(prepared.isNotBlank()) { "TTS text must not be blank" }
         val engine = tts ?: error("TTS engine is not loaded")
-        return engine.generate(text = text, sid = speakerId, speed = speed.coerceIn(0.65f, 1.25f)).samples
+        return engine.generate(text = prepared, sid = speakerId, speed = speed.coerceIn(0.65f, 1.25f)).samples
     }
 
     @Synchronized
@@ -115,6 +116,21 @@ class PiperTtsEngine {
             .replace(Regex("""\[(.*?)]\([^)]*\)"""), "$1")
             .replace(Regex("""[ \t]+"""), " ")
             .trim()
+
+        /**
+         * Ensures Piper VITS receives terminal punctuation so it completes the final
+         * Russian syllable cleanly instead of clipping trailing consonants/vowels.
+         */
+        fun ensureTerminalPunctuation(text: String): String {
+            val cleaned = cleanForSpeech(text)
+            if (cleaned.isEmpty()) return ""
+            val last = cleaned.last()
+            return if (last == '.' || last == '!' || last == '?' || last == '…') {
+                cleaned
+            } else {
+                "$cleaned."
+            }
+        }
 
         /**
          * Strips markdown formatting and splits Russian response text into

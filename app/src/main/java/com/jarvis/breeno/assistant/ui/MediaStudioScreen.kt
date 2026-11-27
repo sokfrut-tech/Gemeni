@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.jarvis.breeno.assistant.media.ComfyAutoWireResult
 import com.jarvis.breeno.assistant.media.GeneratedMediaItem
 import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
@@ -82,6 +83,7 @@ fun MediaStudioScreen(
     onOpenItem: (GeneratedMediaItem) -> Unit,
     onDeleteItem: (String) -> Unit,
     onSaveConfig: (MediaGenConfig) -> Unit,
+    onAutoDiscoverComfy: (suspend (rawUrl: String, apiKey: String) -> Result<ComfyAutoWireResult>)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -103,6 +105,11 @@ fun MediaStudioScreen(
     var cfgSteps by remember(initialConfig) { mutableStateOf(initialConfig.steps.toString()) }
     var cfgScale by remember(initialConfig) { mutableStateOf(initialConfig.cfgScale.toString()) }
     var cfgCheckpoint by remember(initialConfig) { mutableStateOf(initialConfig.checkpointName) }
+    var cfgComfyVae by remember(initialConfig) { mutableStateOf(initialConfig.comfyVaeName) }
+    var cfgComfyClip1 by remember(initialConfig) { mutableStateOf(initialConfig.comfyClip1Name) }
+    var cfgComfyClip2 by remember(initialConfig) { mutableStateOf(initialConfig.comfyClip2Name) }
+    var cfgUncensored by remember(initialConfig) { mutableStateOf(initialConfig.uncensoredMode) }
+    var autoWireStatus by remember { mutableStateOf<String?>(null) }
     var cfgPonyClipSkip2 by remember(initialConfig) { mutableStateOf(initialConfig.comfyPonyClipSkip2) }
     var cfgWanEnabled by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanI2vEnabled) }
     var cfgWanHigh by remember(initialConfig) { mutableStateOf(initialConfig.comfyWanHighNoiseModel) }
@@ -370,10 +377,95 @@ fun MediaStudioScreen(
                             OutlinedTextField(
                                 value = cfgCheckpoint,
                                 onValueChange = { cfgCheckpoint = it },
-                                label = { Text("Чекпоинт .safetensors (Pony V18 / пусто = авто)") },
+                                label = { Text("Модель .gguf или .safetensors (пусто = авто)") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                JarvisOutlinedButton(
+                                    onClick = {
+                                        val wired = JarvisMediaGenerator.autoConfigureComfyModel(
+                                            cfgCheckpoint.ifBlank { "flux1-dev-Q4_K_S.gguf" }
+                                        )
+                                        cfgCheckpoint = wired.modelName
+                                        cfgComfyVae = wired.vaeName
+                                        cfgComfyClip1 = wired.clip1Name
+                                        cfgComfyClip2 = wired.clip2Name
+                                        cfgSteps = wired.steps.toString()
+                                        cfgScale = wired.cfgScale.toString()
+                                        cfgPonyClipSkip2 = wired.usePonyClipSkip2
+                                        cfgNegPrompt = wired.negativePrompt
+                                        autoWireStatus = wired.summaryRu
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text("Автосвязка GGUF+VAE", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                if (onAutoDiscoverComfy != null) {
+                                    JarvisOutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                autoWireStatus = "Опрашиваю ComfyUI…"
+                                                onAutoDiscoverComfy(cfgImgUrl, cfgKey).fold(
+                                                    onSuccess = { wired ->
+                                                        cfgCheckpoint = wired.modelName
+                                                        cfgComfyVae = wired.vaeName
+                                                        cfgComfyClip1 = wired.clip1Name
+                                                        cfgComfyClip2 = wired.clip2Name
+                                                        cfgSteps = wired.steps.toString()
+                                                        cfgScale = wired.cfgScale.toString()
+                                                        cfgPonyClipSkip2 = wired.usePonyClipSkip2
+                                                        cfgNegPrompt = wired.negativePrompt
+                                                        autoWireStatus = wired.summaryRu
+                                                    },
+                                                    onFailure = { err ->
+                                                        autoWireStatus = "Ошибка: ${err.message ?: err.javaClass.simpleName}"
+                                                    },
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Text("С сервера ComfyUI", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
+                            if (!autoWireStatus.isNullOrBlank()) {
+                                Text(
+                                    text = autoWireStatus!!,
+                                    color = Color(0xFF34D399),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                            OutlinedTextField(
+                                value = cfgComfyVae,
+                                onValueChange = { cfgComfyVae = it },
+                                label = { Text("VAE (напр. ae.safetensors / sdxl_vae.safetensors)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                OutlinedTextField(
+                                    value = cfgComfyClip1,
+                                    onValueChange = { cfgComfyClip1 = it },
+                                    label = { Text("CLIP 1 (clip_l)") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                OutlinedTextField(
+                                    value = cfgComfyClip2,
+                                    onValueChange = { cfgComfyClip2 = it },
+                                    label = { Text("CLIP 2 (t5xxl / clip_g)") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                             if (cfgWanEnabled) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -490,6 +582,11 @@ fun MediaStudioScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                        FilterChip(
+                            selected = cfgUncensored,
+                            onClick = { cfgUncensored = !cfgUncensored },
+                            label = { Text("Без цензуры (18+ / локальные модели)") },
+                        )
                         JarvisButton(
                             onClick = {
                                 onSaveConfig(
@@ -503,6 +600,10 @@ fun MediaStudioScreen(
                                         steps = cfgSteps.toIntOrNull()?.coerceIn(1, 100) ?: 24,
                                         cfgScale = cfgScale.replace(',', '.').toFloatOrNull()?.coerceIn(1f, 30f) ?: 7.0f,
                                         checkpointName = cfgCheckpoint,
+                                        comfyVaeName = cfgComfyVae,
+                                        comfyClip1Name = cfgComfyClip1,
+                                        comfyClip2Name = cfgComfyClip2,
+                                        uncensoredMode = cfgUncensored,
                                         comfyPonyClipSkip2 = cfgPonyClipSkip2,
                                         comfyWanI2vEnabled = cfgWanEnabled,
                                         comfyWanHighNoiseModel = cfgWanHigh,

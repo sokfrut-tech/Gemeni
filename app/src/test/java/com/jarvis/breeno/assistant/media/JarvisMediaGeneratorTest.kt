@@ -345,4 +345,47 @@ class JarvisMediaGeneratorTest {
             )
         )
     }
+
+    @Test
+    fun autoConfiguresComfyGgufVaeClipAndUncensoredHorde() {
+        val fluxWire = JarvisMediaGenerator.autoConfigureComfyModel(
+            modelName = "flux1-dev-Q4_K_S.gguf",
+            availableVaes = listOf("sdxl_vae.safetensors", "ae.safetensors"),
+            availableClips = listOf("clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors"),
+        )
+        assertEquals("FLUX_GGUF", fluxWire.architecture)
+        assertEquals("ae.safetensors", fluxWire.vaeName)
+        assertEquals("clip_l.safetensors", fluxWire.clip1Name)
+        assertEquals("t5xxl_fp8_e4m3fn.safetensors", fluxWire.clip2Name)
+        assertEquals(1.0f, fluxWire.cfgScale)
+        assertFalse(fluxWire.usePonyClipSkip2)
+
+        val ggufWorkflow = JarvisMediaGenerator.buildComfyUiWorkflowJson(
+            prompt = "cyberpunk samurai",
+            negativePrompt = "",
+            style = "Фото",
+            width = 1024,
+            height = 1024,
+            steps = fluxWire.steps,
+            cfgScale = fluxWire.cfgScale,
+            seed = 77,
+            checkpointName = fluxWire.modelName,
+            usePonyClipSkip2 = fluxWire.usePonyClipSkip2,
+            vaeName = fluxWire.vaeName,
+            clip1Name = fluxWire.clip1Name,
+            clip2Name = fluxWire.clip2Name,
+        )
+        assertTrue(ggufWorkflow.contains("\"class_type\":\"UnetLoaderGGUF\""))
+        assertTrue(ggufWorkflow.contains("\"unet_name\":\"flux1-dev-Q4_K_S.gguf\""))
+        assertTrue(ggufWorkflow.contains("\"class_type\":\"VAELoader\""))
+        assertTrue(ggufWorkflow.contains("\"vae_name\":\"ae.safetensors\""))
+        assertTrue(ggufWorkflow.contains("\"class_type\":\"DualCLIPLoader\""))
+
+        val uncensoredHorde = JarvisMediaGenerator.buildAiHordeRequestJson(
+            prompt = "artistic portrait",
+            uncensoredMode = true,
+        )
+        assertTrue(uncensoredHorde.contains("\"nsfw\":true"))
+        assertTrue(uncensoredHorde.contains("\"censor_nsfw\":false"))
+    }
 }

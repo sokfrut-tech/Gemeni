@@ -70,6 +70,7 @@ import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -434,7 +435,7 @@ class MainActivity : ComponentActivity() {
         var busy by remember { mutableStateOf(false) }
         var speaking by remember { mutableStateOf(false) }
         var muted by remember { mutableStateOf(runtime.isMuted()) }
-        var continuousDialogue by remember { mutableStateOf(false) }
+        var continuousDialogue by remember { mutableStateOf(runtime.isContinuousDialogueEnabled()) }
         var showModelConsent by remember { mutableStateOf(false) }
         var streamingReply by remember { mutableStateOf<String?>(null) }
         var status by remember { mutableStateOf("ОЖИДАЮ КОМАНДУ") }
@@ -499,7 +500,16 @@ class MainActivity : ComponentActivity() {
             }
             runtime.onSpeakingFinished = {
                 if (autoResumeCheck?.invoke() == true && runtime.isRussianAsrReady()) {
-                    runOnUiThread { requestAndListen() }
+                    lifecycleScope.launch {
+                        listeningJob?.join()
+                        delay(260L)
+                        if (autoResumeCheck?.invoke() == true &&
+                            listeningJob == null &&
+                            modelCheckJob == null
+                        ) {
+                            requestAndListen()
+                        }
+                    }
                 }
             }
             runtime.onRequestMediaGeneration = { type, prompt ->
@@ -548,6 +558,9 @@ class MainActivity : ComponentActivity() {
                         value.startsWith("Запомнил:") ||
                         value.startsWith("Документ ") ||
                         value.startsWith("Фонарик ") ||
+                        value.startsWith("Да, слушаю") ||
+                        value.startsWith("Микрофон отключ") ||
+                        value.startsWith("Хорошо, отключаю") ||
                         value.startsWith("Результат:") ||
                         value.startsWith("Память на паузе") ||
                         value.startsWith("Обнаружен ") ||
@@ -673,7 +686,10 @@ class MainActivity : ComponentActivity() {
                             muted = !muted
                             runtime.setMuted(muted)
                         },
-                        onToggleContinuous = { continuousDialogue = !continuousDialogue },
+                        onToggleContinuous = {
+                            continuousDialogue = !continuousDialogue
+                            runtime.setContinuousDialogueEnabled(continuousDialogue)
+                        },
                         onOpenModels = { navigateTo(JarvisSection.MODELS) },
                         onOpenSettings = { navigateTo(JarvisSection.SETTINGS) },
                         onAttachDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
@@ -692,7 +708,10 @@ class MainActivity : ComponentActivity() {
                         mcpCount = mcpServers.size,
                         cacheBytes = runtime.calculateAppCacheBytes(),
                         onBack = { navigateTo(JarvisSection.HOME) },
-                        onToggleContinuous = { continuousDialogue = it },
+                        onToggleContinuous = {
+                            continuousDialogue = it
+                            runtime.setContinuousDialogueEnabled(it)
+                        },
                         onToggleMuted = { enable ->
                             muted = enable
                             runtime.setMuted(enable)
@@ -785,6 +804,7 @@ class MainActivity : ComponentActivity() {
                                     onOpenItem = { item -> openGeneratedMedia(item) },
                                     onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
                                     onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
+                                    onAutoDiscoverComfy = { url, key -> mediaGenerator.autoDiscoverComfyModels(url, key) },
                                     modifier = Modifier.weight(1f),
                                 )
 

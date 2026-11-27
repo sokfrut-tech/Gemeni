@@ -104,6 +104,7 @@ class JarvisRuntimeController(context: Context) {
     val mcpServerStore = McpServerStore(appContext)
     val appearanceStore = JarvisAppearanceStore(appContext)
     private val webPrefs = appContext.getSharedPreferences("jarvis_web_tools", Context.MODE_PRIVATE)
+    private val voicePrefs = appContext.getSharedPreferences("jarvis_voice_prefs", Context.MODE_PRIVATE)
     private val phoneActionExecutor = JarvisPhoneActionExecutor(appContext)
     private val signalsSource = AndroidRuntimeSignalsSource(appContext)
 
@@ -169,6 +170,8 @@ class JarvisRuntimeController(context: Context) {
     @Volatile private var vadLoaded = false
     @Volatile private var lastSpeakingState = false
     @Volatile private var userCancelledSpeech = false
+    @Volatile private var lastTorchEnabled = false
+    @Volatile private var lastTurnWasVoice = false
 
     var onAudioLevelChanged: ((Float) -> Unit)? = null
     var onOrbModeChanged: ((JarvisOrbMode) -> Unit)? = null
@@ -275,6 +278,14 @@ class JarvisRuntimeController(context: Context) {
             "Голос: ${status.speakerLabel} • Мозг: $llmState."
     }
 
+    fun isContinuousDialogueEnabled(): Boolean = voicePrefs.getBoolean("continuous_dialogue_enabled", true)
+
+    fun setContinuousDialogueEnabled(enabled: Boolean) {
+        voicePrefs.edit().putBoolean("continuous_dialogue_enabled", enabled).apply()
+    }
+
+    fun wasLastTurnVoice(): Boolean = lastTurnWasVoice
+
     fun setMuted(muted: Boolean) {
         speaker.isMuted = muted
         if (muted) speaker.stop()
@@ -288,7 +299,7 @@ class JarvisRuntimeController(context: Context) {
             lastSpeakingState = speaking
             onOrbModeChanged?.invoke(if (speaking) JarvisOrbMode.SPEAKING else JarvisOrbMode.IDLE)
             listener?.invoke(speaking)
-            if (finishedNormally) {
+            if (finishedNormally && lastTurnWasVoice) {
                 onSpeakingFinished?.invoke()
             }
         }
@@ -621,7 +632,7 @@ class JarvisRuntimeController(context: Context) {
             return ""
         }
 
-        handleUserMessage(text, onProgress = onProgress, onTokenStream = onTokenStream)
+        handleUserMessage(text, onProgress = onProgress, onTokenStream = onTokenStream, fromVoice = true)
         return text
     }
 
@@ -633,7 +644,7 @@ class JarvisRuntimeController(context: Context) {
         val clean = rawText.trim()
         if (clean.isEmpty()) return ""
         speaker.stop()
-        return handleUserMessage(clean, onProgress = onProgress, onTokenStream = onTokenStream)
+        return handleUserMessage(clean, onProgress = onProgress, onTokenStream = onTokenStream, fromVoice = false)
     }
 
     suspend fun handleUserMessage(
@@ -641,8 +652,11 @@ class JarvisRuntimeController(context: Context) {
         onProgress: (String) -> Unit,
         onTokenStream: (String) -> Unit = {},
         recordUserMessage: Boolean = true,
+        fromVoice: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         userCancelledSpeech = false
+        lastTurnWasVoice = fromVoice
+        val commandText = JarvisPhoneActions.stripWakeWordPrefix(text)
 
         fun persistTurn(assistantText: String, providerTag: String) {
             if (recordUserMessage) {
@@ -651,8 +665,38 @@ class JarvisRuntimeController(context: Context) {
             memory.saveMessage("assistant", assistantText, providerTag, _activeSessionId.value)
         }
 
+        // 0. Hands-free stop command ("стоп", "хватит", "отбой", "пока")
+        if (fromVoice && JarvisPhoneActions.isStopListeningCommand(text)) {
+            userCancelledSpeech = true
+            val bye = "Хорошо, отключаю микрофон."
+            onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            persistTurn(bye, "deterministic")
+            refreshWorkspaceState()
+            onTokenStream(bye)
+            onCommandCompleted?.invoke(text, bye)
+            speaker.speak(bye)
+            onProgress("Микрофон отключён")
+            return@withContext bye
+        }
+
+        // 0.5. Standalone wake word ("Джарвис", "жарюс", "джервис") -> instant deterministic reply, no LLM hallucination
+        if (JarvisPhoneActions.isOnlyWakeWord(text)) {
+            val ack = "Да, слушаю вас."
+            onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
+            persistTurn(ack, "deterministic")
+            refreshWorkspaceState()
+            onTokenStream(ack)
+            onCommandCompleted?.invoke(text, ack)
+            if (!speaker.speak(ack)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                if (fromVoice) onSpeakingFinished?.invoke()
+            }
+            onProgress(ack)
+            return@withContext ack
+        }
+
         // 1. Offline Unit Converter & Instant Deterministic Commands (time, date, memory, status, tabs, media gen, safe phone actions)
-        JarvisWebTools.convertUnitsOffline(text)?.let { converted ->
+        JarvisWebTools.convertUnitsOffline(commandText)?.let { converted ->
             onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
             persistTurn(converted, "deterministic")
             refreshWorkspaceState()
@@ -660,18 +704,19 @@ class JarvisRuntimeController(context: Context) {
             onCommandCompleted?.invoke(text, converted)
             if (!speaker.speak(converted)) {
                 onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                if (fromVoice) onSpeakingFinished?.invoke()
             }
             onProgress(converted)
             return@withContext converted
         }
 
         val webEnrichedContext = if (_webToolsEnabled.value) {
-            fetchWebContextIfRequested(text, onProgress)
+            fetchWebContextIfRequested(commandText, onProgress)
         } else {
             null
         }
 
-        val deterministic = if (webEnrichedContext == null) tryDeterministicCommand(text) else null
+        val deterministic = if (webEnrichedContext == null) tryDeterministicCommand(commandText) else null
         if (deterministic != null) {
             onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
             persistTurn(deterministic, "deterministic")
@@ -680,6 +725,7 @@ class JarvisRuntimeController(context: Context) {
             onCommandCompleted?.invoke(text, deterministic)
             if (!speaker.speak(deterministic)) {
                 onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                if (fromVoice) onSpeakingFinished?.invoke()
             }
             onProgress(deterministic)
             return@withContext deterministic
@@ -752,7 +798,7 @@ class JarvisRuntimeController(context: Context) {
             _generationWarning.value = warning
         }
 
-        val effectiveUserText = webEnrichedContext?.promptWithContext ?: text
+        val effectiveUserText = webEnrichedContext?.promptWithContext ?: commandText
         val turn = KernelTurn(
             taskId = "turn-${System.currentTimeMillis()}",
             userText = effectiveUserText,
@@ -798,14 +844,22 @@ class JarvisRuntimeController(context: Context) {
             onTokenStream(result.answer)
             onCommandCompleted?.invoke(text, result.answer)
             if (streamSessionId != null && speechChunker != null) {
-                if (streamedSentences > 0 && result.answer.startsWith(streamedRawPrefix)) {
-                    val tail = result.answer.substring(streamedRawPrefix.length)
-                    for (sentence in speechChunker.append(tail) + speechChunker.flush()) {
-                        if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
-                            streamedSentences++
+                if (streamedSentences > 0) {
+                    if (result.answer.startsWith(streamedRawPrefix)) {
+                        val tail = result.answer.substring(streamedRawPrefix.length)
+                        for (sentence in speechChunker.append(tail) + speechChunker.flush()) {
+                            if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
+                                streamedSentences++
+                            }
+                        }
+                    } else {
+                        for (sentence in speechChunker.flush()) {
+                            if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
+                                streamedSentences++
+                            }
                         }
                     }
-                } else if (streamedSentences == 0) {
+                } else {
                     for (sentence in PiperTtsEngine.splitForTts(result.answer)) {
                         if (speaker.enqueueStreamingSentence(streamSessionId, sentence)) {
                             streamedSentences++
@@ -815,9 +869,11 @@ class JarvisRuntimeController(context: Context) {
                 speaker.finishStreamingSession(streamSessionId)
                 if (streamedSentences == 0) {
                     onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                    if (fromVoice) onSpeakingFinished?.invoke()
                 }
             } else if (!speaker.speak(result.answer)) {
                 onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+                if (fromVoice) onSpeakingFinished?.invoke()
             }
             onProgress("Ответ готов (${result.modelId})")
             result.answer
@@ -895,9 +951,9 @@ class JarvisRuntimeController(context: Context) {
             return deviceDiagnosticsText()
         }
 
-        // Image & Video Generation Studio Voice Triggers
+        // Image & Video Generation Studio Voice Triggers (supports wake-word-stripped commands)
         val drawMatch = Regex(
-            """^(?:(?:джарвис|пожалуйста|можешь|сделай|мне)[,\s]*)*(?:нарисуй|нарисовать|сгенерируй картинку|сгенерируй изображение|создай картинку|создай изображение|сделай картинку)\s+(.+)$""",
+            """^(?:(?:пожалуйста|можешь|сделай|мне|давай)[,\s]*)*(?:нарисуй|нарисовать|сгенерируй\s+(?:картинку|изображение|фото|арт)|создай\s+(?:картинку|изображение|фото|арт)|сделай\s+(?:картинку|фото|арт))\s+(.+)$""",
             RegexOption.IGNORE_CASE,
         ).find(text.trim())
         if (drawMatch != null) {
@@ -909,7 +965,7 @@ class JarvisRuntimeController(context: Context) {
         }
 
         val videoMatch = Regex(
-            """^(?:(?:джарвис|пожалуйста|можешь)[,\s]*)*(?:создай видео|сгенерируй видео|сделай видео|сними видео)\s+(.+)$""",
+            """^(?:(?:пожалуйста|можешь|давай)[,\s]*)*(?:создай\s+видео|сгенерируй\s+видео|сделай\s+видео|сними\s+видео)\s+(.+)$""",
             RegexOption.IGNORE_CASE,
         ).find(text.trim())
         if (videoMatch != null) {
@@ -956,10 +1012,26 @@ class JarvisRuntimeController(context: Context) {
             return "Открываю настройки Jarvis Ai."
         }
 
+        // Contextual "выключить" right after turning flashlight ON
+        if (lastTorchEnabled && JarvisPhoneActions.isStandaloneTurnOffCommand(text)) {
+            return phoneActionExecutor.execute(PhoneActionIntent.ToggleFlashlight(enabled = false)).fold(
+                onSuccess = { message ->
+                    lastTorchEnabled = false
+                    message
+                },
+                onFailure = { err -> "Не удалось выключить фонарик: ${err.message ?: err.javaClass.simpleName}" },
+            )
+        }
+
         // Safe Deterministic Phone Actions (Timer, Alarm, Torch, System Settings, Calculator, Safe URL, Share)
         JarvisPhoneActions.parseCommand(text)?.let { phoneAction ->
             return phoneActionExecutor.execute(phoneAction).fold(
-                onSuccess = { message -> message },
+                onSuccess = { message ->
+                    if (phoneAction is PhoneActionIntent.ToggleFlashlight) {
+                        lastTorchEnabled = phoneAction.enabled
+                    }
+                    message
+                },
                 onFailure = { err -> "Не удалось выполнить действие: ${err.message ?: err.javaClass.simpleName}" },
             )
         }

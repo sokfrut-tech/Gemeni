@@ -172,13 +172,14 @@ class JarvisSpeaker(
         var track: AudioTrack? = null
         var startedPlayback = false
         var completedNormally = false
+        var totalWrittenFrames = 0L
 
         try {
             piperEngine.load(modelDir)
             val sampleRate = piperEngine.sampleRate()
             val speed = speechSpeedProvider().coerceIn(0.65f, 1.25f)
             val sliceSamples = (sampleRate / 10).coerceAtLeast(1600)
-            val interChunkSilence = ShortArray((sampleRate * 0.20f).toInt())
+            val interChunkSilence = ShortArray((sampleRate * 0.22f).toInt())
 
             while (true) {
                 val chunk = nextChunk() ?: break
@@ -222,7 +223,8 @@ class JarvisSpeaker(
                     onSpeakingChanged?.invoke(true)
                 } else {
                     currentCoroutineContext().ensureActive()
-                    track?.write(interChunkSilence, 0, interChunkSilence.size, AudioTrack.WRITE_BLOCKING)
+                    val writtenSilence = track?.write(interChunkSilence, 0, interChunkSilence.size, AudioTrack.WRITE_BLOCKING) ?: 0
+                    if (writtenSilence > 0) totalWrittenFrames += writtenSilence
                 }
 
                 val activeOut = track ?: break
@@ -235,15 +237,32 @@ class JarvisSpeaker(
                     val count = minOf(sliceSamples, pcm16.size - offset)
                     val written = activeOut.write(pcm16, offset, count, AudioTrack.WRITE_BLOCKING)
                     if (written < 0) break
+                    totalWrittenFrames += written
                     offset += written
                 }
             }
 
             if (startedPlayback && currentCoroutineContext().isActive) {
-                val tailSilence = ShortArray((sampleRate * 0.25f).toInt())
-                track?.write(tailSilence, 0, tailSilence.size, AudioTrack.WRITE_BLOCKING)
-                track?.stop()
-                delay(250)
+                val activeOut = track
+                val tailSilence = ShortArray((sampleRate * 0.35f).toInt())
+                val writtenTail = activeOut?.write(tailSilence, 0, tailSilence.size, AudioTrack.WRITE_BLOCKING) ?: 0
+                if (writtenTail > 0) totalWrittenFrames += writtenTail
+                activeOut?.stop()
+
+                // Wait until AudioTrack actually plays all buffered frames (buffer holds ~1000 ms on ColorOS/Android)
+                // so trailing Russian syllables are never clipped by premature release().
+                val maxDrainWaitMs = calculateMaxDrainWaitMs(totalWrittenFrames, sampleRate)
+                val drainStartMs = System.currentTimeMillis()
+                while (activeOut != null && currentCoroutineContext().isActive) {
+                    val playedFrames = activeOut.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+                    val elapsedMs = System.currentTimeMillis() - drainStartMs
+                    if (playedFrames >= totalWrittenFrames || elapsedMs >= maxDrainWaitMs) {
+                        break
+                    }
+                    delay(25L)
+                }
+                // Extra hardware HAL output pipeline margin (Bluetooth / ColorOS speaker DSP).
+                delay(180L)
                 currentCoroutineContext().ensureActive()
                 completedNormally = true
             }
@@ -329,5 +348,14 @@ class JarvisSpeaker(
         }
         systemEngine = null
         systemTtsInitialized = false
+    }
+
+    companion object {
+        internal fun calculateMaxDrainWaitMs(totalWrittenFrames: Long, sampleRate: Int): Long {
+            val safeRate = sampleRate.coerceAtLeast(8_000)
+            val audioDurationMs = (totalWrittenFrames * 1000L) / safeRate
+            // Buffer holds ~1.0–1.5s + HAL pipeline; bound max wait so a broken HAL never hangs.
+            return (audioDurationMs + 1_200L).coerceIn(1_500L, 4_500L)
+        }
     }
 }
