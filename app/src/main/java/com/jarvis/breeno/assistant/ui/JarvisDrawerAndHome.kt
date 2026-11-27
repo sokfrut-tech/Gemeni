@@ -102,6 +102,7 @@ import com.jarvis.breeno.assistant.ui.theme.Jarvis3DStageBackground
 import com.jarvis.breeno.assistant.ui.theme.JarvisGlassTile
 import com.jarvis.breeno.assistant.ui.theme.JarvisHoloPedestal
 import com.jarvis.breeno.assistant.ui.theme.JarvisHudChip
+import com.jarvis.breeno.assistant.ui.theme.JarvisMechApertureRing
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
 import com.jarvis.breeno.assistant.ui.theme.jarvisTileShape
@@ -769,18 +770,26 @@ fun JarvisHomeScreen(
                                 ),
                                 contentAlignment = Alignment.Center,
                             ) {
+                                if (palette.useMechArmor) {
+                                    JarvisMechApertureRing(
+                                        ringSize = orbSize + 22.dp,
+                                        accent = if (listening) palette.primaryAccent else if (speaking) palette.secondaryAccent else palette.primaryAccent,
+                                    )
+                                }
                                 JarvisInteractiveOrb(
                                     mode = resolvedOrbMode,
                                     audioRms = audioRms,
                                     orbSize = orbSize,
                                 )
                             }
-                            JarvisHoloPedestal(
-                                accent = if (listening) palette.primaryAccent else if (speaking) palette.secondaryAccent else palette.primaryAccent,
-                                modifier = Modifier
-                                    .width(orbSize * 0.92f)
-                                    .height(if (compact) 20.dp else 28.dp),
-                            )
+                            if (!palette.useMechArmor) {
+                                JarvisHoloPedestal(
+                                    accent = if (listening) palette.primaryAccent else if (speaking) palette.secondaryAccent else palette.primaryAccent,
+                                    modifier = Modifier
+                                        .width(orbSize * 0.92f)
+                                        .height(if (compact) 20.dp else 28.dp),
+                                )
+                            }
                         }
 
                         Spacer(Modifier.height(6.dp))
