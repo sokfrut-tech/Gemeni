@@ -32,7 +32,7 @@ object JarvisWebTools {
         "Mozilla/5.0 (Linux; Android 14; OPPO PGEM10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
     private val DDG_BLOCK_REGEX = Regex(
-        """<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>([\s\S]{0,1200}?)""",
+        """<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>""",
         RegexOption.IGNORE_CASE,
     )
     private val DDG_SNIPPET_REGEX = Regex(
@@ -225,13 +225,19 @@ object JarvisWebTools {
     }
 
     fun parseDuckDuckGoHtml(html: String, maxResults: Int = 5): List<WebSearchHit> {
+        val matches = DDG_BLOCK_REGEX.findAll(html).toList()
         val out = mutableListOf<WebSearchHit>()
-        for (match in DDG_BLOCK_REGEX.findAll(html)) {
+        for (i in matches.indices) {
             if (out.size >= maxResults) break
+            val match = matches[i]
             val rawHref = decodeHtmlEntities(match.groupValues[1].trim())
             val resolvedUrl = resolveDdgRedirectUrl(rawHref)
             val title = normalizeWhitespace(decodeHtmlEntities(stripHtmlTags(match.groupValues[2])))
-            val snippet = DDG_SNIPPET_REGEX.find(match.groupValues[3])?.let {
+            val sliceStart = (match.range.last + 1).coerceAtMost(html.length)
+            val nextStart = matches.getOrNull(i + 1)?.range?.first ?: html.length
+            val sliceEnd = minOf(nextStart, sliceStart + 1500).coerceAtLeast(sliceStart)
+            val tail = html.substring(sliceStart, sliceEnd)
+            val snippet = DDG_SNIPPET_REGEX.find(tail)?.let {
                 normalizeWhitespace(decodeHtmlEntities(stripHtmlTags(it.groupValues[1])))
             }.orEmpty()
             if (resolvedUrl.startsWith("http") && title.isNotBlank()) {

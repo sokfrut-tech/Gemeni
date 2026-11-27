@@ -35,12 +35,19 @@ class JarvisWebToolsTest {
               <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fhuggingface.co%2Fdphn%2FDolphin3.0-Qwen2.5-1.5B&amp;rut=1">Dolphin 3.0 &amp; Qwen2.5</a>
               <div class="result__snippet">Открытая модель &laquo;без цензуры&raquo; на <b>Qwen 2.5</b>.</div>
             </div>
+            <div class="result">
+              <a class="result__a" href="https://example.org/soup">Soup Framework</a>
+              <a class="result__snippet">Layer Streaming для 8B на 4 ГБ VRAM.</a>
+            </div>
         """.trimIndent()
         val ddgHits = JarvisWebTools.parseDuckDuckGoHtml(ddgHtml, maxResults = 3)
-        assertEquals(1, ddgHits.size)
+        assertEquals(2, ddgHits.size)
         assertEquals("https://huggingface.co/dphn/Dolphin3.0-Qwen2.5-1.5B", ddgHits[0].url)
         assertEquals("Dolphin 3.0 & Qwen2.5", ddgHits[0].title)
         assertEquals("Открытая модель «без цензуры» на Qwen 2.5.", ddgHits[0].snippet)
+        assertEquals("https://example.org/soup", ddgHits[1].url)
+        assertEquals("Soup Framework", ddgHits[1].title)
+        assertEquals("Layer Streaming для 8B на 4 ГБ VRAM.", ddgHits[1].snippet)
 
         val wikiJson = """["Qwen",["Qwen","Qwen2.5"],["Семейство LLM","Открытые модели"],["https://ru.wikipedia.org/wiki/Qwen","https://ru.wikipedia.org/wiki/Qwen2"]]"""
         val wikiHits = JarvisWebTools.parseWikipediaOpenSearchJson(wikiJson, maxResults = 5)
