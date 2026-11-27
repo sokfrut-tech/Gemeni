@@ -174,9 +174,9 @@ object JarvisChatPromptBuilder {
         sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets, customSystemPrompt))
         sb.append("<|im_end|>\n")
 
-        recentTurns.takeLast(6).forEach { turn ->
+        recentTurns.takeLast(4).forEach { turn ->
             val role = normalizeRole(turn.role)
-            val clean = turn.content.trim()
+            val clean = turn.content.trim().take(360)
             if (clean.isNotEmpty()) {
                 sb.append("<|im_start|>").append(role).append('\n')
                     .append(clean).append("<|im_end|>\n")
@@ -205,9 +205,9 @@ object JarvisChatPromptBuilder {
         sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets, customSystemPrompt))
         sb.append("<|eot_id|>")
 
-        recentTurns.takeLast(6).forEach { turn ->
+        recentTurns.takeLast(4).forEach { turn ->
             val role = normalizeRole(turn.role)
-            val clean = turn.content.trim()
+            val clean = turn.content.trim().take(360)
             if (clean.isNotEmpty()) {
                 sb.append("<|start_header_id|>").append(role).append("<|end_header_id|>\n\n")
                     .append(clean).append("<|eot_id|>")

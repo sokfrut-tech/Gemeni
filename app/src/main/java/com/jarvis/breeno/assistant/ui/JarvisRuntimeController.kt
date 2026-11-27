@@ -259,6 +259,7 @@ class JarvisRuntimeController(context: Context) {
     ): String {
         val lastUserMsg = _dialogueMessages.value.lastOrNull { it.role == "user" }?.content?.trim().orEmpty()
         if (lastUserMsg.isEmpty()) return ""
+        userCancelledSpeech = true
         speaker.stop()
         return handleUserMessage(
             text = lastUserMsg,
@@ -568,6 +569,7 @@ class JarvisRuntimeController(context: Context) {
         onTokenStream: (String) -> Unit = {},
     ): String {
         // Barge-in: immediately interrupt ongoing speech when user activates mic.
+        userCancelledSpeech = true
         speaker.stop()
         llamaProvider.cancelActiveGeneration()
 
@@ -643,7 +645,9 @@ class JarvisRuntimeController(context: Context) {
     ): String {
         val clean = rawText.trim()
         if (clean.isEmpty()) return ""
+        userCancelledSpeech = true
         speaker.stop()
+        llamaProvider.cancelActiveGeneration()
         return handleUserMessage(clean, onProgress = onProgress, onTokenStream = onTokenStream, fromVoice = false)
     }
 

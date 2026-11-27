@@ -299,16 +299,25 @@ class MainActivity : ComponentActivity() {
                     busySink?.invoke(false)
                     replySink?.invoke(null)
                 }
-                listeningJob = null
+                if (listeningJob == coroutineContext[Job]) {
+                    listeningJob = null
+                }
             }
         }
     }
 
     private fun submitTextQuery(query: String) {
         val clean = query.trim()
-        if (clean.isEmpty() || listeningJob != null) return
+        if (clean.isEmpty()) return
+        // Barge-in: if continuous mic or prior turn is active, cancel it cleanly before submitting text.
+        val previousJob = listeningJob
+        if (previousJob != null) {
+            previousJob.cancel()
+            runtime.cancelActiveWork()
+        }
         listeningJob = lifecycleScope.launch {
             try {
+                previousJob?.join()
                 orbModeSink?.invoke(JarvisOrbMode.THINKING)
                 busySink?.invoke(true)
                 replySink?.invoke("Думаю над: «$clean»…")
@@ -329,7 +338,9 @@ class MainActivity : ComponentActivity() {
                     busySink?.invoke(false)
                     replySink?.invoke(null)
                 }
-                listeningJob = null
+                if (listeningJob == coroutineContext[Job]) {
+                    listeningJob = null
+                }
             }
         }
     }

@@ -67,10 +67,16 @@ class LlamaCppReasoningProvider(
         val verifiedFile = modelManager.verifyBeforeLoad(pack)
         val genSettings = modelManager.generationSettings()
         val isLarge8B = pack.sizeBytes >= 3_500_000_000L
-        val maxSafeCtx = if (isLarge8B) 1536 else 4096
+        val isMedium3B = pack.sizeBytes >= 1_500_000_000L
+        val maxSafeCtx = when {
+            isLarge8B -> 1536
+            isMedium3B -> 2048
+            else -> 3072
+        }
         val requestedCtx = minOf(genSettings.contextLength, maxSafeCtx).coerceAtLeast(512)
-        val maxThreads = if (isLarge8B) 4 else 6
-        val requestedThreads = minOf(genSettings.cpuThreads, Runtime.getRuntime().availableProcessors()).coerceIn(2, maxThreads)
+        // Cap at 4 threads on Android big.LITTLE CPUs (Snapdragon performance cores) to prevent
+        // efficiency-core thread-barrier stalls on Turn 2+ prefills.
+        val requestedThreads = minOf(genSettings.cpuThreads, Runtime.getRuntime().availableProcessors()).coerceIn(2, 4)
 
         return withContext(inferenceDispatcher) {
             try {
@@ -165,8 +171,14 @@ class LlamaCppReasoningProvider(
                 }
 
                 val cleanAnswer = JarvisChatPromptBuilder.sanitizeOutput(rawOutput)
-                check(cleanAnswer.isNotBlank()) {
-                    "Локальная модель не вернула ответ"
+                if (cleanAnswer.isBlank()) {
+                    // Reset context handle if native decode returned empty so next turn starts fresh.
+                    if (loadedHandle != 0L) {
+                        LlamaNativeBridge.nativeUnload(loadedHandle)
+                        loadedHandle = 0L
+                        loadedPackId = null
+                    }
+                    error("Локальная модель не вернула ответ")
                 }
                 ProviderTurnResult(
                     answer = cleanAnswer,

@@ -113,33 +113,33 @@ static size_t utf8_complete_prefix_len(const std::string& buf) {
     return i;
 }
 
-static void strip_trailing_marker(std::string& text, const std::string& marker) {
-    if (text.size() >= marker.size() &&
-        text.compare(text.size() - marker.size(), marker.size(), marker) == 0) {
-        text.erase(text.size() - marker.size());
+static size_t find_stop_marker_pos(const std::string& text) {
+    static const char* kMarkers[] = {
+        "<|im_end|>",
+        "<|im_start|>",
+        "<|endoftext|>",
+        "<|eot_id|>",
+        "<|end_of_text|>",
+        "</s>",
+    };
+    size_t earliest = std::string::npos;
+    for (const char* marker : kMarkers) {
+        const size_t pos = text.find(marker);
+        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
+            earliest = pos;
+        }
     }
-}
-
-static bool ends_with(const std::string& text, const std::string& suffix) {
-    return text.size() >= suffix.size() &&
-           text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
+    return earliest;
 }
 
 static bool contains_stop_marker(const std::string& text) {
-    return ends_with(text, "<|im_end|>") ||
-           ends_with(text, "<|endoftext|>") ||
-           ends_with(text, "<|eot_id|>") ||
-           ends_with(text, "<|end_of_text|>") ||
-           ends_with(text, "</s>");
+    return find_stop_marker_pos(text) != std::string::npos;
 }
 
 static void strip_all_stop_markers(std::string& text) {
-    while (contains_stop_marker(text)) {
-        strip_trailing_marker(text, "<|im_end|>");
-        strip_trailing_marker(text, "<|endoftext|>");
-        strip_trailing_marker(text, "<|eot_id|>");
-        strip_trailing_marker(text, "<|end_of_text|>");
-        strip_trailing_marker(text, "</s>");
+    const size_t pos = find_stop_marker_pos(text);
+    if (pos != std::string::npos) {
+        text.erase(pos);
     }
 }
 
@@ -272,18 +272,35 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
     }
 
     const int32_t batch_cap = 512;
+    int32_t n_past = 0;
+    llama_batch batch = llama_batch_init(batch_cap, 0, 1);
+
     for (size_t pos = 0; pos < prompt_tokens.size(); pos += static_cast<size_t>(batch_cap)) {
         if (session->cancel_requested.load()) {
+            llama_batch_free(batch);
             return utf8_to_jstring(env, "");
         }
         const int32_t chunk = static_cast<int32_t>(
             std::min(static_cast<size_t>(batch_cap), prompt_tokens.size() - pos)
         );
-        llama_batch batch = llama_batch_get_one(prompt_tokens.data() + pos, chunk);
+        batch.n_tokens = chunk;
+        for (int32_t i = 0; i < chunk; ++i) {
+            batch.token[i] = prompt_tokens[pos + static_cast<size_t>(i)];
+            batch.pos[i] = n_past + i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = 0;
+        }
+        const bool is_last_chunk = (pos + static_cast<size_t>(chunk) >= prompt_tokens.size());
+        if (is_last_chunk && chunk > 0) {
+            batch.logits[chunk - 1] = 1;
+        }
         if (llama_decode(session->ctx, batch) != 0) {
-            LOGE("llama_decode prefill failed at pos=%zu", pos);
+            LOGE("llama_decode prefill failed at pos=%zu (n_past=%d)", pos, n_past);
+            llama_batch_free(batch);
             return utf8_to_jstring(env, "");
         }
+        n_past += chunk;
     }
 
     auto sparams = llama_sampler_chain_default_params();
@@ -313,7 +330,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
     const int32_t budget_tokens = std::clamp(
         static_cast<int32_t>(max_tokens),
         16,
-        std::max(16, n_ctx - static_cast<int32_t>(prompt_tokens.size()) - 4)
+        std::max(16, n_ctx - n_past - 4)
     );
 
     std::string output;
@@ -331,7 +348,9 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
             break;
         }
 
-        const int32_t n_chars = llama_token_to_piece(vocab, token, piece_buf, sizeof(piece_buf), 0, false);
+        // Render special tokens too (special=true) so ChatML/Llama3 stop markers like <|im_end|>
+        // are always caught immediately even if GGUF metadata omits them from EOG.
+        const int32_t n_chars = llama_token_to_piece(vocab, token, piece_buf, sizeof(piece_buf), 0, true);
         if (n_chars > 0) {
             pending_utf8.append(piece_buf, static_cast<size_t>(n_chars));
             const size_t complete_len = utf8_complete_prefix_len(pending_utf8);
@@ -345,7 +364,7 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
                     break;
                 }
 
-                if (callback && onTokenMethod && !chunk.empty()) {
+                if (callback && onTokenMethod && !chunk.empty() && chunk.find("<|") == std::string::npos) {
                     jstring jpiece = utf8_to_jstring(env, chunk);
                     env->CallVoidMethod(callback, onTokenMethod, jpiece);
                     env->DeleteLocalRef(jpiece);
@@ -357,13 +376,23 @@ Java_com_jarvis_breeno_assistant_core_LlamaNativeBridge_nativeGenerate(
             }
         }
 
-        llama_batch next_batch = llama_batch_get_one(&token, 1);
-        if (llama_decode(session->ctx, next_batch) != 0) {
-            LOGE("llama_decode generation failed at step=%d", step);
+        if (n_past >= n_ctx - 1) {
             break;
         }
+        batch.n_tokens = 1;
+        batch.token[0] = token;
+        batch.pos[0] = n_past;
+        batch.n_seq_id[0] = 1;
+        batch.seq_id[0][0] = 0;
+        batch.logits[0] = 1;
+        if (llama_decode(session->ctx, batch) != 0) {
+            LOGE("llama_decode generation failed at step=%d (n_past=%d)", step, n_past);
+            break;
+        }
+        n_past += 1;
     }
 
+    llama_batch_free(batch);
     llama_sampler_free(smpl);
     strip_all_stop_markers(output);
     return utf8_to_jstring(env, output);
