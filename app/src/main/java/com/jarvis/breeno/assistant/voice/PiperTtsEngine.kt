@@ -6,6 +6,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
+import java.util.Locale
 
 data class PiperInferenceParams(
     val noiseScale: Float,
@@ -76,7 +77,16 @@ class PiperTtsEngine {
 
     companion object {
         private val MARKDOWN_NOISE = Regex("""[*_`#~>]+""")
-        private val SENTENCE_SPLIT = Regex("""(?<=[.!?…\n])\s+""")
+        private val CLOSING_QUOTES_AND_BRACKETS = setOf('»', '”', '’', '"', '\'', ')', ']', '}')
+        private val ABBREVIATIONS = setOf(
+            "г", "ул", "д", "стр", "т.д", "т.п", "т.е", "т.к", "см", "рис",
+            "им", "проф", "акад", "др", "руб", "коп", "млн", "тыс", "кг",
+            "мм", "км", "мин", "сек", "ч", "mr", "mrs", "ms", "dr", "prof",
+            "vs", "etc", "e.g", "i.e", "fig", "no",
+        )
+        private val SPACED_ABBR_PREFIX = Regex("""(?:^|\s)(?:и\s+)?т\.\s*[дпек]$""", RegexOption.IGNORE_CASE)
+        private val SPACED_ABBR_SUFFIX_NEXT = Regex("""^\s*[дпек]\.""", RegexOption.IGNORE_CASE)
+        private val SPACED_ABBR_AND_NEXT = Regex("""^\s*т\.\s*[дпек]\.""", RegexOption.IGNORE_CASE)
 
         fun parseVoiceInferenceParams(modelDir: File): PiperInferenceParams {
             val fallback = if (modelDir.name.contains("dmitri", ignoreCase = true) ||
@@ -102,9 +112,11 @@ class PiperTtsEngine {
 
         /**
          * Strips markdown formatting and splits Russian response text into
-         * low-latency chunks suitable for streaming Piper TTS playback.
+         * low-latency chunks suitable for streaming Piper TTS playback without
+         * breaking Russian abbreviations, initials, decimals, or overflowing [maxChunkChars].
          */
         fun splitForTts(text: String, maxChunkChars: Int = 160): List<String> {
+            val safeLimit = maxChunkChars.coerceAtLeast(1)
             val cleaned = text
                 .replace(MARKDOWN_NOISE, " ")
                 .replace(Regex("""\[(.*?)]\([^)]*\)"""), "$1")
@@ -112,7 +124,7 @@ class PiperTtsEngine {
                 .trim()
             if (cleaned.isBlank()) return emptyList()
 
-            val rawParts = cleaned.split(SENTENCE_SPLIT)
+            val rawParts = splitSentencesPreservingRussianSyntax(cleaned)
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
 
@@ -120,15 +132,23 @@ class PiperTtsEngine {
             val current = StringBuilder()
 
             for (part in rawParts) {
-                if (part.length > maxChunkChars) {
+                if (part.length > safeLimit) {
                     if (current.isNotEmpty()) {
                         chunks.add(current.toString().trim())
                         current.clear()
                     }
-                    // Split overly long sentence by words so synthesis memory stays bounded.
+                    // Split overly long sentence by words, slicing rare over-limit tokens (e.g. URLs).
                     var buf = StringBuilder()
                     for (word in part.split(Regex("\\s+"))) {
-                        if (buf.isNotEmpty() && buf.length + 1 + word.length > maxChunkChars) {
+                        if (word.length > safeLimit) {
+                            if (buf.isNotEmpty()) {
+                                chunks.add(buf.toString())
+                                buf = StringBuilder()
+                            }
+                            chunks.addAll(word.chunked(safeLimit))
+                            continue
+                        }
+                        if (buf.isNotEmpty() && buf.length + 1 + word.length > safeLimit) {
                             chunks.add(buf.toString())
                             buf = StringBuilder()
                         }
@@ -139,7 +159,7 @@ class PiperTtsEngine {
                     continue
                 }
 
-                if (current.isNotEmpty() && current.length + 1 + part.length > maxChunkChars) {
+                if (current.isNotEmpty() && current.length + 1 + part.length > safeLimit) {
                     chunks.add(current.toString().trim())
                     current.clear()
                 }
@@ -150,6 +170,102 @@ class PiperTtsEngine {
                 chunks.add(current.toString().trim())
             }
             return chunks
+        }
+
+        private fun splitSentencesPreservingRussianSyntax(text: String): List<String> {
+            val parts = mutableListOf<String>()
+            var start = 0
+            var index = 0
+            while (index < text.length) {
+                val ch = text[index]
+                if (ch == '\n' || ch == '\r') {
+                    var end = index + 1
+                    while (end < text.length && (text[end] == '\n' || text[end] == '\r')) end++
+                    val segment = text.substring(start, index).trim()
+                    if (segment.isNotEmpty()) parts.add(segment)
+                    while (end < text.length && text[end].isWhitespace()) end++
+                    start = end
+                    index = end
+                    continue
+                }
+
+                if (ch != '.' && ch != '!' && ch != '?' && ch != '…') {
+                    index++
+                    continue
+                }
+
+                var end = index + 1
+                while (end < text.length && (text[end] == '!' || text[end] == '?' || text[end] == '…')) end++
+                while (end < text.length && text[end] in CLOSING_QUOTES_AND_BRACKETS) end++
+
+                if (end < text.length && !text[end].isWhitespace()) {
+                    index++
+                    continue
+                }
+                if (ch == '.' && isNonTerminalPeriod(text, index)) {
+                    index++
+                    continue
+                }
+
+                val segment = text.substring(start, end).trim()
+                if (segment.isNotEmpty()) parts.add(segment)
+                while (end < text.length && text[end].isWhitespace()) end++
+                start = end
+                index = end
+            }
+            if (start < text.length) {
+                val tail = text.substring(start).trim()
+                if (tail.isNotEmpty()) parts.add(tail)
+            }
+            return parts
+        }
+
+        private fun isNonTerminalPeriod(text: String, index: Int): Boolean {
+            if (index > 0 && index + 1 < text.length &&
+                text[index - 1].isDigit() && text[index + 1].isDigit()
+            ) return true
+
+            var tokenStart = index - 1
+            while (tokenStart >= 0 && !text[tokenStart].isWhitespace()) tokenStart--
+            tokenStart++
+
+            val rawToken = text.substring(tokenStart, index)
+            val cleanedToken = rawToken
+                .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
+                .trimEnd(',', ')', ']', '}', '"', '\'', '»', '”', '’')
+                .lowercase(Locale.ROOT)
+            if (cleanedToken in ABBREVIATIONS) return true
+
+            val prefix = text.substring(0, index)
+            val suffix = text.substring(index + 1)
+            val lastWord = prefix.trim()
+                .split(Regex("\\s+"))
+                .lastOrNull()
+                .orEmpty()
+                .trimStart('(', '[', '{', '"', '\'', '«', '“', '‘')
+            if (lastWord.equals("т", ignoreCase = true) && SPACED_ABBR_SUFFIX_NEXT.containsMatchIn(suffix)) {
+                return true
+            }
+            if (lastWord.equals("и", ignoreCase = true) && SPACED_ABBR_AND_NEXT.containsMatchIn(suffix)) {
+                return true
+            }
+            if (SPACED_ABBR_PREFIX.containsMatchIn(prefix)) {
+                val nextNonWs = suffix.firstOrNull { !it.isWhitespace() }
+                if (nextNonWs != null && !nextNonWs.isUpperCase()) {
+                    return true
+                }
+            }
+
+            // Preserve initials like "А. С. Пушкин" or "И. Петров" inside the sentence.
+            val singleLetter = cleanedToken.length == 1 && cleanedToken[0].isLetter()
+            if (singleLetter) {
+                var nextIdx = index + 1
+                while (nextIdx < text.length && text[nextIdx].isWhitespace()) nextIdx++
+                if (nextIdx < text.length && text[nextIdx].isLetter() && text[nextIdx].isUpperCase()) {
+                    return true
+                }
+            }
+            return false
         }
     }
 }

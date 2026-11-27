@@ -11,13 +11,15 @@ import java.nio.file.Files
 class ModelCatalogValidationTest {
     @Test
     fun qwenAndOpenCommunityModelCatalogDescriptorsAreValidAndPinned() {
-        assertEquals(9, LocalLlmModelManager.CATALOG.size)
+        assertEquals(11, LocalLlmModelManager.CATALOG.size)
         val ids = LocalLlmModelManager.CATALOG.map { it.id }.toSet()
         assertTrue(LocalLlmModelManager.PACK_DOLPHIN_QWEN_3B in ids)
         assertTrue(LocalLlmModelManager.PACK_HERMES3_LLAMA32_3B in ids)
         assertTrue(LocalLlmModelManager.PACK_STHENO_8B_Q3KM in ids)
         assertTrue(LocalLlmModelManager.PACK_STHENO_8B_Q4KM in ids)
         assertTrue(LocalLlmModelManager.PACK_QWEN_3B in ids)
+        assertTrue(LocalLlmModelManager.PACK_QWEN3_06B in ids)
+        assertTrue(LocalLlmModelManager.PACK_QWEN3_4B in ids)
         LocalLlmModelManager.CATALOG.forEach { pack ->
             pack.descriptor.validate()
             assertTrue(pack.downloadUrl.contains(pack.descriptor.sourceRevision))
@@ -95,5 +97,22 @@ class ModelCatalogValidationTest {
         assertTrue(chunks.size >= 2)
         assertTrue(chunks.none { it.contains('*') || it.contains('`') || it.contains('#') })
         assertTrue(chunks.all { it.length <= 90 })
+    }
+
+    @Test
+    fun splitForTtsPreservesRussianAbbreviationsInitialsDecimalsAndBoundsLongTokens() {
+        val abbr = "Встреча в «г. Москва» (рис. 2): книги, ручки и т. д. ждут А. С. Пушкина по 3.14 балла."
+        val abbrChunks = PiperTtsEngine.splitForTts(abbr, maxChunkChars = 160)
+        assertEquals(1, abbrChunks.size)
+        assertEquals(abbr, abbrChunks.single())
+
+        val twoSentences = "Мы купили блокноты, ручки и т. д. Завтра продолжим тестирование."
+        val split = PiperTtsEngine.splitForTts(twoSentences, maxChunkChars = 48)
+        assertEquals(listOf("Мы купили блокноты, ручки и т. д.", "Завтра продолжим тестирование."), split)
+
+        val longUrl = "Откройте https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/afe8ad3577aa22500b3cd1c880f153b3b0e1cae8/Qwen3-0.6B-Q4_0.gguf сейчас."
+        val bounded = PiperTtsEngine.splitForTts(longUrl, maxChunkChars = 40)
+        assertTrue(bounded.isNotEmpty())
+        assertTrue(bounded.all { it.length <= 40 })
     }
 }

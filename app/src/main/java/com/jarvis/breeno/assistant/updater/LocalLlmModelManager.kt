@@ -394,7 +394,7 @@ class LocalLlmModelManager(private val context: Context) {
 
     companion object {
         const val FAMILY_OPEN_COMMUNITY = "Dolphin 3.0 / Hermes 3 / Stheno 8B"
-        const val FAMILY_QWEN = "Qwen 2.5 Instruct"
+        const val FAMILY_QWEN = "Qwen 2.5 / Qwen3 Instruct"
         const val FAMILY_CUSTOM = "Свои .gguf модели"
 
         const val PACK_DOLPHIN_QWEN_05B = "dolphin3.0-qwen2.5-0.5b-q4_k_m"
@@ -407,6 +407,8 @@ class LocalLlmModelManager(private val context: Context) {
         const val PACK_QWEN_05B = "qwen2.5-0.5b-q4_k_m"
         const val PACK_QWEN_15B = "qwen2.5-1.5b-q4_k_m"
         const val PACK_QWEN_3B = "qwen2.5-3b-q4_k_m"
+        const val PACK_QWEN3_06B = "qwen3-0.6b-q4_0"
+        const val PACK_QWEN3_4B = "qwen3-4b-q4_k_m"
 
         private const val KEY_SELECTED_PACK = "selected_llm_pack_id"
         private const val KEY_SELECTED_PERSONA = "selected_jarvis_persona"
@@ -646,6 +648,54 @@ class LocalLlmModelManager(private val context: Context) {
                             fileName = "qwen2.5-3b-instruct-q4_k_m.gguf",
                             sizeBytes = 2_104_932_768L,
                             sha256 = "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
+                        )
+                    ),
+                ),
+            ),
+            LocalLlmPack(
+                id = PACK_QWEN3_06B,
+                title = "Qwen3 0.6B (Ультра-быстрая, Q4_0)",
+                description = "Сверхлёгкая модель Qwen3 (~409 МБ, Apache-2.0) для моментального отклика.",
+                downloadUrl = "https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/afe8ad3577aa22500b3cd1c880f153b3b0e1cae8/Qwen3-0.6B-Q4_0.gguf",
+                family = FAMILY_QWEN,
+                descriptor = ModelPackDescriptor(
+                    packId = PACK_QWEN3_06B,
+                    version = "3-0.6B-Q4_0",
+                    runtime = "llama.cpp",
+                    architecture = "qwen3",
+                    quantization = "Q4_0",
+                    licenseId = "Apache-2.0",
+                    sourceRevision = "afe8ad3577aa22500b3cd1c880f153b3b0e1cae8",
+                    shards = listOf(
+                        ModelShard(
+                            index = 0,
+                            fileName = "Qwen3-0.6B-Q4_0.gguf",
+                            sizeBytes = 428_970_080L,
+                            sha256 = "da2572f16c06133561ce56accaa822216f2391ef4d37fba427801cd6736417d4",
+                        )
+                    ),
+                ),
+            ),
+            LocalLlmPack(
+                id = PACK_QWEN3_4B,
+                title = "Qwen3 4B (Новое поколение, Q4_K_M)",
+                description = "Сильное рассуждение и русский язык нового поколения Qwen3 для 12/16 ГБ ОЗУ (~2.33 ГБ, Apache-2.0).",
+                downloadUrl = "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf",
+                family = FAMILY_QWEN,
+                descriptor = ModelPackDescriptor(
+                    packId = PACK_QWEN3_4B,
+                    version = "3-4B-Q4_K_M",
+                    runtime = "llama.cpp",
+                    architecture = "qwen3",
+                    quantization = "Q4_K_M",
+                    licenseId = "Apache-2.0",
+                    sourceRevision = "bc640142c66e1fdd12af0bd68f40445458f3869b",
+                    shards = listOf(
+                        ModelShard(
+                            index = 0,
+                            fileName = "Qwen3-4B-Q4_K_M.gguf",
+                            sizeBytes = 2_497_280_256L,
+                            sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
                         )
                     ),
                 ),
