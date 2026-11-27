@@ -14,6 +14,7 @@ import com.jarvis.breeno.assistant.core.PromptTemplateFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
@@ -303,12 +304,13 @@ class LocalLlmModelManager(private val context: Context) {
                 }
 
                 isZipMagic(actualHeader) -> {
+                    val callerContext = currentCoroutineContext()
                     val extracted = openUriStream(uri).use { rawStream ->
                         copyZipGgufEntry(
                             rawStream = rawStream,
                             destTmpFile = tmpFile,
                             digest = digest,
-                            checkCancelled = { currentCoroutineContext().isActive },
+                            checkCancelled = { callerContext.isActive },
                             onBytesCopied = ::emitProgress,
                         )
                     }
