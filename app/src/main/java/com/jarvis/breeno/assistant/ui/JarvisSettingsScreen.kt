@@ -35,7 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jarvis.breeno.assistant.ui.theme.JarvisOutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -249,12 +249,12 @@ fun JarvisSettingsScreen(
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = onTestVoice) {
+                                    JarvisOutlinedButton(onClick = onTestVoice) {
                                         Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
                                         Text("Тест голоса")
                                     }
-                                    OutlinedButton(onClick = { onNavigateSection(JarvisSection.MODELS) }) {
+                                    JarvisOutlinedButton(onClick = { onNavigateSection(JarvisSection.MODELS) }) {
                                         Text("Голоса (Дмитрий / Руслан)")
                                     }
                                 }
@@ -285,7 +285,7 @@ fun JarvisSettingsScreen(
                                     color = if (stackStatus.asrReady) palette.successAccent else palette.textSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
-                                OutlinedButton(onClick = { onNavigateSection(JarvisSection.MODELS) }) {
+                                JarvisOutlinedButton(onClick = { onNavigateSection(JarvisSection.MODELS) }) {
                                     Text("Открыть загрузку моделей речи")
                                 }
                             }

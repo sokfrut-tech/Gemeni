@@ -23,7 +23,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
+import com.jarvis.breeno.assistant.ui.theme.JarvisButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,7 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jarvis.breeno.assistant.ui.theme.JarvisOutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -284,7 +284,7 @@ fun MediaStudioScreen(
                                 color = Color(0xFF34D399),
                                 style = MaterialTheme.typography.labelSmall,
                             )
-                            OutlinedButton(
+                            JarvisOutlinedButton(
                                 onClick = {
                                     cfgLocalDreamUrl = JarvisMediaGenerator.DEFAULT_LOCAL_DREAM_URL
                                     cfgSteps = "24"
@@ -324,7 +324,7 @@ fun MediaStudioScreen(
                             )
                         }
                         if (cfgBackend == MediaGenBackend.CUSTOM_COMFYUI) {
-                            OutlinedButton(
+                            JarvisOutlinedButton(
                                 onClick = {
                                     cfgCheckpoint = JarvisMediaGenerator.DEFAULT_PONY_CHECKPOINT
                                     cfgSteps = "30"
@@ -490,7 +490,7 @@ fun MediaStudioScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        Button(
+                        JarvisButton(
                             onClick = {
                                 onSaveConfig(
                                     MediaGenConfig(
@@ -585,7 +585,7 @@ fun MediaStudioScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Button(
+                JarvisButton(
                     onClick = { startGeneration(GeneratedMediaType.IMAGE) },
                     enabled = !generating,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D4ED8)),
@@ -595,7 +595,7 @@ fun MediaStudioScreen(
                     Spacer(Modifier.padding(horizontal = 3.dp))
                     Text("Картинка")
                 }
-                OutlinedButton(
+                JarvisOutlinedButton(
                     onClick = { startGeneration(GeneratedMediaType.VIDEO) },
                     enabled = !generating,
                     modifier = Modifier.weight(1f),

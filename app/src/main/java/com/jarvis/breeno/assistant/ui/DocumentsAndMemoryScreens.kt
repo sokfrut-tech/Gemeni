@@ -35,13 +35,13 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.Button
+import com.jarvis.breeno.assistant.ui.theme.JarvisButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jarvis.breeno.assistant.ui.theme.JarvisOutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -122,7 +122,7 @@ fun DocumentsScreen(
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                JarvisButton(
                     onClick = onImportDocument,
                     colors = ButtonDefaults.buttonColors(containerColor = palette.primaryAccent, contentColor = Color(0xFF04101B)),
                     modifier = Modifier.weight(1f),
@@ -131,7 +131,7 @@ fun DocumentsScreen(
                     Spacer(Modifier.width(6.dp))
                     Text("Файл (PDF/TXT)")
                 }
-                OutlinedButton(
+                JarvisOutlinedButton(
                     onClick = { showNoteForm = !showNoteForm },
                     modifier = Modifier.weight(1f),
                 ) {
@@ -167,7 +167,7 @@ fun DocumentsScreen(
                             maxLines = 6,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Button(
+                        JarvisButton(
                             onClick = {
                                 scope.launch {
                                     onAddTextNote(noteTitle, noteBody).fold(
@@ -377,7 +377,7 @@ fun MemoryManagerScreen(
                         Switch(checked = memoryPaused, onCheckedChange = onTogglePaused)
                     }
 
-                    OutlinedButton(
+                    JarvisOutlinedButton(
                         onClick = {
                             val json = onExportJson()
                             val send = Intent(Intent.ACTION_SEND).apply {
@@ -413,7 +413,7 @@ fun MemoryManagerScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Button(
+                    JarvisButton(
                         onClick = {
                             val res = onAddFact("manual_${System.currentTimeMillis()}", newFactText)
                             feedback = res
@@ -674,7 +674,7 @@ fun ToolsAndMcpScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
+                        JarvisOutlinedButton(
                             onClick = {
                                 val src = quickInput.trim().ifBlank { "100 км в мили" }
                                 val conv = JarvisWebTools.convertUnitsOffline(src)
@@ -690,10 +690,10 @@ fun ToolsAndMcpScreen(
                             Spacer(Modifier.width(4.dp))
                             Text("Расчёт / Ед.")
                         }
-                        Button(
+                        JarvisButton(
                             onClick = {
                                 val raw = quickInput.trim()
-                                if (raw.isEmpty()) return@Button
+                                if (raw.isEmpty()) return@JarvisButton
                                 quickBusy = true
                                 scope.launch {
                                     actionFeedback = if (raw.startsWith("http://", true) || raw.startsWith("https://", true)) {
@@ -739,7 +739,7 @@ fun ToolsAndMcpScreen(
 
         // HTTP MCP Servers (collapsible)
         item {
-            OutlinedButton(
+            JarvisOutlinedButton(
                 onClick = { showMcpForm = !showMcpForm },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -781,7 +781,7 @@ fun ToolsAndMcpScreen(
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Button(
+                        JarvisButton(
                             onClick = {
                                 val validUrl = JarvisMcpClient.validateMcpEndpointUrl(serverUrl)
                                 if (validUrl == null) {
@@ -847,7 +847,7 @@ fun ToolsAndMcpScreen(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(onClick = {
+                        JarvisOutlinedButton(onClick = {
                             scope.launch {
                                 mcpFeedback = "Проверяю ${srv.name} (tools/list)…"
                                 val result = JarvisMcpClient.listTools(srv)

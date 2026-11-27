@@ -6,18 +6,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
@@ -259,25 +264,27 @@ fun jarvisScreenBackground(palette: JarvisPalette): Brush = Brush.verticalGradie
 
 private fun buildJarvisTypography(appearance: JarvisAppearanceConfig): Typography {
     val scale = appearance.fontScale.coerceIn(0.90f, 1.18f)
+    // Only large screen headings use the decorative family; buttons, labels and body
+    // always use a compact proportional face so Cyrillic labels never wrap into tall buttons.
     val displayFamily: FontFamily
     val bodyFamily: FontFamily
-    val letterBoost: Float
+    val headingSpacing: Float
 
     when (appearance.fontStyle) {
         JarvisFontStyle.TECH_HUD -> {
             displayFamily = FontFamily.Monospace
             bodyFamily = FontFamily.SansSerif
-            letterBoost = 0.6f
+            headingSpacing = 0.6f
         }
         JarvisFontStyle.MODERN_SANS -> {
             displayFamily = FontFamily.SansSerif
             bodyFamily = FontFamily.SansSerif
-            letterBoost = 0.2f
+            headingSpacing = 0.3f
         }
         JarvisFontStyle.CLASSIC_SERIF -> {
             displayFamily = FontFamily.Serif
             bodyFamily = FontFamily.Serif
-            letterBoost = 0.1f
+            headingSpacing = 0.2f
         }
     }
 
@@ -285,61 +292,175 @@ private fun buildJarvisTypography(appearance: JarvisAppearanceConfig): Typograph
         headlineSmall = TextStyle(
             fontFamily = displayFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = (22f * scale).sp,
-            letterSpacing = (0.8f + letterBoost).sp,
+            fontSize = (20f * scale).sp,
+            lineHeight = (26f * scale).sp,
+            letterSpacing = headingSpacing.sp,
         ),
         titleLarge = TextStyle(
             fontFamily = displayFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = (20f * scale).sp,
-            letterSpacing = (0.5f + letterBoost).sp,
+            fontSize = (18f * scale).sp,
+            lineHeight = (24f * scale).sp,
+            letterSpacing = (headingSpacing * 0.6f).sp,
         ),
         titleMedium = TextStyle(
-            fontFamily = displayFamily,
+            fontFamily = bodyFamily,
             fontWeight = FontWeight.SemiBold,
-            fontSize = (16f * scale).sp,
-            letterSpacing = (0.4f + letterBoost).sp,
+            fontSize = (15f * scale).sp,
+            lineHeight = (20f * scale).sp,
+            letterSpacing = 0.1.sp,
         ),
         titleSmall = TextStyle(
-            fontFamily = displayFamily,
+            fontFamily = bodyFamily,
             fontWeight = FontWeight.SemiBold,
-            fontSize = (14f * scale).sp,
-            letterSpacing = (0.3f + letterBoost).sp,
+            fontSize = (13.5f * scale).sp,
+            lineHeight = (18f * scale).sp,
+            letterSpacing = 0.1.sp,
         ),
         bodyLarge = TextStyle(
             fontFamily = bodyFamily,
             fontWeight = FontWeight.Normal,
-            fontSize = (16f * scale).sp,
+            fontSize = (15.5f * scale).sp,
+            lineHeight = (22f * scale).sp,
         ),
         bodyMedium = TextStyle(
             fontFamily = bodyFamily,
             fontWeight = FontWeight.Normal,
             fontSize = (14f * scale).sp,
+            lineHeight = (20f * scale).sp,
         ),
         bodySmall = TextStyle(
             fontFamily = bodyFamily,
             fontWeight = FontWeight.Normal,
             fontSize = (12.5f * scale).sp,
+            lineHeight = (17f * scale).sp,
         ),
         labelLarge = TextStyle(
-            fontFamily = displayFamily,
+            fontFamily = bodyFamily,
             fontWeight = FontWeight.Medium,
             fontSize = (13.5f * scale).sp,
-            letterSpacing = letterBoost.sp,
+            lineHeight = (18f * scale).sp,
+            letterSpacing = 0.1.sp,
         ),
         labelMedium = TextStyle(
-            fontFamily = displayFamily,
+            fontFamily = bodyFamily,
             fontWeight = FontWeight.Medium,
             fontSize = (12f * scale).sp,
-            letterSpacing = letterBoost.sp,
+            lineHeight = (16f * scale).sp,
+            letterSpacing = 0.2.sp,
         ),
         labelSmall = TextStyle(
-            fontFamily = displayFamily,
+            fontFamily = bodyFamily,
             fontWeight = FontWeight.Normal,
             fontSize = (11f * scale).sp,
-            letterSpacing = (letterBoost * 0.6f).sp,
+            lineHeight = (14f * scale).sp,
+            letterSpacing = 0.2.sp,
         ),
     )
+}
+
+private val JarvisButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+
+/** Compact HUD-styled filled button (38dp, single-weight label, cut/rounded corners from the theme). */
+@Composable
+fun JarvisButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: ButtonColors? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val palette = LocalJarvisPalette.current
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 38.dp),
+        enabled = enabled,
+        shape = jarvisTileShape(palette, 10.dp),
+        colors = colors ?: ButtonDefaults.buttonColors(
+            containerColor = palette.primaryAccent,
+            contentColor = Color(0xFF04101B),
+        ),
+        contentPadding = JarvisButtonPadding,
+    ) {
+        val rowScope = this
+        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)) {
+            rowScope.content()
+        }
+    }
+}
+
+/** Compact HUD-styled outlined button with a thin accent border on a translucent glass background. */
+@Composable
+fun JarvisOutlinedButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: ButtonColors? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val palette = LocalJarvisPalette.current
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 38.dp),
+        enabled = enabled,
+        shape = jarvisTileShape(palette, 10.dp),
+        colors = colors ?: ButtonDefaults.outlinedButtonColors(
+            containerColor = palette.tileBg.copy(alpha = 0.55f),
+            contentColor = palette.textPrimary,
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (enabled) palette.primaryAccent.copy(alpha = 0.45f) else palette.tileBorder.copy(alpha = 0.35f),
+        ),
+        contentPadding = JarvisButtonPadding,
+    ) {
+        val rowScope = this
+        ProvideTextStyle(MaterialTheme.typography.labelLarge) {
+            rowScope.content()
+        }
+    }
+}
+
+/** Small pill-like HUD chip (≈32dp) for quick shortcuts. */
+@Composable
+fun JarvisHudChip(
+    label: String,
+    icon: ImageVector? = null,
+    accent: Color? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalJarvisPalette.current
+    val resolvedAccent = accent ?: palette.primaryAccent
+    Surface(
+        onClick = onClick,
+        shape = jarvisTileShape(palette, 10.dp),
+        color = palette.tileBg.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, resolvedAccent.copy(alpha = 0.40f)),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = resolvedAccent,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+            Text(
+                text = label,
+                color = palette.textPrimary,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @Composable
@@ -354,7 +475,7 @@ fun JarvisGlassTile(
 ) {
     val palette = LocalJarvisPalette.current
     val resolvedAccent = accent ?: palette.primaryAccent
-    val shape = jarvisTileShape(palette, 14.dp)
+    val shape = jarvisTileShape(palette, 12.dp)
 
     Surface(
         onClick = onClick,
@@ -364,70 +485,50 @@ fun JarvisGlassTile(
             width = 1.dp,
             brush = Brush.linearGradient(
                 colors = listOf(
-                    resolvedAccent.copy(alpha = 0.72f),
-                    palette.secondaryAccent.copy(alpha = 0.42f),
+                    resolvedAccent.copy(alpha = 0.55f),
+                    palette.secondaryAccent.copy(alpha = 0.25f),
                 ),
             ),
         ),
         modifier = modifier,
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(palette.tileBgAlt, palette.tileBg),
+                        colors = listOf(palette.tileBgAlt.copy(alpha = 0.85f), palette.tileBg.copy(alpha = 0.85f)),
                     ),
                 )
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+            if (icon != null) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(resolvedAccent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (icon != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(resolvedAccent.copy(alpha = 0.16f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = resolvedAccent,
-                                modifier = Modifier.size(17.dp),
-                            )
-                        }
-                    }
-                    if (!badge.isNullOrBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = resolvedAccent.copy(alpha = 0.18f),
-                        ) {
-                            Text(
-                                text = badge,
-                                color = resolvedAccent,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = resolvedAccent,
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
-                if (icon != null || !badge.isNullOrBlank()) {
-                    Spacer(Modifier.height(1.dp))
-                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
                 Text(
                     text = title,
                     color = palette.textPrimary,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!subtitle.isNullOrBlank()) {
@@ -435,8 +536,23 @@ fun JarvisGlassTile(
                         text = subtitle,
                         color = palette.textSecondary,
                         style = MaterialTheme.typography.labelSmall,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (!badge.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = resolvedAccent.copy(alpha = 0.16f),
+                ) {
+                    Text(
+                        text = badge,
+                        color = resolvedAccent,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
             }

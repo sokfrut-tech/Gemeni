@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Button
+import com.jarvis.breeno.assistant.ui.theme.JarvisButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -39,7 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jarvis.breeno.assistant.ui.theme.JarvisOutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -249,7 +249,7 @@ fun AiModelsScreen(
                 style = MaterialTheme.typography.labelMedium,
             )
             if (!starterComplete) {
-                Button(
+                JarvisButton(
                     onClick = onDownloadStarterBundle,
                     enabled = !downloadState.active,
                     colors = ButtonDefaults.buttonColors(containerColor = palette.primaryAccent, contentColor = Color(0xFF03101B)),
@@ -456,7 +456,7 @@ fun AiModelsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (isInstalled || inspectedPack.isCustom) {
-                                Button(
+                                JarvisButton(
                                     onClick = { onSelectLlm(inspectedPack.id) },
                                     enabled = isInstalled && !isActive,
                                     colors = ButtonDefaults.buttonColors(
@@ -467,13 +467,13 @@ fun AiModelsScreen(
                                 ) {
                                     Text(if (isActive) "Активна" else "Активировать")
                                 }
-                                OutlinedButton(
+                                JarvisOutlinedButton(
                                     onClick = { scope.launch { onDeleteLlm(inspectedPack.id) } },
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Удалить модель", tint = palette.errorAccent)
                                 }
                             } else {
-                                Button(
+                                JarvisButton(
                                     onClick = { onDownloadLlm(inspectedPack.id) },
                                     enabled = !downloadState.active,
                                     colors = ButtonDefaults.buttonColors(containerColor = palette.primaryAccent, contentColor = Color(0xFF04101B)),
@@ -489,7 +489,7 @@ fun AiModelsScreen(
                 }
             }
 
-            OutlinedButton(
+            JarvisOutlinedButton(
                 onClick = onImportCustomGguf,
                 enabled = !downloadState.active,
                 modifier = Modifier.fillMaxWidth(),
@@ -605,7 +605,7 @@ fun AiModelsScreen(
                         colors = SliderDefaults.colors(thumbColor = palette.primaryAccent, activeTrackColor = palette.primaryAccent),
                     )
 
-                    Button(
+                    JarvisButton(
                         onClick = {
                             onSaveGenerationSettings(
                                 LlmGenerationSettings(
@@ -672,7 +672,7 @@ fun AiModelsScreen(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
-                        Button(
+                        JarvisButton(
                             onClick = {
                                 scope.launch {
                                     hfBusy = true
@@ -714,7 +714,7 @@ fun AiModelsScreen(
                                         Text(repo.repoId, color = palette.textPrimary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
                                         Text("↓ ${repo.downloads} • ♥ ${repo.likes}", color = palette.textSecondary, style = MaterialTheme.typography.labelSmall)
                                     }
-                                    OutlinedButton(
+                                    JarvisOutlinedButton(
                                         onClick = {
                                             scope.launch {
                                                 hfBusy = true
@@ -752,7 +752,7 @@ fun AiModelsScreen(
                                                 Text(file.fileName, color = palette.textPrimary, style = MaterialTheme.typography.labelMedium)
                                                 Text(sizeLabel, color = palette.textSecondary, style = MaterialTheme.typography.labelSmall)
                                             }
-                                            OutlinedButton(
+                                            JarvisOutlinedButton(
                                                 onClick = { onDownloadHfGguf(file.downloadUrl, file.fileName, file.sizeBytes) },
                                                 enabled = !downloadState.active,
                                             ) { Text("Скачать") }
@@ -785,7 +785,7 @@ fun AiModelsScreen(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
-                OutlinedButton(onClick = onTestVoice) {
+                JarvisOutlinedButton(onClick = onTestVoice) {
                     Icon(Icons.Default.VolumeUp, contentDescription = null, tint = palette.primaryAccent)
                     Spacer(Modifier.width(4.dp))
                     Text("Тест")
@@ -851,7 +851,7 @@ fun AiModelsScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Удалить голос", tint = palette.errorAccent)
                         }
                     } else {
-                        OutlinedButton(
+                        JarvisOutlinedButton(
                             onClick = { onDownloadVoice(inspectedVoice.id) },
                             enabled = !downloadState.active,
                             modifier = Modifier.fillMaxWidth(),
@@ -898,12 +898,12 @@ fun AiModelsScreen(
             AnimatedVisibility(visible = speechAsrExpanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                     if (!status.asrReady) {
-                        OutlinedButton(onClick = onDownloadAsr, enabled = !downloadState.active, modifier = Modifier.fillMaxWidth()) {
+                        JarvisOutlinedButton(onClick = onDownloadAsr, enabled = !downloadState.active, modifier = Modifier.fillMaxWidth()) {
                             Text("Скачать Sherpa-ONNX Русский ASR")
                         }
                     }
                     if (!status.vadReady) {
-                        OutlinedButton(onClick = onDownloadVad, enabled = !downloadState.active, modifier = Modifier.fillMaxWidth()) {
+                        JarvisOutlinedButton(onClick = onDownloadVad, enabled = !downloadState.active, modifier = Modifier.fillMaxWidth()) {
                             Text("Скачать Silero VAD (2 МБ)")
                         }
                     }
@@ -968,7 +968,7 @@ fun AiModelsScreen(
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Button(
+                    JarvisButton(
                         onClick = {
                             onSaveExternalAi(
                                 ExternalAiConfig(

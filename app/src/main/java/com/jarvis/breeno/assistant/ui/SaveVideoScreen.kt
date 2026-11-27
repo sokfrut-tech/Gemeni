@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
+import com.jarvis.breeno.assistant.ui.theme.JarvisButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,7 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jarvis.breeno.assistant.ui.theme.JarvisOutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -135,9 +135,9 @@ fun SaveVideoScreen(
                 .padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(
+            JarvisOutlinedButton(
                 onClick = {
-                    if (inspecting) return@OutlinedButton
+                    if (inspecting) return@JarvisOutlinedButton
                     inspecting = true
                     inspectedMeta = null
                     feedback = "Проверяю метаданные…"
@@ -163,7 +163,7 @@ fun SaveVideoScreen(
                 Text(if (inspecting) "Проверка…" else "Проверить")
             }
 
-            Button(
+            JarvisButton(
                 onClick = {
                     val res = onEnqueue(urlInput, selectedQuality)
                     res.onSuccess {

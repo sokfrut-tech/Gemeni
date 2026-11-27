@@ -98,6 +98,7 @@ import com.jarvis.breeno.assistant.memory.ChatSession
 import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
 import com.jarvis.breeno.assistant.ui.theme.JarvisGlassTile
+import com.jarvis.breeno.assistant.ui.theme.JarvisHudChip
 import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
 import com.jarvis.breeno.assistant.ui.theme.jarvisTileShape
@@ -841,45 +842,35 @@ fun JarvisHomeScreen(
                                 .padding(top = 2.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            JarvisGlassTile(
-                                title = "Веб-поиск",
-                                subtitle = "Живые факты",
+                            JarvisHudChip(
+                                label = "Веб-поиск",
                                 icon = Icons.Default.Public,
                                 accent = palette.primaryAccent,
                                 onClick = { onOpenSection(JarvisSection.TOOLS_MCP) },
-                                modifier = Modifier.width(126.dp),
                             )
-                            JarvisGlassTile(
-                                title = "Модели",
-                                subtitle = "Dolphin / Qwen",
+                            JarvisHudChip(
+                                label = "Модели",
                                 icon = Icons.Default.AutoAwesome,
                                 accent = palette.secondaryAccent,
                                 onClick = onOpenModels,
-                                modifier = Modifier.width(126.dp),
                             )
-                            JarvisGlassTile(
-                                title = "Документы",
-                                subtitle = "Заметки и RAG",
+                            JarvisHudChip(
+                                label = "Документы",
                                 icon = Icons.Default.Description,
                                 accent = palette.successAccent,
                                 onClick = { onOpenSection(JarvisSection.DOCUMENTS) },
-                                modifier = Modifier.width(126.dp),
                             )
-                            JarvisGlassTile(
-                                title = "Студия ИИ",
-                                subtitle = "Арт и Видео",
+                            JarvisHudChip(
+                                label = "Студия ИИ",
                                 icon = Icons.Default.Image,
                                 accent = palette.primaryAccent,
                                 onClick = { onOpenSection(JarvisSection.STUDIO) },
-                                modifier = Modifier.width(126.dp),
                             )
-                            JarvisGlassTile(
-                                title = "Темы HUD",
-                                subtitle = "Стиль и шрифт",
+                            JarvisHudChip(
+                                label = "Темы HUD",
                                 icon = Icons.Default.Palette,
                                 accent = palette.secondaryAccent,
                                 onClick = onOpenSettings,
-                                modifier = Modifier.width(126.dp),
                             )
                         }
                     }
