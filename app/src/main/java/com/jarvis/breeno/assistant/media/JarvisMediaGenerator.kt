@@ -1341,6 +1341,11 @@ class JarvisMediaGenerator(
 
             fun pickMatching(list: List<String>, keywords: List<String>, fallback: String): String {
                 for (kw in keywords) {
+                    list.firstOrNull {
+                        it.substringAfterLast('/').substringAfterLast('\\').equals(kw, ignoreCase = true)
+                    }?.let { return it }
+                }
+                for (kw in keywords) {
                     list.firstOrNull { it.lowercase().contains(kw) }?.let { return it }
                 }
                 return list.firstOrNull() ?: fallback
@@ -1348,7 +1353,7 @@ class JarvisMediaGenerator(
 
             return when {
                 lower.contains("flux") -> {
-                    val vae = pickMatching(availableVaes, listOf("ae.safetensors", "flux", "ae."), "ae.safetensors")
+                    val vae = pickMatching(availableVaes, listOf("ae.safetensors", "flux_vae", "flux"), "ae.safetensors")
                     val clip1 = pickMatching(availableClips, listOf("clip_l", "clipl"), "clip_l.safetensors")
                     val clip2 = pickMatching(availableClips, listOf("t5xxl", "t5_xxl", "t5-"), "t5xxl_fp8_e4m3fn.safetensors")
                     val isSchnell = lower.contains("schnell")
