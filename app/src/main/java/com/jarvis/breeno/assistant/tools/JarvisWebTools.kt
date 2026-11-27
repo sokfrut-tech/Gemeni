@@ -327,7 +327,10 @@ object JarvisWebTools {
         }
     }
 
-    private fun normalizeWhitespace(s: String): String = s.replace(Regex("\\s+"), " ").trim()
+    private fun normalizeWhitespace(s: String): String =
+        s.replace(Regex("\\s+"), " ")
+            .replace(Regex("\\s+([.,!?;:])"), "$1")
+            .trim()
 
     fun convertUnitsOffline(rawQuery: String): String? {
         val clean = rawQuery.trim().lowercase(RU_LOCALE)
