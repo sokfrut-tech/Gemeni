@@ -49,11 +49,15 @@ import com.jarvis.breeno.assistant.savevideo.SaveVideoMetadata
 import com.jarvis.breeno.assistant.savevideo.SaveVideoQuality
 import com.jarvis.breeno.assistant.savevideo.SaveVideoStatus
 import com.jarvis.breeno.assistant.savevideo.SaveVideoTask
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import kotlinx.coroutines.launch
 
-private val CardBg = Color(0xCC111C2A)
-private val AccentCyan = Color(0xFF75E5FF)
-private val MutedText = Color(0xFF9AAABD)
+private val CardBg: Color
+    @Composable get() = LocalJarvisPalette.current.tileBg
+private val AccentCyan: Color
+    @Composable get() = LocalJarvisPalette.current.primaryAccent
+private val MutedText: Color
+    @Composable get() = LocalJarvisPalette.current.textSecondary
 
 @Composable
 fun SaveVideoScreen(

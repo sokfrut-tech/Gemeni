@@ -59,13 +59,17 @@ import com.jarvis.breeno.assistant.media.GeneratedMediaType
 import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenBackend
 import com.jarvis.breeno.assistant.media.MediaGenConfig
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 
-private val StudioCardBg = Color(0xCC111C2A)
-private val StudioCyan = Color(0xFF75E5FF)
-private val StudioMuted = Color(0xFF9AAABD)
+private val StudioCardBg: Color
+    @Composable get() = LocalJarvisPalette.current.tileBg
+private val StudioCyan: Color
+    @Composable get() = LocalJarvisPalette.current.primaryAccent
+private val StudioMuted: Color
+    @Composable get() = LocalJarvisPalette.current.textSecondary
 
 @Composable
 fun MediaStudioScreen(

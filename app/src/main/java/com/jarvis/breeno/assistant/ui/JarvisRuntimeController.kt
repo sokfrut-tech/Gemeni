@@ -29,9 +29,13 @@ import com.jarvis.breeno.assistant.memory.MemoryFact
 import com.jarvis.breeno.assistant.nlp.RussianIntentDispatcher
 import com.jarvis.breeno.assistant.tools.JarvisPhoneActionExecutor
 import com.jarvis.breeno.assistant.tools.JarvisPhoneActions
+import com.jarvis.breeno.assistant.tools.JarvisWebTools
 import com.jarvis.breeno.assistant.tools.McpServerConfig
 import com.jarvis.breeno.assistant.tools.McpServerStore
 import com.jarvis.breeno.assistant.tools.PhoneActionIntent
+import com.jarvis.breeno.assistant.ui.theme.JarvisAppearanceConfig
+import com.jarvis.breeno.assistant.ui.theme.JarvisAppearanceStore
+import com.jarvis.breeno.assistant.updater.LlmGenerationSettings
 import com.jarvis.breeno.assistant.updater.LocalLlmModelManager
 import com.jarvis.breeno.assistant.updater.LocalLlmPack
 import com.jarvis.breeno.assistant.updater.ModelDownloadManager
@@ -77,6 +81,9 @@ data class AiStackStatus(
     val selectedPersona: JarvisPersona = JarvisPersona.STARK_JARVIS,
     val selectedPromptTemplate: PromptTemplateFormat = PromptTemplateFormat.AUTO,
     val speechSpeed: Float = PiperTtsModelDownloadManager.DEFAULT_SPEECH_SPEED,
+    val generationSettings: LlmGenerationSettings = LlmGenerationSettings(),
+    val webToolsEnabled: Boolean = true,
+    val lastGenerationSpeed: String? = null,
 )
 
 /**
@@ -95,6 +102,8 @@ class JarvisRuntimeController(context: Context) {
     val memory = JarvisMemoryRepository(appContext)
     val documentStore = JarvisDocumentStore(appContext)
     val mcpServerStore = McpServerStore(appContext)
+    val appearanceStore = JarvisAppearanceStore(appContext)
+    private val webPrefs = appContext.getSharedPreferences("jarvis_web_tools", Context.MODE_PRIVATE)
     private val phoneActionExecutor = JarvisPhoneActionExecutor(appContext)
     private val signalsSource = AndroidRuntimeSignalsSource(appContext)
 
@@ -151,6 +160,12 @@ class JarvisRuntimeController(context: Context) {
     private val _generationWarning = MutableStateFlow<String?>(null)
     val generationWarning: StateFlow<String?> = _generationWarning.asStateFlow()
 
+    private val _appearance = MutableStateFlow(appearanceStore.load())
+    val appearance: StateFlow<JarvisAppearanceConfig> = _appearance.asStateFlow()
+
+    private val _webToolsEnabled = MutableStateFlow(webPrefs.getBoolean("web_tools_enabled", true))
+    val webToolsEnabled: StateFlow<Boolean> = _webToolsEnabled.asStateFlow()
+
     @Volatile private var vadLoaded = false
     @Volatile private var lastSpeakingState = false
     @Volatile private var userCancelledSpeech = false
@@ -194,7 +209,70 @@ class JarvisRuntimeController(context: Context) {
             selectedPersona = llmModels.selectedPersona(),
             selectedPromptTemplate = llmModels.selectedPromptTemplate(),
             speechSpeed = ttsModels.speechSpeed(),
+            generationSettings = llmModels.generationSettings(),
+            webToolsEnabled = _webToolsEnabled.value,
+            lastGenerationSpeed = llamaProvider.lastSpeedLabel,
         )
+    }
+
+    fun updateAppearance(next: JarvisAppearanceConfig) {
+        appearanceStore.save(next)
+        _appearance.value = appearanceStore.load()
+    }
+
+    fun setWebToolsEnabled(enabled: Boolean) {
+        webPrefs.edit().putBoolean("web_tools_enabled", enabled).apply()
+        _webToolsEnabled.value = enabled
+        onStackStatusChanged?.invoke()
+    }
+
+    fun saveGenerationSettings(settings: LlmGenerationSettings) {
+        llmModels.saveGenerationSettings(settings)
+        onStackStatusChanged?.invoke()
+    }
+
+    suspend fun addTextDocumentNote(title: String, rawText: String): Result<IndexedDocument> {
+        val result = documentStore.addTextNote(title, rawText)
+        refreshWorkspaceState()
+        return result
+    }
+
+    fun exportActiveDialogueMarkdown(): String {
+        val activeSession = _sessions.value.firstOrNull { it.id == _activeSessionId.value }
+        val messages = _dialogueMessages.value
+        val sb = StringBuilder()
+        sb.append("# Jarvis Ai — ").append(activeSession?.title ?: "Диалог").append("\n\n")
+        messages.forEach { msg ->
+            val who = if (msg.role == "user") "Пользователь" else "Jarvis (${msg.provider})"
+            sb.append("### ").append(who).append('\n')
+            sb.append(msg.content.trim()).append("\n\n")
+        }
+        return sb.toString().trim()
+    }
+
+    suspend fun regenerateLastReply(
+        onProgress: (String) -> Unit,
+        onTokenStream: (String) -> Unit = {},
+    ): String {
+        val lastUserMsg = _dialogueMessages.value.lastOrNull { it.role == "user" }?.content?.trim().orEmpty()
+        if (lastUserMsg.isEmpty()) return ""
+        speaker.stop()
+        return handleUserMessage(
+            text = lastUserMsg,
+            onProgress = onProgress,
+            onTokenStream = onTokenStream,
+            recordUserMessage = false,
+        )
+    }
+
+    fun deviceDiagnosticsText(): String {
+        val signals: RuntimeSignals = signalsSource.snapshot()
+        val status = currentStackStatus()
+        val llmState = status.activeLlmTitle ?: if (status.externalAiConfig.enabled) "внешний ИИ" else "не загружена"
+        val powerState = if (signals.charging) "на зарядке" else if (signals.batterySaver) "энергосбережение" else "от батареи"
+        return "Свободно RAM: ${signals.availableMemoryMb} МБ • Питание: $powerState • " +
+            "Нагрев: ${if (signals.thermalStatus in 0..6) "уровень ${signals.thermalStatus}" else "норма"} • " +
+            "Голос: ${status.speakerLabel} • Мозг: $llmState."
     }
 
     fun setMuted(muted: Boolean) {
@@ -562,15 +640,41 @@ class JarvisRuntimeController(context: Context) {
         text: String,
         onProgress: (String) -> Unit,
         onTokenStream: (String) -> Unit = {},
+        recordUserMessage: Boolean = true,
     ): String = withContext(Dispatchers.IO) {
         userCancelledSpeech = false
 
-        // 1. Instant deterministic commands (time, date, memory, status, tabs, media gen, safe phone actions)
-        val deterministic = tryDeterministicCommand(text)
+        fun persistTurn(assistantText: String, providerTag: String) {
+            if (recordUserMessage) {
+                memory.saveMessage("user", text, "user", _activeSessionId.value)
+            }
+            memory.saveMessage("assistant", assistantText, providerTag, _activeSessionId.value)
+        }
+
+        // 1. Offline Unit Converter & Instant Deterministic Commands (time, date, memory, status, tabs, media gen, safe phone actions)
+        JarvisWebTools.convertUnitsOffline(text)?.let { converted ->
+            onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
+            persistTurn(converted, "deterministic")
+            refreshWorkspaceState()
+            onTokenStream(converted)
+            onCommandCompleted?.invoke(text, converted)
+            if (!speaker.speak(converted)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            }
+            onProgress(converted)
+            return@withContext converted
+        }
+
+        val webEnrichedContext = if (_webToolsEnabled.value) {
+            fetchWebContextIfRequested(text, onProgress)
+        } else {
+            null
+        }
+
+        val deterministic = if (webEnrichedContext == null) tryDeterministicCommand(text) else null
         if (deterministic != null) {
             onOrbModeChanged?.invoke(JarvisOrbMode.EXECUTING)
-            memory.saveMessage("user", text, "user", _activeSessionId.value)
-            memory.saveMessage("assistant", deterministic, "deterministic", _activeSessionId.value)
+            persistTurn(deterministic, "deterministic")
             refreshWorkspaceState()
             onTokenStream(deterministic)
             onCommandCompleted?.invoke(text, deterministic)
@@ -584,12 +688,25 @@ class JarvisRuntimeController(context: Context) {
         val hasLocalLlm = llmModels.activeReadyPack() != null
         val extCfg = externalAiStore.load()
 
+        // If web search / URL reader returned live content and no LLM is active, return the web summary directly!
+        if (webEnrichedContext != null && !hasLocalLlm && !extCfg.enabled) {
+            val directWebReply = webEnrichedContext.directUserAnswer
+            persistTurn(directWebReply, "web-search")
+            refreshWorkspaceState()
+            onTokenStream(directWebReply)
+            onCommandCompleted?.invoke(text, directWebReply)
+            if (!speaker.speak(webEnrichedContext.spokenSummary)) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.IDLE)
+            }
+            onProgress("Найдено в сети")
+            return@withContext directWebReply
+        }
+
         // Only show setup hint when BOTH local GGUF AND external AI are unconfigured/disabled.
         if (!hasLocalLlm && !extCfg.enabled) {
             val guidance = "Я вас услышал: «$text». Сейчас не выбран ни локальный ИИ, ни внешний сервер. " +
                 "Откройте раздел «Модели ИИ» (в Настройках или через боковое меню): скачайте офлайн-набор с Dolphin 3.0 + голос Дмитрий HD, поищите GGUF на Hugging Face или импортируйте свой файл."
-            memory.saveMessage("user", text, "user", _activeSessionId.value)
-            memory.saveMessage("assistant", guidance, "setup-hint", _activeSessionId.value)
+            persistTurn(guidance, "setup-hint")
             refreshWorkspaceState()
             onTokenStream(guidance)
             onCommandCompleted?.invoke(text, guidance)
@@ -602,7 +719,7 @@ class JarvisRuntimeController(context: Context) {
 
         // 2. Real Cognitive Kernel (Local GGUF via llama.cpp -> Optional Opt-in Cloud/PC)
         onOrbModeChanged?.invoke(JarvisOrbMode.THINKING)
-        onProgress("Джарвис думает…")
+        onProgress(if (webEnrichedContext != null) "Анализирую найденное в сети…" else "Джарвис думает…")
 
         val streamSessionId = speaker.beginStreamingSession()
         val speechChunker = if (streamSessionId != null) RussianStreamingSpeechChunker(maxChunkChars = 160) else null
@@ -635,12 +752,17 @@ class JarvisRuntimeController(context: Context) {
             _generationWarning.value = warning
         }
 
+        val effectiveUserText = webEnrichedContext?.promptWithContext ?: text
         val turn = KernelTurn(
             taskId = "turn-${System.currentTimeMillis()}",
-            userText = text,
+            userText = effectiveUserText,
             locale = "ru-RU",
             networkAllowed = extCfg.enabled,
-            budget = KernelBudget(maxOutputTokens = 384, maxToolProposals = 0, timeoutMillis = 45_000),
+            budget = KernelBudget(
+                maxOutputTokens = llmModels.generationSettings().maxTokens.coerceIn(128, 1024),
+                maxToolProposals = 0,
+                timeoutMillis = 45_000,
+            ),
         )
 
         return@withContext try {
@@ -671,8 +793,7 @@ class JarvisRuntimeController(context: Context) {
                 }
             }
 
-            memory.saveMessage("user", text, "user", _activeSessionId.value)
-            memory.saveMessage("assistant", result.answer, result.modelId, _activeSessionId.value)
+            persistTurn(result.answer, result.modelId)
             refreshWorkspaceState()
             onTokenStream(result.answer)
             onCommandCompleted?.invoke(text, result.answer)
@@ -711,8 +832,7 @@ class JarvisRuntimeController(context: Context) {
             val realMsg = error.message ?: error.javaClass.simpleName
             onOrbModeChanged?.invoke(JarvisOrbMode.ERROR)
             val failText = "Ошибка ИИ: $realMsg"
-            memory.saveMessage("user", text, "user", _activeSessionId.value)
-            memory.saveMessage("assistant", failText, "error", _activeSessionId.value)
+            persistTurn(failText, "error")
             refreshWorkspaceState()
             onTokenStream(failText)
             onCommandCompleted?.invoke(text, failText)
@@ -766,12 +886,13 @@ class JarvisRuntimeController(context: Context) {
         }
 
         // Device Telemetry Status
-        if (lower.contains("статус системы") || lower.contains("сколько памяти") || lower.contains("состояние телефона")) {
-            val signals: RuntimeSignals = signalsSource.snapshot()
-            val status = currentStackStatus()
-            val llmState = status.activeLlmTitle ?: if (status.externalAiConfig.enabled) "внешний ИИ" else "не скачана"
-            return "Свободно оперативной памяти: ${signals.availableMemoryMb} МБ. " +
-                "Голос: ${status.speakerLabel}. Мозг: $llmState."
+        if (lower.contains("статус системы") ||
+            lower.contains("сколько памяти") ||
+            lower.contains("состояние телефона") ||
+            lower.contains("диагностик") ||
+            lower.contains("заряд батаре")
+        ) {
+            return deviceDiagnosticsText()
         }
 
         // Image & Video Generation Studio Voice Triggers
@@ -877,6 +998,94 @@ class JarvisRuntimeController(context: Context) {
             }
             else -> null
         }
+    }
+
+    private data class WebEnrichedContext(
+        val promptWithContext: String,
+        val directUserAnswer: String,
+        val spokenSummary: String,
+    )
+
+    private suspend fun fetchWebContextIfRequested(
+        text: String,
+        onProgress: (String) -> Unit,
+    ): WebEnrichedContext? {
+        val trimmed = text.trim()
+        val lower = trimmed.lowercase(Locale("ru", "RU"))
+
+        // 1. Read explicit https/http URL when user asks to read/summarize it
+        val urlMatch = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE).find(trimmed)?.value
+        val wantsReadUrl = urlMatch != null && (
+            lower.contains("прочит") ||
+                lower.contains("перескаж") ||
+                lower.contains("разбер") ||
+                lower.contains("о чём") ||
+                lower.contains("о чем") ||
+                lower.contains("суммар") ||
+                lower.startsWith("http")
+            )
+        if (wantsReadUrl && urlMatch != null && !lower.startsWith("открой сайт") && !lower.startsWith("открой ссылк")) {
+            onOrbModeChanged?.invoke(JarvisOrbMode.SEARCHING)
+            onProgress("Читаю страницу по ссылке…")
+            val pageRes = JarvisWebTools.readWebPage(urlMatch)
+            return pageRes.fold(
+                onSuccess = { page ->
+                    val direct = "**${page.title}**\n${page.url}\n\n${page.text.take(1800)}"
+                    val prompt = "${trimmed}\n\nСодержимое веб-страницы «${page.title}» (${page.url}):\n${page.text.take(2200)}\n\nОтветь на русском языке, опираясь на текст выше."
+                    WebEnrichedContext(
+                        promptWithContext = prompt,
+                        directUserAnswer = direct,
+                        spokenSummary = "Прочитал страницу «${page.title}». Текст выведен на экран.",
+                    )
+                },
+                onFailure = { err ->
+                    val msg = "Не удалось прочитать страницу: ${err.message ?: err.javaClass.simpleName}"
+                    WebEnrichedContext(
+                        promptWithContext = trimmed,
+                        directUserAnswer = msg,
+                        spokenSummary = msg,
+                    )
+                },
+            )
+        }
+
+        // 2. Live Web Search triggers
+        val searchRegex = Regex(
+            """^(?:(?:джарвис|пожалуйста)[,\s]+)*(?:найди\s+в\s+интернете|поищи\s+в\s+(?:интернете|сети)|загугли|погугли|веб-поиск|поиск\s+в\s+сети|найди)\s*:?\s*(.+)$""",
+            RegexOption.IGNORE_CASE,
+        )
+        val searchMatch = searchRegex.find(trimmed)
+        if (searchMatch != null) {
+            val query = searchMatch.groupValues[1].trim()
+            if (query.length >= 2) {
+                onOrbModeChanged?.invoke(JarvisOrbMode.SEARCHING)
+                onProgress("Ищу в интернете: $query…")
+                val searchRes = JarvisWebTools.searchWeb(query, maxResults = 4)
+                return searchRes.fold(
+                    onSuccess = { hits ->
+                        if (hits.isEmpty()) {
+                            val emptyMsg = "Поиск по запросу «$query» не дал результатов."
+                            WebEnrichedContext(trimmed, emptyMsg, emptyMsg)
+                        } else {
+                            val formatted = hits.mapIndexed { idx, h ->
+                                buildString {
+                                    append("${idx + 1}. ${h.title}\n${h.url}")
+                                    if (h.snippet.isNotBlank()) append("\n${h.snippet}")
+                                }
+                            }.joinToString("\n\n")
+                            val prompt = "Запрос пользователя: $trimmed\n\nРезультаты свежего веб-поиска:\n$formatted\n\nДай чёткий, полезный ответ на русском языке, опираясь на найденные факты и указывая источники."
+                            val spoken = "Вот что нашлось по запросу «$query»: ${hits.first().title}. Подробности со ссылками на экране."
+                            WebEnrichedContext(prompt, formatted, spoken)
+                        }
+                    },
+                    onFailure = { err ->
+                        val msg = "Ошибка веб-поиска (проверьте интернет): ${err.message ?: err.javaClass.simpleName}"
+                        WebEnrichedContext(trimmed, msg, msg)
+                    },
+                )
+            }
+        }
+        return null
     }
 
     fun cancelActiveWork() {

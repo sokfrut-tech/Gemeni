@@ -23,9 +23,15 @@ enum class JarvisPersona(
     ),
     DIRECT_ASSISTANT(
         id = "direct",
-        title = "Прямой (Dolphin / Hermes)",
-        systemPrompt = "Ты — прямой, эрудированный и открытый локальный ИИ-ассистент пользователя. " +
-            "Отвечай на грамотном русском языке чётко, подробно и по существу, без нравоучений, воды и лишних оговорок.",
+        title = "Прямой (Dolphin / без лекций)",
+        systemPrompt = "Ты — прямой, откровенный и максимально полезный локальный ИИ-помощник (Dolphin / Hermes). " +
+            "Отвечай по существу на русском языке, без нравоучений, без самоцензурных оговорок и лишних лекций. " +
+            "Сразу переходи к сути и решению задачи.",
+    ),
+    CUSTOM(
+        id = "custom",
+        title = "Свой промпт",
+        systemPrompt = "Ты — персональный локальный ИИ-ассистент пользователя. Отвечай точно, прямо и на русском языке.",
     );
 
     companion object {
@@ -86,6 +92,7 @@ object JarvisChatPromptBuilder {
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         documentSnippets: List<String> = emptyList(),
+        customSystemPrompt: String = "",
     ): String = when (format) {
         PromptTemplateFormat.LLAMA3 -> buildLlama3Prompt(
             userText = userText,
@@ -94,6 +101,7 @@ object JarvisChatPromptBuilder {
             systemInfoNote = systemInfoNote,
             persona = persona,
             documentSnippets = documentSnippets,
+            customSystemPrompt = customSystemPrompt,
         )
         PromptTemplateFormat.AUTO, PromptTemplateFormat.CHATML ->
             buildQwenChatMlPrompt(
@@ -103,6 +111,7 @@ object JarvisChatPromptBuilder {
                 systemInfoNote = systemInfoNote,
                 persona = persona,
                 documentSnippets = documentSnippets,
+                customSystemPrompt = customSystemPrompt,
             )
     }
 
@@ -111,8 +120,16 @@ object JarvisChatPromptBuilder {
         systemInfoNote: String,
         persona: JarvisPersona,
         documentSnippets: List<String> = emptyList(),
+        customSystemPrompt: String = "",
     ): String {
-        val systemBuilder = StringBuilder(persona.systemPrompt)
+        val basePrompt = if (persona == JarvisPersona.CUSTOM && customSystemPrompt.isNotBlank()) {
+            customSystemPrompt.trim()
+        } else if (persona == JarvisPersona.CUSTOM) {
+            JarvisPersona.DIRECT_ASSISTANT.systemPrompt
+        } else {
+            persona.systemPrompt
+        }
+        val systemBuilder = StringBuilder(basePrompt)
         if (recalledFacts.isNotEmpty()) {
             systemBuilder.append("\n\nФакты из памяти пользователя:")
             recalledFacts.forEach { fact ->
@@ -150,10 +167,11 @@ object JarvisChatPromptBuilder {
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         documentSnippets: List<String> = emptyList(),
+        customSystemPrompt: String = "",
     ): String {
         val sb = StringBuilder()
         sb.append("<|im_start|>system\n")
-        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets))
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets, customSystemPrompt))
         sb.append("<|im_end|>\n")
 
         recentTurns.takeLast(6).forEach { turn ->
@@ -179,11 +197,12 @@ object JarvisChatPromptBuilder {
         systemInfoNote: String = "",
         persona: JarvisPersona = JarvisPersona.STARK_JARVIS,
         documentSnippets: List<String> = emptyList(),
+        customSystemPrompt: String = "",
     ): String {
         val sb = StringBuilder()
         sb.append("<|begin_of_text|>")
         sb.append("<|start_header_id|>system<|end_header_id|>\n\n")
-        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets))
+        sb.append(buildSystemText(recalledFacts, systemInfoNote, persona, documentSnippets, customSystemPrompt))
         sb.append("<|eot_id|>")
 
         recentTurns.takeLast(6).forEach { turn ->

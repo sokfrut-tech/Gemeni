@@ -1,7 +1,9 @@
 package com.jarvis.breeno.assistant.updater
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -14,8 +16,21 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import java.net.URL
 import java.security.MessageDigest
+import java.util.Locale
+import java.util.zip.GZIPInputStream
+import java.util.zip.ZipInputStream
+
+data class LlmGenerationSettings(
+    val temperature: Float = 0.65f,
+    val topP: Float = 0.90f,
+    val maxTokens: Int = 384,
+    val contextLength: Int = 2048,
+    val cpuThreads: Int = 4,
+    val customSystemPrompt: String = "",
+)
 
 data class LocalLlmPack(
     val id: String,
@@ -130,6 +145,29 @@ class LocalLlmModelManager(private val context: Context) {
         prefs.edit().putString(KEY_PROMPT_TEMPLATE, format.id).apply()
     }
 
+    fun generationSettings(): LlmGenerationSettings = clampGenerationSettings(
+        LlmGenerationSettings(
+            temperature = prefs.getFloat(KEY_GEN_TEMP, 0.65f),
+            topP = prefs.getFloat(KEY_GEN_TOP_P, 0.90f),
+            maxTokens = prefs.getInt(KEY_GEN_MAX_TOKENS, 384),
+            contextLength = prefs.getInt(KEY_GEN_CTX, 2048),
+            cpuThreads = prefs.getInt(KEY_GEN_THREADS, 4),
+            customSystemPrompt = prefs.getString(KEY_GEN_CUSTOM_PROMPT, "") ?: "",
+        )
+    )
+
+    fun saveGenerationSettings(raw: LlmGenerationSettings) {
+        val clamped = clampGenerationSettings(raw)
+        prefs.edit()
+            .putFloat(KEY_GEN_TEMP, clamped.temperature)
+            .putFloat(KEY_GEN_TOP_P, clamped.topP)
+            .putInt(KEY_GEN_MAX_TOKENS, clamped.maxTokens)
+            .putInt(KEY_GEN_CTX, clamped.contextLength)
+            .putInt(KEY_GEN_THREADS, clamped.cpuThreads)
+            .putString(KEY_GEN_CUSTOM_PROMPT, clamped.customSystemPrompt)
+            .apply()
+    }
+
     fun activeReadyPack(): LocalLlmPack? {
         val selected = selectedPackId()?.let(::findPack)
         if (selected != null && isPackReady(selected.id)) {
@@ -180,23 +218,32 @@ class LocalLlmModelManager(private val context: Context) {
         target
     }
 
+    private fun openUriStream(uri: Uri): InputStream {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        val direct = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
+        if (direct != null) return direct
+        val pfd = runCatching { context.contentResolver.openFileDescriptor(uri, "r") }.getOrNull()
+        if (pfd != null) {
+            return ParcelFileDescriptor.AutoCloseInputStream(pfd)
+        }
+        error("Не удалось открыть выбранный файл по URI ($uri)")
+    }
+
     suspend fun importCustomGguf(
         uri: Uri,
         displayName: String,
         onProgress: (percent: Int) -> Unit = {},
     ): LocalLlmPack = withContext(Dispatchers.IO) {
-        val safeName = sanitizeCustomFileName(displayName)
+        var safeName = sanitizeCustomFileName(displayName)
         val packId = "custom_${System.currentTimeMillis()}"
         val customRoot = context.filesDir.resolve("models/llm/custom")
         val packDir = customRoot.resolve(packId)
         packDir.mkdirs()
-
-        val target = packDir.resolve(safeName)
-        val tmpFile = packDir.resolve("$safeName.tmp")
-        val canonRoot = customRoot.canonicalFile
-        check(target.canonicalFile.path.startsWith(canonRoot.path + File.separator)) {
-            "Недопустимое имя файла: $safeName"
-        }
 
         val expectedSize = runCatching {
             context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
@@ -209,49 +256,109 @@ class LocalLlmModelManager(private val context: Context) {
         var copiedBytes = 0L
         var lastPct = -1
 
+        fun emitProgress(copied: Long) {
+            val pct = if (expectedSize > 0) {
+                ((copied * 100L) / expectedSize).toInt().coerceIn(0, 99)
+            } else {
+                ((copied / (10L * 1024L * 1024L)) % 90 + 5).toInt().coerceIn(5, 95)
+            }
+            if (pct != lastPct) {
+                lastPct = pct
+                onProgress(pct)
+            }
+        }
+
         try {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: error("Не удалось открыть выбранный файл")
-            input.use { stream ->
-                val buf = ByteArray(128 * 1024)
-                val firstRead = stream.read(buf)
-                check(firstRead >= 4) { "Выбранный файл пуст или слишком мал" }
-                check(isValidGgufMagic(buf.copyOfRange(0, firstRead))) {
-                    "Выбранный файл не является моделью формата GGUF"
-                }
-
-                tmpFile.outputStream().use { out ->
-                    out.write(buf, 0, firstRead)
-                    digest.update(buf, 0, firstRead)
-                    copiedBytes += firstRead
-                    if (expectedSize > 0) {
-                        val pct = ((copiedBytes * 100L) / expectedSize).toInt().coerceIn(0, 99)
-                        if (pct != lastPct) {
-                            lastPct = pct
-                            onProgress(pct)
-                        }
-                    }
-
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val read = stream.read(buf)
-                        if (read <= 0) break
-                        out.write(buf, 0, read)
-                        digest.update(buf, 0, read)
-                        copiedBytes += read
-                        if (expectedSize > 0) {
-                            val pct = ((copiedBytes * 100L) / expectedSize).toInt().coerceIn(0, 99)
-                            if (pct != lastPct) {
-                                lastPct = pct
-                                onProgress(pct)
-                            }
-                        }
-                    }
-                    out.flush()
-                }
+            val headerProbe = ByteArray(8)
+            val probeLen = openUriStream(uri).use { readHeaderAtLeast(it, headerProbe, headerProbe.size) }
+            val actualHeader = headerProbe.copyOf(probeLen)
+            check(probeLen >= 4) {
+                formatHeaderDiagnostic(displayName, expectedSize, actualHeader)
             }
 
-            check(copiedBytes > 1024L) { "Скопированный GGUF-файл слишком мал" }
+            var target = packDir.resolve(safeName)
+            var tmpFile = packDir.resolve("$safeName.tmp")
+            val canonRoot = customRoot.canonicalFile
+            check(target.canonicalFile.path.startsWith(canonRoot.path + File.separator)) {
+                "Недопустимое имя файла: $safeName"
+            }
+
+            when {
+                isValidGgufMagic(actualHeader) -> {
+                    val buf = ByteArray(128 * 1024)
+                    openUriStream(uri).use { stream ->
+                        tmpFile.outputStream().use { out ->
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val read = stream.read(buf)
+                                if (read <= 0) break
+                                out.write(buf, 0, read)
+                                digest.update(buf, 0, read)
+                                copiedBytes += read
+                                emitProgress(copiedBytes)
+                            }
+                            out.flush()
+                        }
+                    }
+                }
+
+                isZipMagic(actualHeader) -> {
+                    val extracted = openUriStream(uri).use { rawStream ->
+                        copyZipGgufEntry(
+                            rawStream = rawStream,
+                            destTmpFile = tmpFile,
+                            digest = digest,
+                            checkCancelled = { currentCoroutineContext().isActive },
+                            onBytesCopied = ::emitProgress,
+                        )
+                    }
+                    copiedBytes = extracted.copiedBytes
+                    if (extracted.entryName.isNotBlank()) {
+                        val entrySafe = sanitizeCustomFileName(extracted.entryName)
+                        val newTarget = packDir.resolve(entrySafe)
+                        val newTmp = packDir.resolve("$entrySafe.tmp")
+                        check(newTarget.canonicalFile.path.startsWith(canonRoot.path + File.separator)) {
+                            "Недопустимое имя файла: $entrySafe"
+                        }
+                        if (newTmp != tmpFile && tmpFile.renameTo(newTmp)) {
+                            safeName = entrySafe
+                            target = newTarget
+                            tmpFile = newTmp
+                        }
+                    }
+                }
+
+                isGzipMagic(actualHeader) -> {
+                    val buf = ByteArray(128 * 1024)
+                    GZIPInputStream(openUriStream(uri)).use { gz ->
+                        val gzHeader = ByteArray(8)
+                        val gzRead = readHeaderAtLeast(gz, gzHeader, gzHeader.size)
+                        check(gzRead >= 4 && isValidGgufMagic(gzHeader.copyOf(gzRead))) {
+                            formatHeaderDiagnostic(displayName, expectedSize, gzHeader.copyOf(gzRead))
+                        }
+                        tmpFile.outputStream().use { out ->
+                            out.write(gzHeader, 0, gzRead)
+                            digest.update(gzHeader, 0, gzRead)
+                            copiedBytes += gzRead
+                            emitProgress(copiedBytes)
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val read = gz.read(buf)
+                                if (read <= 0) break
+                                out.write(buf, 0, read)
+                                digest.update(buf, 0, read)
+                                copiedBytes += read
+                                emitProgress(copiedBytes)
+                            }
+                            out.flush()
+                        }
+                    }
+                }
+
+                else -> error(formatHeaderDiagnostic(displayName, expectedSize, actualHeader))
+            }
+
+            check(copiedBytes > 1024L) { "Скопированный GGUF-файл слишком мал ($copiedBytes байт)" }
             if (target.exists()) target.delete()
             check(tmpFile.renameTo(target)) { "Не удалось сохранить файл модели в хранилище" }
 
@@ -414,6 +521,27 @@ class LocalLlmModelManager(private val context: Context) {
         private const val KEY_SELECTED_PERSONA = "selected_jarvis_persona"
         private const val KEY_PROMPT_TEMPLATE = "selected_prompt_template"
         private const val KEY_CUSTOM_PACKS = "custom_gguf_packs_json"
+        private const val KEY_GEN_TEMP = "gen_temperature"
+        private const val KEY_GEN_TOP_P = "gen_top_p"
+        private const val KEY_GEN_MAX_TOKENS = "gen_max_tokens"
+        private const val KEY_GEN_CTX = "gen_context_length"
+        private const val KEY_GEN_THREADS = "gen_cpu_threads"
+        private const val KEY_GEN_CUSTOM_PROMPT = "gen_custom_system_prompt"
+
+        data class ExtractedZipGguf(
+            val entryName: String,
+            val copiedBytes: Long,
+        )
+
+        fun clampGenerationSettings(raw: LlmGenerationSettings): LlmGenerationSettings =
+            LlmGenerationSettings(
+                temperature = raw.temperature.coerceIn(0.10f, 1.40f),
+                topP = raw.topP.coerceIn(0.50f, 1.00f),
+                maxTokens = raw.maxTokens.coerceIn(128, 1024),
+                contextLength = raw.contextLength.coerceIn(512, 4096),
+                cpuThreads = raw.cpuThreads.coerceIn(2, 6),
+                customSystemPrompt = raw.customSystemPrompt.trim().take(2000),
+            )
 
         fun isValidGgufMagic(header: ByteArray): Boolean =
             header.size >= 4 &&
@@ -421,6 +549,98 @@ class LocalLlmModelManager(private val context: Context) {
                 header[1] == 0x47.toByte() &&
                 header[2] == 0x55.toByte() &&
                 header[3] == 0x46.toByte()
+
+        fun isZipMagic(header: ByteArray): Boolean =
+            header.size >= 4 &&
+                header[0] == 0x50.toByte() &&
+                header[1] == 0x4B.toByte() &&
+                header[2] == 0x03.toByte() &&
+                header[3] == 0x04.toByte()
+
+        fun isGzipMagic(header: ByteArray): Boolean =
+            header.size >= 2 &&
+                header[0] == 0x1F.toByte() &&
+                header[1] == 0x8B.toByte()
+
+        fun readHeaderAtLeast(stream: InputStream, dest: ByteArray, minBytes: Int = dest.size): Int {
+            var total = 0
+            val targetLen = minOf(minBytes, dest.size)
+            while (total < targetLen) {
+                val read = stream.read(dest, total, targetLen - total)
+                if (read <= 0) break
+                total += read
+            }
+            return total
+        }
+
+        fun formatHeaderDiagnostic(
+            displayName: String,
+            sizeBytes: Long,
+            header: ByteArray,
+        ): String {
+            val count = header.size.coerceAtMost(8)
+            val hex = if (count == 0) "<пусто>" else header.take(count).joinToString(" ") { "%02X".format(it) }
+            val ascii = if (count == 0) "" else header.take(count).joinToString("") { b ->
+                val v = b.toInt() and 0xFF
+                if (v in 32..126) v.toChar().toString() else "."
+            }
+            val sizeLabel = when {
+                sizeBytes >= 1024L * 1024L -> "%.1f МБ".format(Locale.US, sizeBytes / (1024f * 1024f))
+                sizeBytes >= 1024L -> "${sizeBytes / 1024L} КБ"
+                sizeBytes >= 0L -> "$sizeBytes Б"
+                else -> "размер неизвестен"
+            }
+            val hint = when {
+                count == 0 -> "Файл пустой или проводник не отдал данные (дождитесь полного копирования в Download)."
+                ascii.startsWith("<") || ascii.startsWith("{") ->
+                    "Вместо бинарной модели выбрана HTML/JSON-страница. Проверьте реальный размер (должен быть сотни МБ)."
+                else -> "Ожидался заголовок GGUF (47 47 55 46). Возможно, файл повреждён при переносе — перекопируйте его заново."
+            }
+            return "Выбранный файл ($displayName, $sizeLabel) не является моделью GGUF: байты [$hex] ('$ascii'). $hint"
+        }
+
+        fun copyZipGgufEntry(
+            rawStream: InputStream,
+            destTmpFile: File,
+            digest: MessageDigest,
+            checkCancelled: () -> Boolean = { true },
+            onBytesCopied: (Long) -> Unit = {},
+        ): ExtractedZipGguf {
+            ZipInputStream(rawStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory) {
+                        val headerBuf = ByteArray(8)
+                        val readHead = readHeaderAtLeast(zip, headerBuf, headerBuf.size)
+                        val validMagic = readHead >= 4 && isValidGgufMagic(headerBuf.copyOf(readHead))
+                        val looksGguf = entry.name.endsWith(".gguf", ignoreCase = true)
+                        if (validMagic && (looksGguf || entry.size <= 0L || entry.size > 1024L)) {
+                            var copiedBytes = 0L
+                            val buf = ByteArray(128 * 1024)
+                            destTmpFile.outputStream().use { out ->
+                                out.write(headerBuf, 0, readHead)
+                                digest.update(headerBuf, 0, readHead)
+                                copiedBytes += readHead
+                                while (true) {
+                                    check(checkCancelled()) { "Импорт отменён" }
+                                    val n = zip.read(buf)
+                                    if (n <= 0) break
+                                    out.write(buf, 0, n)
+                                    digest.update(buf, 0, n)
+                                    copiedBytes += n
+                                    onBytesCopied(copiedBytes)
+                                }
+                                out.flush()
+                            }
+                            return ExtractedZipGguf(entry.name, copiedBytes)
+                        }
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+            error("ZIP-архив не содержит модель формата GGUF внутри")
+        }
 
         fun sanitizeCustomFileName(rawName: String): String {
             val leaf = rawName.substringAfterLast('/').substringAfterLast('\\').trim()

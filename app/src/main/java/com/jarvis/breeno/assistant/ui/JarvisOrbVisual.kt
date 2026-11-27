@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.core.JarvisOrbMode
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -70,25 +71,26 @@ fun JarvisInteractiveOrb(
     orbSize: Dp,
     modifier: Modifier = Modifier,
 ) {
+    val palette = LocalJarvisPalette.current
     val primaryAccent = when (mode) {
-        JarvisOrbMode.IDLE -> Color(0xFF00E5FF)
+        JarvisOrbMode.IDLE -> palette.primaryAccent
         JarvisOrbMode.LISTENING -> Color(0xFF38F2FF)
         JarvisOrbMode.THINKING -> Color(0xFFA78BFA)
         JarvisOrbMode.SEARCHING -> Color(0xFF0EA5E9)
-        JarvisOrbMode.EXECUTING -> Color(0xFF34D399)
-        JarvisOrbMode.SPEAKING -> Color(0xFFFFC107)
+        JarvisOrbMode.EXECUTING -> palette.successAccent
+        JarvisOrbMode.SPEAKING -> palette.secondaryAccent
         JarvisOrbMode.LEARNING -> Color(0xFFFBBF24)
         JarvisOrbMode.ERROR -> Color(0xFFFF5252)
     }
 
     val secondaryAccent = when (mode) {
-        JarvisOrbMode.IDLE -> Color(0xFFFFB300) // Classic Iron Man J.A.R.V.I.S. gold
-        JarvisOrbMode.LISTENING -> Color(0xFF00B4D8)
-        JarvisOrbMode.THINKING -> Color(0xFF00E5FF)
+        JarvisOrbMode.IDLE -> palette.secondaryAccent
+        JarvisOrbMode.LISTENING -> palette.primaryAccent
+        JarvisOrbMode.THINKING -> palette.primaryAccent
         JarvisOrbMode.SEARCHING -> Color(0xFF67E8F9)
-        JarvisOrbMode.EXECUTING -> Color(0xFF00E5FF)
-        JarvisOrbMode.SPEAKING -> Color(0xFFFF8F00)
-        JarvisOrbMode.LEARNING -> Color(0xFF00E5FF)
+        JarvisOrbMode.EXECUTING -> palette.primaryAccent
+        JarvisOrbMode.SPEAKING -> palette.primaryAccent
+        JarvisOrbMode.LEARNING -> palette.primaryAccent
         JarvisOrbMode.ERROR -> Color(0xFFFF8A80)
     }
 

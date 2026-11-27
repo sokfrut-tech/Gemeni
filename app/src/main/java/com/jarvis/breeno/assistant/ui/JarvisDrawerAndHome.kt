@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,7 +23,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -43,11 +46,14 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -91,6 +97,10 @@ import com.jarvis.breeno.assistant.core.JarvisOrbMode
 import com.jarvis.breeno.assistant.memory.ChatSession
 import com.jarvis.breeno.assistant.memory.DialogueMessage
 import com.jarvis.breeno.assistant.memory.JarvisMemoryRepository
+import com.jarvis.breeno.assistant.ui.theme.JarvisGlassTile
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
+import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
+import com.jarvis.breeno.assistant.ui.theme.jarvisTileShape
 
 enum class JarvisSection(val title: String) {
     HOME("Ядро и чат"),
@@ -104,17 +114,6 @@ enum class JarvisSection(val title: String) {
     MODELS("Модели и движки ИИ"),
 }
 
-private val DrawerBg = Color(0xFF14171E)
-private val ScreenBg = Color(0xFF0A0D14)
-private val CapsuleBg = Color(0xFF1A1E27)
-private val CapsuleBorder = Color(0xFF2B3240)
-private val BubbleAssistant = Color(0xFF161B24)
-private val BubbleUser = Color(0xFF183049)
-private val JarvisCyan = Color(0xFF56E4FF)
-private val JarvisGold = Color(0xFFFFB74D)
-private val TextPrimary = Color(0xFFF3F6FA)
-private val TextSecondary = Color(0xFF96A1B2)
-
 private val PROMPT_IDEAS_SETS = listOf(
     listOf(
         "Поставь таймер на 5 минут",
@@ -124,12 +123,12 @@ private val PROMPT_IDEAS_SETS = listOf(
     listOf(
         "Посчитай (1250 + 350) * 0.15",
         "Что ты помнишь обо мне?",
-        "Создай видео космический корабль в туманности",
+        "Найди в интернете курс биткоина сегодня",
     ),
     listOf(
         "Покажи статус системы",
         "Включи фонарик",
-        "Открой настройки Wi-Fi",
+        "Переведи 42 км в мили",
     ),
 )
 
@@ -147,6 +146,7 @@ fun JarvisNavigationDrawerSheet(
     onNewSession: () -> Unit,
     onDeleteSession: (String) -> Unit,
 ) {
+    val palette = LocalJarvisPalette.current
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -159,8 +159,8 @@ fun JarvisNavigationDrawerSheet(
     }
 
     ModalDrawerSheet(
-        drawerContainerColor = DrawerBg,
-        drawerContentColor = TextPrimary,
+        drawerContainerColor = palette.drawerBg,
+        drawerContentColor = palette.textPrimary,
         modifier = Modifier.widthIn(max = 316.dp),
     ) {
         Column(
@@ -170,7 +170,7 @@ fun JarvisNavigationDrawerSheet(
                 .navigationBarsPadding()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            // Drawer Header (matches Фото 7: Jarvis Ai identity + top-right Settings gear)
+            // Drawer Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -184,11 +184,11 @@ fun JarvisNavigationDrawerSheet(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
-                                    colors = listOf(Color(0xFF7BF2FF), Color(0xFF0A4D7A)),
+                                    colors = listOf(palette.primaryAccent, palette.secondaryAccent.copy(alpha = 0.45f), palette.bgTop),
                                 )
                             ),
                         contentAlignment = Alignment.Center,
@@ -199,7 +199,7 @@ fun JarvisNavigationDrawerSheet(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Jarvis Ai",
-                            color = TextPrimary,
+                            color = palette.textPrimary,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -210,7 +210,7 @@ fun JarvisNavigationDrawerSheet(
                             } else {
                                 "Офлайн ядро"
                             },
-                            color = TextSecondary,
+                            color = palette.primaryAccent,
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -221,14 +221,14 @@ fun JarvisNavigationDrawerSheet(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Настройки из меню",
-                        tint = TextPrimary,
+                        tint = palette.primaryAccent,
                     )
                 }
             }
 
             Spacer(Modifier.height(6.dp))
 
-            // Primary Capabilities Modules (matching Фото 7 top links)
+            // Primary Capabilities Modules
             DrawerModuleRow(
                 icon = Icons.Default.AutoAwesome,
                 title = "Ядро и чат",
@@ -276,13 +276,13 @@ fun JarvisNavigationDrawerSheet(
             )
 
             HorizontalDivider(
-                color = CapsuleBorder,
+                color = palette.tileBorder.copy(alpha = 0.35f),
                 modifier = Modifier.padding(vertical = 8.dp),
             )
 
             Text(
                 text = "Список диалогов",
-                color = TextSecondary,
+                color = palette.textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             )
@@ -317,7 +317,7 @@ fun JarvisNavigationDrawerSheet(
                     item {
                         Text(
                             text = "История диалогов пуста",
-                            color = TextSecondary,
+                            color = palette.textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
                         )
@@ -327,7 +327,7 @@ fun JarvisNavigationDrawerSheet(
                         item(key = "bucket_${bucket.name}") {
                             Text(
                                 text = bucket.title,
-                                color = TextSecondary,
+                                color = palette.textSecondary,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
@@ -338,8 +338,8 @@ fun JarvisNavigationDrawerSheet(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isActive) Color(0xFF212938) else Color.Transparent)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isActive) palette.tileBgAlt else Color.Transparent)
                                     .clickable { onSelectSession(session.id) }
                                     .padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -347,7 +347,7 @@ fun JarvisNavigationDrawerSheet(
                             ) {
                                 Text(
                                     text = session.title,
-                                    color = if (isActive) JarvisCyan else TextPrimary,
+                                    color = if (isActive) palette.primaryAccent else palette.textPrimary,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -357,7 +357,7 @@ fun JarvisNavigationDrawerSheet(
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Удалить диалог",
-                                        tint = TextSecondary.copy(alpha = 0.7f),
+                                        tint = palette.textSecondary.copy(alpha = 0.7f),
                                         modifier = Modifier
                                             .size(18.dp)
                                             .clickable { onDeleteSession(session.id) },
@@ -371,7 +371,6 @@ fun JarvisNavigationDrawerSheet(
 
             Spacer(Modifier.height(6.dp))
 
-            // Bottom sticky bar: Search icon + New Dialogue button (matches Фото 7)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -379,8 +378,8 @@ fun JarvisNavigationDrawerSheet(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = CapsuleBg,
-                    border = BorderStroke(1.dp, CapsuleBorder),
+                    color = palette.tileBg,
+                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.5f)),
                     modifier = Modifier.size(44.dp),
                     onClick = { showSearch = !showSearch },
                 ) {
@@ -388,14 +387,14 @@ fun JarvisNavigationDrawerSheet(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Поиск диалогов",
-                            tint = if (showSearch) JarvisCyan else TextPrimary,
+                            tint = if (showSearch) palette.primaryAccent else palette.textPrimary,
                         )
                     }
                 }
                 Surface(
                     shape = RoundedCornerShape(22.dp),
-                    color = CapsuleBg,
-                    border = BorderStroke(1.dp, CapsuleBorder),
+                    color = palette.tileBg,
+                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.5f)),
                     modifier = Modifier
                         .weight(1f)
                         .height(44.dp),
@@ -409,13 +408,13 @@ fun JarvisNavigationDrawerSheet(
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = null,
-                            tint = TextPrimary,
+                            tint = palette.primaryAccent,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = "Новый диалог",
-                            color = TextPrimary,
+                            color = palette.textPrimary,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Medium,
                         )
@@ -434,11 +433,12 @@ private fun DrawerModuleRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val palette = LocalJarvisPalette.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) Color(0xFF202A3A) else Color.Transparent)
+            .clip(jarvisTileShape(palette, 10.dp))
+            .background(if (selected) palette.tileBgAlt else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -446,13 +446,13 @@ private fun DrawerModuleRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (selected) JarvisCyan else TextPrimary,
+            tint = if (selected) palette.primaryAccent else palette.textPrimary,
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = title,
-            color = if (selected) JarvisCyan else TextPrimary,
+            color = if (selected) palette.primaryAccent else palette.textPrimary,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             modifier = Modifier.weight(1f),
@@ -460,11 +460,11 @@ private fun DrawerModuleRow(
         if (!badgeText.isNullOrBlank()) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF263244),
+                color = palette.primaryAccent.copy(alpha = 0.16f),
             ) {
                 Text(
                     text = badgeText,
-                    color = JarvisCyan,
+                    color = palette.primaryAccent,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                 )
@@ -502,7 +502,10 @@ fun JarvisHomeScreen(
     onOpenSettings: () -> Unit,
     onAttachDocument: () -> Unit,
     onOpenSection: (JarvisSection) -> Unit,
+    onRegenerateLast: () -> Unit = {},
+    onExportDialogue: () -> Unit = {},
 ) {
+    val palette = LocalJarvisPalette.current
     var textQuery by remember { mutableStateOf("") }
     var promptIdeaSetIndex by remember { mutableIntStateOf(0) }
     var showToolsSheet by remember { mutableStateOf(false) }
@@ -531,6 +534,7 @@ fun JarvisHomeScreen(
         listening -> "Я СЛУШАЮ"
         speaking -> "Я ОТВЕЧАЮ"
         orbMode == JarvisOrbMode.ERROR -> "ОШИБКА ЯДРА"
+        orbMode == JarvisOrbMode.SEARCHING -> "ПОИСК В СЕТИ"
         orbMode == JarvisOrbMode.EXECUTING -> "ВЫПОЛНЯЮ"
         busy -> "Я ДУМАЮ"
         else -> "Я РЯДОМ"
@@ -551,75 +555,86 @@ fun JarvisHomeScreen(
     if (showToolsSheet) {
         ModalBottomSheet(
             onDismissRequest = { showToolsSheet = false },
-            containerColor = DrawerBg,
-            contentColor = TextPrimary,
+            containerColor = palette.drawerBg,
+            contentColor = palette.textPrimary,
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Инструменты Jarvis Ai",
-                    color = TextPrimary,
+                    text = "Модули Jarvis Ai",
+                    color = palette.primaryAccent,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
-                DrawerModuleRow(
-                    icon = Icons.Default.AttachFile,
-                    title = "Загрузить документ (TXT / MD / PDF)",
-                    selected = false,
-                    onClick = {
-                        showToolsSheet = false
-                        onAttachDocument()
-                    },
-                )
-                DrawerModuleRow(
-                    icon = Icons.Default.Image,
-                    title = "Студия ИИ — картинки и видео",
-                    selected = false,
-                    onClick = {
-                        showToolsSheet = false
-                        onOpenSection(JarvisSection.STUDIO)
-                    },
-                )
-                DrawerModuleRow(
-                    icon = Icons.Default.Download,
-                    title = "SaveVideo — скачивание медиа",
-                    selected = false,
-                    onClick = {
-                        showToolsSheet = false
-                        onOpenSection(JarvisSection.SAVE_VIDEO)
-                    },
-                )
-                DrawerModuleRow(
-                    icon = Icons.Default.Psychology,
-                    title = "Память Джарвиса (SecretGuard)",
-                    selected = false,
-                    onClick = {
-                        showToolsSheet = false
-                        onOpenSection(JarvisSection.MEMORY)
-                    },
-                )
-                DrawerModuleRow(
-                    icon = Icons.Default.Build,
-                    title = "Действия телефона и MCP",
-                    selected = false,
-                    onClick = {
-                        showToolsSheet = false
-                        onOpenSection(JarvisSection.TOOLS_MCP)
-                    },
-                )
-                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    JarvisGlassTile(
+                        title = "Документ RAG",
+                        subtitle = "TXT, MD, PDF",
+                        icon = Icons.Default.AttachFile,
+                        accent = palette.primaryAccent,
+                        onClick = { showToolsSheet = false; onAttachDocument() },
+                        modifier = Modifier.weight(1f),
+                    )
+                    JarvisGlassTile(
+                        title = "Студия ИИ",
+                        subtitle = "Фото и видео",
+                        icon = Icons.Default.Image,
+                        accent = palette.secondaryAccent,
+                        onClick = { showToolsSheet = false; onOpenSection(JarvisSection.STUDIO) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    JarvisGlassTile(
+                        title = "Инструменты",
+                        subtitle = "Поиск, URL, MCP",
+                        icon = Icons.Default.Build,
+                        accent = palette.successAccent,
+                        onClick = { showToolsSheet = false; onOpenSection(JarvisSection.TOOLS_MCP) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    JarvisGlassTile(
+                        title = "SaveVideo",
+                        subtitle = "Очередь медиа",
+                        icon = Icons.Default.Download,
+                        accent = palette.primaryAccent,
+                        onClick = { showToolsSheet = false; onOpenSection(JarvisSection.SAVE_VIDEO) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    JarvisGlassTile(
+                        title = "Память",
+                        subtitle = "SecretGuard",
+                        icon = Icons.Default.Psychology,
+                        accent = palette.secondaryAccent,
+                        onClick = { showToolsSheet = false; onOpenSection(JarvisSection.MEMORY) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    JarvisGlassTile(
+                        title = "Модели ИИ",
+                        subtitle = "GGUF и голоса",
+                        icon = Icons.Default.AutoAwesome,
+                        accent = palette.primaryAccent,
+                        onClick = { showToolsSheet = false; onOpenModels() },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
             }
         }
     }
 
+    val hasMessages = dialogueFeed.isNotEmpty() || !streamingReply.isNullOrBlank()
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBg)
+            .background(jarvisScreenBackground(palette))
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
@@ -630,7 +645,7 @@ fun JarvisHomeScreen(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Top bar: Hamburger Drawer ≡ + Model Pill + Voice/Mute + Gear Settings
+            // Top bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -644,21 +659,21 @@ fun JarvisHomeScreen(
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = "Меню возможностей",
-                            tint = TextPrimary,
+                            tint = palette.textPrimary,
                         )
                     }
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = CapsuleBg,
-                        border = BorderStroke(1.dp, CapsuleBorder),
+                        shape = jarvisTileShape(palette, 12.dp),
+                        color = palette.tileBg,
+                        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.65f)),
                         onClick = onOpenModels,
                     ) {
                         Text(
                             text = if (activeTasksCount > 0) "ЗАДАЧ: $activeTasksCount • $brainBadge" else brainBadge,
                             color = if (stackStatus.activeLlmId != null || stackStatus.externalAiConfig.enabled) {
-                                Color(0xFF34D399)
+                                palette.successAccent
                             } else {
-                                JarvisGold
+                                palette.secondaryAccent
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
@@ -669,25 +684,34 @@ fun JarvisHomeScreen(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (hasMessages) {
+                        IconButton(onClick = onExportDialogue) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Экспорт диалога",
+                                tint = palette.textSecondary,
+                            )
+                        }
+                    }
                     IconButton(onClick = onToggleContinuous) {
                         Icon(
                             imageVector = Icons.Default.RecordVoiceOver,
                             contentDescription = if (continuousDialogue) "Выключить живой диалог" else "Включить живой диалог",
-                            tint = if (continuousDialogue) JarvisGold else TextSecondary,
+                            tint = if (continuousDialogue) palette.secondaryAccent else palette.textSecondary,
                         )
                     }
                     IconButton(onClick = onToggleMute) {
                         Icon(
                             imageVector = if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
                             contentDescription = if (muted) "Включить звук" else "Выключить звук",
-                            tint = if (muted) Color(0xFFFF9C9C) else TextSecondary,
+                            tint = if (muted) palette.errorAccent else palette.textSecondary,
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Настройки",
-                            tint = TextPrimary,
+                            tint = palette.textPrimary,
                         )
                     }
                 }
@@ -702,7 +726,7 @@ fun JarvisHomeScreen(
                 ) {
                     Text(
                         text = "${downloadState.label} (${downloadState.percent}%)",
-                        color = JarvisCyan,
+                        color = palette.primaryAccent,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -710,13 +734,12 @@ fun JarvisHomeScreen(
                     LinearProgressIndicator(
                         progress = { (downloadState.percent / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
+                        color = palette.primaryAccent,
                     )
                 }
             }
 
-            val hasMessages = dialogueFeed.isNotEmpty() || !streamingReply.isNullOrBlank()
             if (!hasMessages) {
-                // Clean centerpiece 3D Universe Orb + greeting + rotating prompt chips (Фото 1 + Фото 6)
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -726,7 +749,7 @@ fun JarvisHomeScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(
@@ -739,24 +762,24 @@ fun JarvisHomeScreen(
                             JarvisInteractiveOrb(
                                 mode = resolvedOrbMode,
                                 audioRms = audioRms,
-                                orbSize = if (compact) 144.dp else 192.dp,
+                                orbSize = if (compact) 136.dp else 176.dp,
                             )
                         }
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(6.dp))
 
                         Text(
                             text = orbTitle,
-                            color = if (listening) JarvisCyan else if (speaking) JarvisGold else TextPrimary,
+                            color = if (listening) palette.primaryAccent else if (speaking) palette.secondaryAccent else palette.textPrimary,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = status,
                             color = if (status.startsWith("ОШИБКА") || status.startsWith("РУССКИЙ ГОЛОС")) {
-                                Color(0xFFFF9C9C)
+                                palette.errorAccent
                             } else {
-                                JarvisCyan
+                                palette.primaryAccent
                             },
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
@@ -766,57 +789,107 @@ fun JarvisHomeScreen(
                         )
                         Text(
                             text = orbHint,
-                            color = TextSecondary,
+                            color = palette.textSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 4.dp, bottom = if (compact) 8.dp else 14.dp),
+                            modifier = Modifier.padding(top = 3.dp, bottom = if (compact) 6.dp else 10.dp),
                         )
 
-                        // Sleek Foto-6 inspired prompt suggestion pills
+                        // Prompt ideas
                         val ideas = PROMPT_IDEAS_SETS[promptIdeaSetIndex % PROMPT_IDEAS_SETS.size]
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             ideas.forEach { suggestion ->
                                 Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = CapsuleBg,
-                                    border = BorderStroke(1.dp, CapsuleBorder),
+                                    shape = jarvisTileShape(palette, 14.dp),
+                                    color = palette.tileBg,
+                                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.45f)),
                                     onClick = { onSendText(suggestion) },
                                 ) {
                                     Text(
                                         text = suggestion,
-                                        color = TextPrimary,
+                                        color = palette.textPrimary,
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
                                     )
                                 }
                             }
                             TextButton(
                                 onClick = { promptIdeaSetIndex = (promptIdeaSetIndex + 1) % PROMPT_IDEAS_SETS.size },
                             ) {
-                                Text("Другие идеи", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                                Text("Другие идеи", color = palette.textSecondary, style = MaterialTheme.typography.labelMedium)
                                 Spacer(Modifier.width(4.dp))
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Сменить идеи",
-                                    tint = TextSecondary,
+                                    tint = palette.textSecondary,
                                     modifier = Modifier.size(16.dp),
                                 )
                             }
                         }
+
+                        // Compact glass HUD tiles strip (never titled "БЫСТРЫЕ ДЕЙСТВИЯ")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            JarvisGlassTile(
+                                title = "Веб-поиск",
+                                subtitle = "Живые факты",
+                                icon = Icons.Default.Public,
+                                accent = palette.primaryAccent,
+                                onClick = { onOpenSection(JarvisSection.TOOLS_MCP) },
+                                modifier = Modifier.width(126.dp),
+                            )
+                            JarvisGlassTile(
+                                title = "Модели",
+                                subtitle = "Dolphin / Qwen",
+                                icon = Icons.Default.AutoAwesome,
+                                accent = palette.secondaryAccent,
+                                onClick = onOpenModels,
+                                modifier = Modifier.width(126.dp),
+                            )
+                            JarvisGlassTile(
+                                title = "Документы",
+                                subtitle = "Заметки и RAG",
+                                icon = Icons.Default.Description,
+                                accent = palette.successAccent,
+                                onClick = { onOpenSection(JarvisSection.DOCUMENTS) },
+                                modifier = Modifier.width(126.dp),
+                            )
+                            JarvisGlassTile(
+                                title = "Студия ИИ",
+                                subtitle = "Арт и Видео",
+                                icon = Icons.Default.Image,
+                                accent = palette.primaryAccent,
+                                onClick = { onOpenSection(JarvisSection.STUDIO) },
+                                modifier = Modifier.width(126.dp),
+                            )
+                            JarvisGlassTile(
+                                title = "Темы HUD",
+                                subtitle = "Стиль и шрифт",
+                                icon = Icons.Default.Palette,
+                                accent = palette.secondaryAccent,
+                                onClick = onOpenSettings,
+                                modifier = Modifier.width(126.dp),
+                            )
+                        }
                     }
                 }
             } else {
-                // Active Dialogue View: compact live 3D Orb bar + full scrollable message bubbles
+                // Active Dialogue View
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = BubbleAssistant,
-                    border = BorderStroke(1.dp, CapsuleBorder),
+                    shape = jarvisTileShape(palette, 16.dp),
+                    color = palette.tileBg,
+                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.55f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
@@ -841,20 +914,20 @@ fun JarvisHomeScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = orbTitle,
-                                color = if (listening) JarvisCyan else TextPrimary,
+                                color = if (listening) palette.primaryAccent else palette.textPrimary,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
                                 text = status,
-                                color = JarvisCyan,
+                                color = palette.primaryAccent,
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = orbHint,
-                                color = TextSecondary,
+                                color = palette.textSecondary,
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -864,7 +937,7 @@ fun JarvisHomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Новый диалог",
-                                tint = TextSecondary,
+                                tint = palette.textSecondary,
                             )
                         }
                     }
@@ -878,13 +951,16 @@ fun JarvisHomeScreen(
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(dialogueFeed, key = { it.id }) { msg ->
+                    itemsIndexed(dialogueFeed, key = { _, msg -> msg.id }) { idx, msg ->
+                        val isLastAssistant = !busy && idx == dialogueFeed.lastIndex && msg.role != "user"
                         DialogueBubbleRow(
                             role = msg.role,
                             content = msg.content,
                             provider = msg.provider,
+                            speedBadge = if (isLastAssistant) stackStatus.lastGenerationSpeed else null,
                             onCopy = { clipboard.setText(AnnotatedString(msg.content)) },
                             onSpeak = { onSpeakText(msg.content) },
+                            onRegenerate = if (isLastAssistant) onRegenerateLast else null,
                         )
                     }
                     if (!streamingReply.isNullOrBlank()) {
@@ -893,8 +969,10 @@ fun JarvisHomeScreen(
                                 role = "assistant",
                                 content = streamingReply,
                                 provider = "генерация…",
+                                speedBadge = null,
                                 onCopy = { clipboard.setText(AnnotatedString(streamingReply)) },
                                 onSpeak = null,
+                                onRegenerate = null,
                             )
                         }
                     }
@@ -905,7 +983,7 @@ fun JarvisHomeScreen(
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFF332410),
-                    border = BorderStroke(1.dp, JarvisGold.copy(alpha = 0.6f)),
+                    border = BorderStroke(1.dp, palette.secondaryAccent.copy(alpha = 0.65f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 6.dp),
@@ -919,22 +997,22 @@ fun JarvisHomeScreen(
                     ) {
                         Text(
                             text = generationWarning,
-                            color = JarvisGold,
+                            color = palette.secondaryAccent,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = onStopWork) {
-                            Text("Стоп", color = Color(0xFFFF8A8A))
+                            Text("Стоп", color = palette.errorAccent)
                         }
                     }
                 }
             }
 
-            // Bottom dark capsule matching Фото 6 (Attach Doc | Input Field | Mic | + / Send)
+            // Bottom Glass Capsule Input Bar
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = CapsuleBg,
-                border = BorderStroke(1.dp, CapsuleBorder),
+                color = palette.tileBg,
+                border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.65f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp, bottom = 2.dp),
@@ -949,7 +1027,7 @@ fun JarvisHomeScreen(
                         Icon(
                             imageVector = Icons.Default.AttachFile,
                             contentDescription = "Прикрепить документ",
-                            tint = TextSecondary,
+                            tint = palette.textSecondary,
                         )
                     }
 
@@ -959,7 +1037,7 @@ fun JarvisHomeScreen(
                         placeholder = {
                             Text(
                                 text = "Спросить…",
-                                color = TextSecondary,
+                                color = palette.textSecondary,
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -977,14 +1055,14 @@ fun JarvisHomeScreen(
                             },
                         ),
                         colors = TextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
+                            focusedTextColor = palette.textPrimary,
+                            unfocusedTextColor = palette.textPrimary,
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             disabledContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = JarvisCyan,
+                            cursorColor = palette.primaryAccent,
                         ),
                         modifier = Modifier.weight(1f),
                     )
@@ -994,7 +1072,7 @@ fun JarvisHomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Stop,
                                 contentDescription = "Остановить",
-                                tint = Color(0xFFFF8A8A),
+                                tint = palette.errorAccent,
                             )
                         }
                     } else {
@@ -1002,7 +1080,7 @@ fun JarvisHomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Mic,
                                 contentDescription = "Голосовой ввод",
-                                tint = JarvisCyan,
+                                tint = palette.primaryAccent,
                             )
                         }
                         if (textQuery.isNotBlank()) {
@@ -1018,7 +1096,7 @@ fun JarvisHomeScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Send,
                                     contentDescription = "Отправить",
-                                    tint = JarvisCyan,
+                                    tint = palette.primaryAccent,
                                 )
                             }
                         } else {
@@ -1026,7 +1104,7 @@ fun JarvisHomeScreen(
                                 Icon(
                                     imageVector = Icons.Default.AddCircleOutline,
                                     contentDescription = "Быстрые возможности",
-                                    tint = TextPrimary,
+                                    tint = palette.textPrimary,
                                 )
                             }
                         }
@@ -1042,36 +1120,48 @@ private fun DialogueBubbleRow(
     role: String,
     content: String,
     provider: String,
+    speedBadge: String?,
     onCopy: () -> Unit,
     onSpeak: (() -> Unit)?,
+    onRegenerate: (() -> Unit)?,
 ) {
+    val palette = LocalJarvisPalette.current
     val isUser = role == "user"
-    val displayProvider = when (provider) {
+    val baseProvider = when (provider) {
         "deterministic" -> "Мгновенный ответ"
+        "web-search" -> "Веб-поиск"
         "setup-hint" -> "Подсказка"
         "error" -> "Ошибка"
         "llama-cpp-local" -> "Локальный ИИ"
         "генерация…" -> "Генерация…"
         else -> provider
     }
+    val displayProvider = if (!speedBadge.isNullOrBlank() && provider != "deterministic" && provider != "web-search" && provider != "setup-hint" && provider != "error") {
+        "$baseProvider • $speedBadge"
+    } else {
+        baseProvider
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (isUser) BubbleUser else BubbleAssistant,
-            border = BorderStroke(1.dp, if (isUser) Color(0xFF284D75) else CapsuleBorder),
-            modifier = Modifier.widthIn(max = 310.dp),
+            shape = jarvisTileShape(palette, 15.dp),
+            color = if (isUser) palette.bubbleUser else palette.bubbleAssistant,
+            border = BorderStroke(
+                1.dp,
+                if (isUser) palette.primaryAccent.copy(alpha = 0.50f) else palette.tileBorder.copy(alpha = 0.45f),
+            ),
+            modifier = Modifier.widthIn(max = 315.dp),
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                 Text(
                     text = content,
-                    color = TextPrimary,
+                    color = palette.textPrimary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (!isUser) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(5.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1079,17 +1169,17 @@ private fun DialogueBubbleRow(
                     ) {
                         Text(
                             text = displayProvider,
-                            color = TextSecondary,
+                            color = palette.textSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = "Копировать ответ",
-                                tint = TextSecondary,
+                                tint = palette.textSecondary,
                                 modifier = Modifier
                                     .size(18.dp)
                                     .clickable(onClick = onCopy),
@@ -1099,10 +1189,21 @@ private fun DialogueBubbleRow(
                                 Icon(
                                     imageVector = Icons.Default.VolumeUp,
                                     contentDescription = "Озвучить ответ",
-                                    tint = JarvisCyan,
+                                    tint = palette.primaryAccent,
                                     modifier = Modifier
                                         .size(18.dp)
                                         .clickable(onClick = onSpeak),
+                                )
+                            }
+                            if (onRegenerate != null) {
+                                Spacer(Modifier.width(10.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Повторить ответ",
+                                    tint = palette.secondaryAccent,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable(onClick = onRegenerate),
                                 )
                             }
                         }

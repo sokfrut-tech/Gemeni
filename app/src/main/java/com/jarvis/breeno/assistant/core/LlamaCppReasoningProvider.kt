@@ -42,6 +42,9 @@ class LlamaCppReasoningProvider(
     @Volatile private var loadedHandle: Long = 0L
     @Volatile private var loadedPackId: String? = null
     @Volatile private var loadedNCtx: Int = 0
+    @Volatile private var loadedThreads: Int = 0
+    @Volatile var lastSpeedLabel: String? = null
+        private set
 
     override suspend fun availability(): ProviderAvailability {
         if (!LlamaNativeBridge.isNativeLibraryLoaded) {
@@ -62,24 +65,26 @@ class LlamaCppReasoningProvider(
         val pack = modelManager.activeReadyPack()
             ?: error("Нет готовой локальной модели GGUF")
         val verifiedFile = modelManager.verifyBeforeLoad(pack)
+        val genSettings = modelManager.generationSettings()
         val isLarge8B = pack.sizeBytes >= 3_500_000_000L
-        val requestedCtx = if (isLarge8B) 1024 else (turn.budget.maxOutputTokens * 2).coerceIn(1024, 2048)
+        val maxSafeCtx = if (isLarge8B) 1536 else 4096
+        val requestedCtx = minOf(genSettings.contextLength, maxSafeCtx).coerceAtLeast(512)
+        val maxThreads = if (isLarge8B) 4 else 6
+        val requestedThreads = minOf(genSettings.cpuThreads, Runtime.getRuntime().availableProcessors()).coerceIn(2, maxThreads)
 
         return withContext(inferenceDispatcher) {
             try {
-                if (loadedHandle == 0L || loadedPackId != pack.id || loadedNCtx != requestedCtx) {
+                if (loadedHandle == 0L || loadedPackId != pack.id || loadedNCtx != requestedCtx || loadedThreads != requestedThreads) {
                     if (loadedHandle != 0L) {
                         LlamaNativeBridge.nativeUnload(loadedHandle)
                         loadedHandle = 0L
                         loadedPackId = null
                     }
-                    val maxThreads = if (isLarge8B) 4 else 6
-                    val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, maxThreads)
                     onStatusUpdate?.invoke("Загружаю ${pack.title} в память…")
                     val handle = LlamaNativeBridge.nativeLoadModel(
                         modelPath = verifiedFile.absolutePath,
                         nCtx = requestedCtx,
-                        nThreads = threads,
+                        nThreads = requestedThreads,
                     )
                     check(handle != 0L) {
                         "Не удалось загрузить модель ${pack.title} в память (возможно, нехватка RAM)"
@@ -87,6 +92,7 @@ class LlamaCppReasoningProvider(
                     loadedHandle = handle
                     loadedPackId = pack.id
                     loadedNCtx = requestedCtx
+                    loadedThreads = requestedThreads
                 }
 
                 onStatusUpdate?.invoke("Джарвис генерирует ответ…")
@@ -107,10 +113,13 @@ class LlamaCppReasoningProvider(
                     recalledFacts = recalledFacts,
                     persona = modelManager.selectedPersona(),
                     documentSnippets = documentSnippets,
+                    customSystemPrompt = genSettings.customSystemPrompt,
                 )
 
                 val streamedBuffer = StringBuilder()
-                val lastTokenAtMs = AtomicLong(System.currentTimeMillis())
+                var tokenCallbacksCount = 0
+                val genStartMs = System.currentTimeMillis()
+                val lastTokenAtMs = AtomicLong(genStartMs)
                 val warnedAboutStall = AtomicBoolean(false)
                 val watchdogJob = watchdogScope.launch {
                     val thresholdMs = stallWarnDelayMs.coerceAtLeast(10_000L)
@@ -126,10 +135,11 @@ class LlamaCppReasoningProvider(
                     LlamaNativeBridge.nativeGenerate(
                         handle = loadedHandle,
                         prompt = prompt,
-                        maxTokens = turn.budget.maxOutputTokens.coerceIn(64, 512),
-                        temperature = 0.65f,
-                        topP = 0.90f,
+                        maxTokens = maxOf(genSettings.maxTokens, turn.budget.maxOutputTokens).coerceIn(128, 1024),
+                        temperature = genSettings.temperature,
+                        topP = genSettings.topP,
                         callback = TokenCallback { piece ->
+                            tokenCallbacksCount++
                             lastTokenAtMs.set(System.currentTimeMillis())
                             if (warnedAboutStall.compareAndSet(true, false)) {
                                 onStallWarning?.invoke(null)
@@ -144,6 +154,14 @@ class LlamaCppReasoningProvider(
                 } finally {
                     watchdogJob.cancel()
                     onStallWarning?.invoke(null)
+                }
+
+                val elapsedSec = ((System.currentTimeMillis() - genStartMs) / 1000.0).coerceAtLeast(0.1)
+                lastSpeedLabel = if (tokenCallbacksCount > 2) {
+                    val tps = tokenCallbacksCount / elapsedSec
+                    String.format(java.util.Locale.US, "%.1f т/с • %.1f с", tps, elapsedSec)
+                } else {
+                    String.format(java.util.Locale.US, "%.1f с", elapsedSec)
                 }
 
                 val cleanAnswer = JarvisChatPromptBuilder.sanitizeOutput(rawOutput)
@@ -178,6 +196,7 @@ class LlamaCppReasoningProvider(
             loadedHandle = 0L
             loadedPackId = null
             loadedNCtx = 0
+            loadedThreads = 0
         }
     }
 

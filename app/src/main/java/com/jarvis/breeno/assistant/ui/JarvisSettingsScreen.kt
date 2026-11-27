@@ -2,9 +2,11 @@ package com.jarvis.breeno.assistant.ui
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -44,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -51,20 +57,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jarvis.breeno.assistant.BuildConfig
 import com.jarvis.breeno.assistant.core.LlamaNativeBridge
+import com.jarvis.breeno.assistant.ui.theme.JarvisAppearanceConfig
+import com.jarvis.breeno.assistant.ui.theme.JarvisFontStyle
+import com.jarvis.breeno.assistant.ui.theme.JarvisThemePreset
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
+import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
+import com.jarvis.breeno.assistant.ui.theme.jarvisTileShape
+import com.jarvis.breeno.assistant.ui.theme.paletteForTheme
 import java.util.Locale
 
-private val SettingsBg = Color(0xFF0A0D14)
-private val SettingsCardBg = Color(0xFF171A22)
-private val SettingsDivider = Color(0xFF252A36)
-private val SettingsCyan = Color(0xFF56E4FF)
-private val SettingsText = Color(0xFFF3F6FA)
-private val SettingsMuted = Color(0xFF96A1B2)
-private val SettingsGreen = Color(0xFF34D399)
-
-/**
- * Structured ColorOS/Breeno-inspired Settings screen (Фото 8) where every row/subgroup
- * is an independent LazyColumn item for reliable scrolling and tapping across all screen sizes.
- */
 @Composable
 fun JarvisSettingsScreen(
     stackStatus: AiStackStatus,
@@ -84,13 +85,19 @@ fun JarvisSettingsScreen(
     onClearCache: () -> Long,
     onNavigateSection: (JarvisSection) -> Unit,
     onImportCustomGguf: () -> Unit,
+    appearance: JarvisAppearanceConfig = JarvisAppearanceConfig(),
+    onUpdateAppearance: (JarvisAppearanceConfig) -> Unit = {},
+    webToolsEnabled: Boolean = true,
+    onToggleWebTools: (Boolean) -> Unit = {},
 ) {
+    val palette = LocalJarvisPalette.current
     val context = LocalContext.current
     var showBanner by remember { mutableStateOf(true) }
     var voiceExpanded by remember { mutableStateOf(false) }
     var asrExpanded by remember { mutableStateOf(false) }
     var modelsExpanded by remember { mutableStateOf(false) }
     var enginesExpanded by remember { mutableStateOf(false) }
+    var appearanceExpanded by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
     var currentCacheBytes by remember(cacheBytes) { mutableLongStateOf(cacheBytes) }
     var cacheFeedback by remember { mutableStateOf<String?>(null) }
@@ -111,13 +118,14 @@ fun JarvisSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SettingsBg)
+            .background(jarvisScreenBackground(palette))
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(palette.topBarBg)
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -125,13 +133,13 @@ fun JarvisSettingsScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Назад",
-                    tint = SettingsText,
+                    tint = palette.textPrimary,
                 )
             }
             Spacer(Modifier.width(4.dp))
             Text(
                 text = "Настройки",
-                color = SettingsText,
+                color = palette.textPrimary,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -146,8 +154,9 @@ fun JarvisSettingsScreen(
             if (showBanner) {
                 item(key = "assistant_banner") {
                     Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = SettingsCardBg,
+                        shape = jarvisTileShape(palette, 16.dp),
+                        color = palette.tileBg,
+                        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.55f)),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
@@ -159,14 +168,14 @@ fun JarvisSettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                tint = SettingsMuted,
+                                tint = palette.primaryAccent,
                                 modifier = Modifier.size(20.dp),
                             )
                             Spacer(Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Назначьте Jarvis Ai системным помощником Android для быстрого вызова кнопкой питания или жестом.",
-                                    color = SettingsText,
+                                    color = palette.textPrimary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 TextButton(
@@ -177,18 +186,18 @@ fun JarvisSettingsScreen(
                                         )
                                     },
                                 ) {
-                                    Text("Включить", color = SettingsCyan, fontWeight = FontWeight.SemiBold)
+                                    Text("Включить", color = palette.primaryAccent, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                             TextButton(onClick = { showBanner = false }) {
-                                Text("×", color = SettingsMuted)
+                                Text("×", color = palette.textSecondary)
                             }
                         }
                     }
                 }
             }
 
-            // Section 1: Activation & Voice (each row is its own LazyColumn item)
+            // Section 1: Activation & Voice
             item(key = "hdr_activation") {
                 SectionHeader("Настройки активации и голоса")
             }
@@ -203,7 +212,7 @@ fun JarvisSettingsScreen(
             item(key = "row_voice_mute") {
                 SettingsSwitchRow(
                     title = "Озвучивать ответы голосом",
-                    subtitle = "Локальный голос Piper TTS на русском языке.",
+                    subtitle = "Потоковый локальный голос Piper TTS на русском языке.",
                     checked = !muted,
                     onCheckedChange = { enabled -> onToggleMuted(!enabled) },
                 )
@@ -273,7 +282,7 @@ fun JarvisSettingsScreen(
                             ) {
                                 Text(
                                     text = "ASR: ${if (stackStatus.asrReady) "готов (офлайн)" else "не скачан"} • Silero VAD: ${if (stackStatus.vadReady) "готов" else "не скачан"}",
-                                    color = if (stackStatus.asrReady) SettingsGreen else SettingsMuted,
+                                    color = if (stackStatus.asrReady) palette.successAccent else palette.textSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 OutlinedButton(onClick = { onNavigateSection(JarvisSection.MODELS) }) {
@@ -304,7 +313,7 @@ fun JarvisSettingsScreen(
                 )
             }
 
-            // Section 2: AI Models & Engines (collapsed by default, each child link is an independent item when expanded)
+            // Section 2: AI Models & Engines
             item(key = "hdr_models") {
                 SectionHeader("Модели ИИ и движки")
             }
@@ -334,7 +343,7 @@ fun JarvisSettingsScreen(
                 item(key = "row_models_import") {
                     SettingsLinkRow(
                         title = "Импортировать свой .gguf с телефона",
-                        valueText = "Файл",
+                        valueText = "Файл / ZIP",
                         onClick = onImportCustomGguf,
                     )
                 }
@@ -371,9 +380,135 @@ fun JarvisSettingsScreen(
                 }
             }
 
-            // Section 3: Memory, Documents & Privacy
+            // Section 3: Appearance & Iron Man Themes (collapsed by default so smoke scroll stays intact)
+            item(key = "hdr_appearance") {
+                SectionHeader("Темы (Железный человек) и шрифт")
+            }
+            item(key = "row_appearance_group") {
+                CollapsibleRowHeader(
+                    title = "Оформление, темы HUD и типографика",
+                    summary = "${appearance.theme.title} • ${appearance.fontStyle.title}",
+                    expanded = appearanceExpanded,
+                    onClick = { appearanceExpanded = !appearanceExpanded },
+                )
+            }
+            if (appearanceExpanded) {
+                item(key = "row_appearance_body") {
+                    RowCard {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Palette, contentDescription = null, tint = palette.primaryAccent, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Выберите тему оформления", color = palette.textPrimary, fontWeight = FontWeight.SemiBold)
+                            }
+                            JarvisThemePreset.entries.chunked(2).forEach { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    pair.forEach { preset ->
+                                        val preview = paletteForTheme(preset)
+                                        val active = appearance.theme == preset
+                                        Surface(
+                                            onClick = { onUpdateAppearance(appearance.copy(theme = preset)) },
+                                            shape = jarvisTileShape(preview, 12.dp),
+                                            color = Color.Transparent,
+                                            border = BorderStroke(
+                                                width = if (active) 2.dp else 1.dp,
+                                                color = if (active) preview.primaryAccent else preview.tileBorder.copy(alpha = 0.45f),
+                                            ),
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .background(Brush.verticalGradient(colors = listOf(preview.bgMid, preview.bgTop)))
+                                                    .padding(10.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Box(Modifier.size(10.dp).clip(CircleShape).background(preview.primaryAccent))
+                                                        Box(Modifier.size(10.dp).clip(CircleShape).background(preview.secondaryAccent))
+                                                    }
+                                                    if (active) {
+                                                        Text("✓", color = preview.primaryAccent, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                Text(
+                                                    text = preset.title,
+                                                    color = preview.textPrimary,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    text = preset.subtitle,
+                                                    color = preview.textSecondary,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (pair.size == 1) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+
+                            Text("Шрифт интерфейса:", color = palette.textSecondary, style = MaterialTheme.typography.labelSmall)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                JarvisFontStyle.entries.forEach { fontStyle ->
+                                    FilterChip(
+                                        selected = appearance.fontStyle == fontStyle,
+                                        onClick = { onUpdateAppearance(appearance.copy(fontStyle = fontStyle)) },
+                                        label = { Text(fontStyle.title) },
+                                    )
+                                }
+                            }
+
+                            Text("Размер текста:", color = palette.textSecondary, style = MaterialTheme.typography.labelSmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(0.92f to "Компактно", 1.00f to "Стандарт", 1.12f to "Крупнее").forEach { (sc, lbl) ->
+                                    FilterChip(
+                                        selected = kotlin.math.abs(appearance.fontScale - sc) < 0.03f,
+                                        onClick = { onUpdateAppearance(appearance.copy(fontScale = sc)) },
+                                        label = { Text(lbl) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section 4: Web Tools, Memory, Documents & Privacy
             item(key = "hdr_memory") {
-                SectionHeader("Память, документы и приватность")
+                SectionHeader("Инструменты сети, память и документы")
+            }
+            item(key = "row_web_tools") {
+                SettingsSwitchRow(
+                    title = "Веб-поиск и чтение ссылок (бесплатно)",
+                    subtitle = "Позволяет Джарвису искать свежие факты в сети и читать URL при наличии интернета (без API-ключей).",
+                    checked = webToolsEnabled,
+                    onCheckedChange = onToggleWebTools,
+                )
             }
             item(key = "row_memory_pause") {
                 SettingsSwitchRow(
@@ -398,7 +533,7 @@ fun JarvisSettingsScreen(
                 )
             }
 
-            // Section 4: System & About
+            // Section 5: System & About
             item(key = "hdr_other") {
                 SectionHeader("Другое")
             }
@@ -416,8 +551,9 @@ fun JarvisSettingsScreen(
                         currentCacheBytes = 0L
                         cacheFeedback = "Очищено %.2f МБ".format(Locale("ru", "RU"), freed / (1024f * 1024f))
                     },
-                    shape = RoundedCornerShape(16.dp),
-                    color = SettingsCardBg,
+                    shape = jarvisTileShape(palette, 14.dp),
+                    color = palette.tileBg,
+                    border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.35f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
@@ -428,14 +564,14 @@ fun JarvisSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Кэш приложения", color = SettingsText, style = MaterialTheme.typography.bodyLarge)
+                            Text("Кэш приложения", color = palette.textPrimary, style = MaterialTheme.typography.bodyLarge)
                             Text(
                                 text = cacheFeedback ?: "%.2f МБ".format(Locale("ru", "RU"), currentCacheBytes / (1024f * 1024f)),
-                                color = SettingsMuted,
+                                color = palette.textSecondary,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                        Text("Очистить", color = SettingsCyan, style = MaterialTheme.typography.labelLarge)
+                        Text("Очистить", color = palette.primaryAccent, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -450,7 +586,7 @@ fun JarvisSettingsScreen(
                             standaloneCard = false,
                         )
                         if (aboutExpanded) {
-                            HorizontalDivider(color = SettingsDivider, modifier = Modifier.padding(horizontal = 14.dp))
+                            HorizontalDivider(color = palette.tileBorder.copy(alpha = 0.35f), modifier = Modifier.padding(horizontal = 14.dp))
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -459,17 +595,17 @@ fun JarvisSettingsScreen(
                             ) {
                                 Text(
                                     text = "Версия: ${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE})",
-                                    color = SettingsText,
+                                    color = palette.textPrimary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
                                     text = "libjarvis_llama.so: ${if (LlamaNativeBridge.isNativeLibraryLoaded) "активна" else "не загружена"}",
-                                    color = if (LlamaNativeBridge.isNativeLibraryLoaded) SettingsGreen else SettingsMuted,
+                                    color = if (LlamaNativeBridge.isNativeLibraryLoaded) palette.successAccent else palette.textSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
                                     text = "Полная автономная версия Jarvis Ai без рекламы, ограничений и платных подписок.",
-                                    color = SettingsMuted,
+                                    color = palette.textSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -485,9 +621,11 @@ fun JarvisSettingsScreen(
 
 @Composable
 private fun RowCard(content: @Composable () -> Unit) {
+    val palette = LocalJarvisPalette.current
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = SettingsCardBg,
+        shape = jarvisTileShape(palette, 14.dp),
+        color = palette.tileBg,
+        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         content()
@@ -496,10 +634,12 @@ private fun RowCard(content: @Composable () -> Unit) {
 
 @Composable
 private fun SectionHeader(title: String) {
+    val palette = LocalJarvisPalette.current
     Text(
         text = title,
-        color = SettingsMuted,
+        color = palette.primaryAccent.copy(alpha = 0.90f),
         style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 2.dp),
     )
 }
@@ -511,10 +651,12 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val palette = LocalJarvisPalette.current
     Surface(
         onClick = { onCheckedChange(!checked) },
-        shape = RoundedCornerShape(16.dp),
-        color = SettingsCardBg,
+        shape = jarvisTileShape(palette, 14.dp),
+        color = palette.tileBg,
+        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -525,9 +667,9 @@ private fun SettingsSwitchRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                Text(title, color = SettingsText, style = MaterialTheme.typography.bodyLarge)
+                Text(title, color = palette.textPrimary, style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(2.dp))
-                Text(subtitle, color = SettingsMuted, style = MaterialTheme.typography.bodySmall)
+                Text(subtitle, color = palette.textSecondary, style = MaterialTheme.typography.bodySmall)
             }
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
@@ -540,10 +682,12 @@ private fun SettingsLinkRow(
     valueText: String,
     onClick: () -> Unit,
 ) {
+    val palette = LocalJarvisPalette.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = SettingsCardBg,
+        shape = jarvisTileShape(palette, 14.dp),
+        color = palette.tileBg,
+        border = BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -555,7 +699,7 @@ private fun SettingsLinkRow(
         ) {
             Text(
                 text = title,
-                color = SettingsText,
+                color = palette.textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
@@ -563,7 +707,7 @@ private fun SettingsLinkRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = valueText,
-                    color = SettingsMuted,
+                    color = palette.textSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -571,7 +715,7 @@ private fun SettingsLinkRow(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = SettingsMuted,
+                    tint = palette.textSecondary,
                 )
             }
         }
@@ -586,10 +730,12 @@ private fun CollapsibleRowHeader(
     onClick: () -> Unit,
     standaloneCard: Boolean = true,
 ) {
+    val palette = LocalJarvisPalette.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (standaloneCard) SettingsCardBg else Color.Transparent,
+        shape = jarvisTileShape(palette, 14.dp),
+        color = if (standaloneCard) palette.tileBg else Color.Transparent,
+        border = if (standaloneCard) BorderStroke(1.dp, palette.tileBorder.copy(alpha = 0.38f)) else null,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -601,7 +747,7 @@ private fun CollapsibleRowHeader(
         ) {
             Text(
                 text = title,
-                color = SettingsText,
+                color = palette.textPrimary,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f),
             )
@@ -609,7 +755,7 @@ private fun CollapsibleRowHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = summary,
-                    color = SettingsMuted,
+                    color = palette.textSecondary,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -618,7 +764,7 @@ private fun CollapsibleRowHeader(
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = null,
-                    tint = SettingsMuted,
+                    tint = palette.textSecondary,
                 )
             }
         }

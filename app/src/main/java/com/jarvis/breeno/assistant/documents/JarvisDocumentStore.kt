@@ -118,6 +118,62 @@ class JarvisDocumentStore(context: Context) {
         }
     }
 
+    suspend fun addTextNote(
+        title: String,
+        rawText: String,
+    ): Result<IndexedDocument> = withContext(Dispatchers.IO) {
+        runCatching {
+            val cleanText = rawText.trim()
+            check(cleanText.length >= 4) { "Текст заметки слишком короткий" }
+            val utf8Bytes = cleanText.toByteArray(Charsets.UTF_8)
+            check(utf8Bytes.size <= MAX_FILE_BYTES) { "Заметка превышает 4 МБ" }
+            val cleanName = title.trim().ifBlank { "Заметка ${listDocuments().size + 1}" } + ".txt"
+            val chunks = chunkDocumentText(cleanText)
+            check(chunks.isNotEmpty()) { "Не удалось разбить заметку на фрагменты" }
+
+            val doc = IndexedDocument(
+                id = "note_${UUID.randomUUID().toString().take(10)}",
+                name = cleanName,
+                mimeType = "text/plain",
+                sizeBytes = utf8Bytes.size.toLong(),
+                chunkCount = chunks.size,
+                importedAt = System.currentTimeMillis(),
+            )
+            val db = dbHelper.writableDatabase
+            db.beginTransaction()
+            try {
+                db.insertOrThrow(
+                    "documents",
+                    null,
+                    ContentValues().apply {
+                        put("id", doc.id)
+                        put("name", doc.name)
+                        put("mime_type", doc.mimeType)
+                        put("size_bytes", doc.sizeBytes)
+                        put("chunk_count", doc.chunkCount)
+                        put("imported_at", doc.importedAt)
+                    },
+                )
+                chunks.forEachIndexed { idx, chunk ->
+                    db.insertOrThrow(
+                        "chunks",
+                        null,
+                        ContentValues().apply {
+                            put("doc_id", doc.id)
+                            put("doc_name", doc.name)
+                            put("chunk_index", idx)
+                            put("content", chunk)
+                        },
+                    )
+                }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            doc
+        }
+    }
+
     fun listDocuments(): List<IndexedDocument> {
         val db = dbHelper.readableDatabase
         val out = mutableListOf<IndexedDocument>()

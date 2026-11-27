@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +47,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,16 +64,14 @@ import com.jarvis.breeno.assistant.media.JarvisMediaGenerator
 import com.jarvis.breeno.assistant.media.MediaGenConfigStore
 import com.jarvis.breeno.assistant.savevideo.SaveVideoManager
 import com.jarvis.breeno.assistant.ui.theme.JarvisTheme
+import com.jarvis.breeno.assistant.ui.theme.LocalJarvisPalette
+import com.jarvis.breeno.assistant.ui.theme.jarvisScreenBackground
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-
-private val RootBackground = Color(0xFF0A0D14)
-private val TopHeaderBg = Color(0xFF10141D)
-private val HeaderText = Color(0xFFF3F6FA)
 
 class MainActivity : ComponentActivity() {
     private lateinit var jarvisApp: JarvisApp
@@ -198,7 +196,12 @@ class MainActivity : ComponentActivity() {
         refreshTelemetry()
         refreshDialogueFeed()
 
-        setContent { JarvisTheme { JarvisAppRoot() } }
+        setContent {
+            val appearance by runtime.appearance.collectAsState()
+            JarvisTheme(appearance = appearance) {
+                JarvisAppRoot()
+            }
+        }
     }
 
     override fun onResume() {
@@ -329,6 +332,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun regenerateLastReply() {
+        if (listeningJob != null) return
+        listeningJob = lifecycleScope.launch {
+            try {
+                orbModeSink?.invoke(JarvisOrbMode.THINKING)
+                busySink?.invoke(true)
+                replySink?.invoke("Повторная генерация ответа…")
+                runtime.regenerateLastReply(
+                    onProgress = { status -> runOnUiThread { statusSink?.invoke(status) } },
+                    onTokenStream = { partial -> runOnUiThread { replySink?.invoke(partial) } },
+                )
+                refreshDialogueFeed()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                val msg = error.message ?: error.javaClass.simpleName
+                orbModeSink?.invoke(JarvisOrbMode.ERROR)
+                statusSink?.invoke("Ошибка: $msg")
+            } finally {
+                runOnUiThread {
+                    busySink?.invoke(false)
+                    replySink?.invoke(null)
+                }
+                listeningJob = null
+            }
+        }
+    }
+
+    private fun shareActiveDialogue() {
+        val md = runtime.exportActiveDialogueMarkdown()
+        if (md.isBlank()) return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Диалог с Jarvis Ai")
+            putExtra(Intent.EXTRA_TEXT, md)
+        }
+        runCatching {
+            startActivity(Intent.createChooser(send, "Поделиться диалогом"))
+        }
+    }
+
     private fun stopListening() {
         pendingListen = false
         modelCheckJob?.cancel()
@@ -405,6 +449,9 @@ class MainActivity : ComponentActivity() {
         val indexedDocuments by runtime.documents.collectAsState()
         val mcpServers by runtime.mcpServers.collectAsState()
         val generationWarning by runtime.generationWarning.collectAsState()
+        val appearance by runtime.appearance.collectAsState()
+        val webToolsEnabled by runtime.webToolsEnabled.collectAsState()
+        val palette = LocalJarvisPalette.current
 
         val saveVideoTasks by saveVideoManager.tasks.collectAsState()
         val studioItems by mediaGenerator.items.collectAsState()
@@ -508,7 +555,8 @@ class MainActivity : ComponentActivity() {
                         value.startsWith("Сегодня ") ||
                         value.startsWith("Вот что") ||
                         value.startsWith("Память ") ||
-                        value.startsWith("Свободно ")
+                        value.startsWith("Свободно ") ||
+                        value.startsWith("Найдено в сети")
                     )
             }
             onDispose {
@@ -588,7 +636,7 @@ class MainActivity : ComponentActivity() {
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = RootBackground,
+                color = palette.bgBottom,
             ) {
                 when (currentSection) {
                     JarvisSection.HOME -> JarvisHomeScreen(
@@ -629,6 +677,8 @@ class MainActivity : ComponentActivity() {
                         onOpenSettings = { navigateTo(JarvisSection.SETTINGS) },
                         onAttachDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
                         onOpenSection = { sec -> navigateTo(sec) },
+                        onRegenerateLast = { regenerateLastReply() },
+                        onExportDialogue = { shareActiveDialogue() },
                     )
 
                     JarvisSection.SETTINGS -> JarvisSettingsScreen(
@@ -654,183 +704,195 @@ class MainActivity : ComponentActivity() {
                         onClearCache = { runtime.clearAppCache() },
                         onNavigateSection = { sec -> navigateTo(sec) },
                         onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
+                        appearance = appearance,
+                        onUpdateAppearance = { next -> runtime.updateAppearance(next) },
+                        webToolsEnabled = webToolsEnabled,
+                        onToggleWebTools = { enabled -> runtime.setWebToolsEnabled(enabled) },
                     )
 
-                    else -> Column(
+                    else -> Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(RootBackground)
-                            .statusBarsPadding()
-                            .navigationBarsPadding(),
+                            .background(jarvisScreenBackground(palette)),
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(TopHeaderBg)
-                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding(),
                         ) {
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(palette.topBarBg)
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f),
                             ) {
-                                IconButton(onClick = {
-                                    if (currentSection == JarvisSection.MODELS) {
-                                        navigateTo(JarvisSection.SETTINGS)
-                                    } else {
-                                        navigateTo(JarvisSection.HOME)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    IconButton(onClick = {
+                                        if (currentSection == JarvisSection.MODELS) {
+                                            navigateTo(JarvisSection.SETTINGS)
+                                        } else {
+                                            navigateTo(JarvisSection.HOME)
+                                        }
+                                    }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = palette.textPrimary)
                                     }
-                                }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = HeaderText)
+                                    IconButton(onClick = { uiScope.launch { drawerState.open() } }) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Меню возможностей", tint = palette.textPrimary)
+                                    }
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = currentSection.title,
+                                        color = palette.textPrimary,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
-                                IconButton(onClick = { uiScope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Меню возможностей", tint = HeaderText)
+                                IconButton(onClick = { navigateTo(JarvisSection.SETTINGS) }) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = palette.textPrimary)
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = currentSection.title,
-                                    color = HeaderText,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                            }
+
+                            when (currentSection) {
+                                JarvisSection.DOCUMENTS -> DocumentsScreen(
+                                    documents = indexedDocuments,
+                                    onImportDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
+                                    onDeleteDocument = { docId ->
+                                        lifecycleScope.launch(Dispatchers.IO) { runtime.deleteDocument(docId) }
+                                    },
+                                    onSearchDocuments = { q -> runtime.documentStore.searchMatches(q, limit = 5) },
+                                    onAddTextNote = { title, body -> runtime.addTextDocumentNote(title, body) },
+                                    modifier = Modifier.weight(1f),
                                 )
-                            }
-                            IconButton(onClick = { navigateTo(JarvisSection.SETTINGS) }) {
-                                Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = HeaderText)
-                            }
-                        }
 
-                        when (currentSection) {
-                            JarvisSection.DOCUMENTS -> DocumentsScreen(
-                                documents = indexedDocuments,
-                                onImportDocument = { importRagDocumentLauncher.launch(arrayOf("*/*")) },
-                                onDeleteDocument = { docId ->
-                                    lifecycleScope.launch(Dispatchers.IO) { runtime.deleteDocument(docId) }
-                                },
-                                onSearchDocuments = { q -> runtime.documentStore.searchMatches(q, limit = 5) },
-                                modifier = Modifier.weight(1f),
-                            )
+                                JarvisSection.STUDIO -> MediaStudioScreen(
+                                    items = studioItems,
+                                    initialConfig = mediaGenerator.currentConfig(),
+                                    pendingPromptRequest = pendingStudioRequest,
+                                    onClearPendingRequest = { pendingStudioRequest = null },
+                                    onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
+                                    onGenerateVideo = { p, s, w, h, mp, cb -> mediaGenerator.generateVideo(p, s, w, h, mp, cb) },
+                                    onOpenItem = { item -> openGeneratedMedia(item) },
+                                    onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
+                                    onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.STUDIO -> MediaStudioScreen(
-                                items = studioItems,
-                                initialConfig = mediaGenerator.currentConfig(),
-                                pendingPromptRequest = pendingStudioRequest,
-                                onClearPendingRequest = { pendingStudioRequest = null },
-                                onGenerateImage = { p, s, w, h, cb -> mediaGenerator.generateImage(p, s, w, h, cb) },
-                                onGenerateVideo = { p, s, w, h, mp, cb -> mediaGenerator.generateVideo(p, s, w, h, mp, cb) },
-                                onOpenItem = { item -> openGeneratedMedia(item) },
-                                onDeleteItem = { id -> mediaGenerator.deleteItem(id) },
-                                onSaveConfig = { cfg -> mediaGenerator.saveConfig(cfg) },
-                                modifier = Modifier.weight(1f),
-                            )
+                                JarvisSection.SAVE_VIDEO -> SaveVideoScreen(
+                                    tasks = saveVideoTasks,
+                                    onInspect = { url -> saveVideoManager.inspectMetadata(url) },
+                                    onEnqueue = { url, quality -> saveVideoManager.enqueue(url, quality) },
+                                    onCancel = { id -> saveVideoManager.cancelTask(id) },
+                                    onRetry = { id -> saveVideoManager.startTask(id) },
+                                    onDelete = { id -> saveVideoManager.deleteTask(id) },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.SAVE_VIDEO -> SaveVideoScreen(
-                                tasks = saveVideoTasks,
-                                onInspect = { url -> saveVideoManager.inspectMetadata(url) },
-                                onEnqueue = { url, quality -> saveVideoManager.enqueue(url, quality) },
-                                onCancel = { id -> saveVideoManager.cancelTask(id) },
-                                onRetry = { id -> saveVideoManager.startTask(id) },
-                                onDelete = { id -> saveVideoManager.deleteTask(id) },
-                                modifier = Modifier.weight(1f),
-                            )
+                                JarvisSection.MEMORY -> MemoryManagerScreen(
+                                    facts = memoryFacts,
+                                    memoryPaused = memoryPaused,
+                                    lastDeletedFact = lastDeletedFact,
+                                    onTogglePaused = { paused ->
+                                        lifecycleScope.launch(Dispatchers.IO) { runtime.setMemoryPaused(paused) }
+                                    },
+                                    onAddFact = { key, content -> runtime.addMemoryFact(key, content) },
+                                    onDeleteFact = { id ->
+                                        lifecycleScope.launch(Dispatchers.IO) { runtime.deleteMemoryFact(id) }
+                                    },
+                                    onUndoDelete = {
+                                        lifecycleScope.launch(Dispatchers.IO) { runtime.undoDeleteMemoryFact() }
+                                    },
+                                    onDismissUndo = { runtime.clearLastDeletedFact() },
+                                    onExportJson = { runtime.exportMemoryJson() },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.MEMORY -> MemoryManagerScreen(
-                                facts = memoryFacts,
-                                memoryPaused = memoryPaused,
-                                lastDeletedFact = lastDeletedFact,
-                                onTogglePaused = { paused ->
-                                    lifecycleScope.launch(Dispatchers.IO) { runtime.setMemoryPaused(paused) }
-                                },
-                                onAddFact = { key, content -> runtime.addMemoryFact(key, content) },
-                                onDeleteFact = { id ->
-                                    lifecycleScope.launch(Dispatchers.IO) { runtime.deleteMemoryFact(id) }
-                                },
-                                onUndoDelete = {
-                                    lifecycleScope.launch(Dispatchers.IO) { runtime.undoDeleteMemoryFact() }
-                                },
-                                onDismissUndo = { runtime.clearLastDeletedFact() },
-                                onExportJson = { runtime.exportMemoryJson() },
-                                modifier = Modifier.weight(1f),
-                            )
+                                JarvisSection.TOOLS_MCP -> ToolsAndMcpScreen(
+                                    servers = mcpServers,
+                                    onSaveServers = { updated ->
+                                        lifecycleScope.launch(Dispatchers.IO) { runtime.saveMcpServers(updated) }
+                                    },
+                                    onExecutePhoneAction = { action -> runtime.executePhoneAction(action) },
+                                    onGetDeviceDiagnostics = { runtime.deviceDiagnosticsText() },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.TOOLS_MCP -> ToolsAndMcpScreen(
-                                servers = mcpServers,
-                                onSaveServers = { updated ->
-                                    lifecycleScope.launch(Dispatchers.IO) { runtime.saveMcpServers(updated) }
-                                },
-                                onExecutePhoneAction = { action -> runtime.executePhoneAction(action) },
-                                modifier = Modifier.weight(1f),
-                            )
+                                JarvisSection.CONTROL -> ControlCenterScreen(
+                                    snapshot = controlSnapshot,
+                                    onRefreshTelemetry = { refreshTelemetry() },
+                                    onClearEvents = { controlCenter.clearEvents() },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.CONTROL -> ControlCenterScreen(
-                                snapshot = controlSnapshot,
-                                onRefreshTelemetry = { refreshTelemetry() },
-                                onClearEvents = { controlCenter.clearEvents() },
-                                modifier = Modifier.weight(1f),
-                            )
-
-                            JarvisSection.MODELS -> AiModelsScreen(
-                                status = stackStatus,
-                                downloadState = downloadState,
-                                llmCatalog = stackStatus.allLlmPacks,
-                                voiceCatalog = runtime.ttsModels.catalog(),
-                                onDownloadStarterBundle = {
-                                    jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
-                                        runtime.downloadOfflineStarterBundle { stage, pct -> update(stage, pct) }
-                                    }
-                                },
-                                onDownloadAsr = {
-                                    jarvisApp.downloads.start("Русский слух (ASR)") { update ->
-                                        runtime.downloadAsr { pct -> update(null, pct) }
-                                    }
-                                },
-                                onDownloadVad = {
-                                    jarvisApp.downloads.start("Silero VAD") { update ->
-                                        runtime.downloadVad { pct -> update(null, pct) }
-                                    }
-                                },
-                                onDownloadVoice = { id ->
-                                    val title = runtime.ttsModels.findVoice(id)?.title ?: id
-                                    jarvisApp.downloads.start(title) { update ->
-                                        runtime.downloadTtsVoice(id) { pct -> update(null, pct) }
-                                    }
-                                },
-                                onCancelDownload = { jarvisApp.downloads.cancel() },
-                                onSelectVoice = { id -> runtime.selectTtsVoice(id) },
-                                onSetSpeechSpeed = { speed -> runtime.setSpeechSpeed(speed) },
-                                onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
-                                onTestVoice = { runtime.testRussianVoice() },
-                                onDownloadLlm = { id ->
-                                    val title = runtime.llmModels.findPack(id)?.title ?: id
-                                    jarvisApp.downloads.start(title) { update ->
-                                        runtime.downloadLlmPack(id) { pct, dl, total ->
-                                            val dlMb = dl / (1024 * 1024)
-                                            val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
-                                            update("$title: $dlMb/$totalMb МБ ($pct%)", pct)
+                                JarvisSection.MODELS -> AiModelsScreen(
+                                    status = stackStatus,
+                                    downloadState = downloadState,
+                                    llmCatalog = stackStatus.allLlmPacks,
+                                    voiceCatalog = runtime.ttsModels.catalog(),
+                                    onDownloadStarterBundle = {
+                                        jarvisApp.downloads.start("Базовый офлайн-набор") { update ->
+                                            runtime.downloadOfflineStarterBundle { stage, pct -> update(stage, pct) }
                                         }
-                                    }
-                                },
-                                onSelectLlm = { id -> runtime.selectLlmPack(id) },
-                                onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
-                                onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
-                                onSelectPersona = { persona -> runtime.selectPersona(persona) },
-                                onSelectPromptTemplate = { fmt -> runtime.selectPromptTemplate(fmt) },
-                                onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
-                                onDownloadHfGguf = { url, fileName, sizeBytes ->
-                                    jarvisApp.downloads.start(fileName) { update ->
-                                        runtime.downloadCustomHfGguf(url, fileName, sizeBytes) { pct, dl, total ->
-                                            val dlMb = dl / (1024 * 1024)
-                                            val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
-                                            update("$fileName: $dlMb/$totalMb МБ ($pct%)", pct)
+                                    },
+                                    onDownloadAsr = {
+                                        jarvisApp.downloads.start("Русский слух (ASR)") { update ->
+                                            runtime.downloadAsr { pct -> update(null, pct) }
                                         }
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
+                                    },
+                                    onDownloadVad = {
+                                        jarvisApp.downloads.start("Silero VAD") { update ->
+                                            runtime.downloadVad { pct -> update(null, pct) }
+                                        }
+                                    },
+                                    onDownloadVoice = { id ->
+                                        val title = runtime.ttsModels.findVoice(id)?.title ?: id
+                                        jarvisApp.downloads.start(title) { update ->
+                                            runtime.downloadTtsVoice(id) { pct -> update(null, pct) }
+                                        }
+                                    },
+                                    onCancelDownload = { jarvisApp.downloads.cancel() },
+                                    onSelectVoice = { id -> runtime.selectTtsVoice(id) },
+                                    onSetSpeechSpeed = { speed -> runtime.setSpeechSpeed(speed) },
+                                    onDeleteVoice = { id -> runtime.deleteTtsVoice(id) },
+                                    onTestVoice = { runtime.testRussianVoice() },
+                                    onDownloadLlm = { id ->
+                                        val title = runtime.llmModels.findPack(id)?.title ?: id
+                                        jarvisApp.downloads.start(title) { update ->
+                                            runtime.downloadLlmPack(id) { pct, dl, total ->
+                                                val dlMb = dl / (1024 * 1024)
+                                                val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
+                                                update("$title: $dlMb/$totalMb МБ ($pct%)", pct)
+                                            }
+                                        }
+                                    },
+                                    onSelectLlm = { id -> runtime.selectLlmPack(id) },
+                                    onDeleteLlm = { id -> runtime.deleteLlmPack(id) },
+                                    onImportCustomGguf = { importGgufLauncher.launch(arrayOf("*/*")) },
+                                    onSelectPersona = { persona -> runtime.selectPersona(persona) },
+                                    onSelectPromptTemplate = { fmt -> runtime.selectPromptTemplate(fmt) },
+                                    onSaveExternalAi = { cfg -> runtime.saveExternalAiConfig(cfg) },
+                                    onDownloadHfGguf = { url, fileName, sizeBytes ->
+                                        jarvisApp.downloads.start(fileName) { update ->
+                                            runtime.downloadCustomHfGguf(url, fileName, sizeBytes) { pct, dl, total ->
+                                                val dlMb = dl / (1024 * 1024)
+                                                val totalMb = (total / (1024 * 1024)).coerceAtLeast(1)
+                                                update("$fileName: $dlMb/$totalMb МБ ($pct%)", pct)
+                                            }
+                                        }
+                                    },
+                                    onSaveGenerationSettings = { gen -> runtime.saveGenerationSettings(gen) },
+                                    modifier = Modifier.weight(1f),
+                                )
 
-                            JarvisSection.HOME, JarvisSection.SETTINGS -> Unit
+                                JarvisSection.HOME, JarvisSection.SETTINGS -> Unit
+                            }
                         }
                     }
                 }
